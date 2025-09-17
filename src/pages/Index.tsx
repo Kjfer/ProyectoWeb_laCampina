@@ -6,9 +6,39 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { UpcomingClasses } from "@/components/dashboard/UpcomingClasses";
 import { BookOpen, FileText, GraduationCap, TrendingUp } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import heroImage from "@/assets/hero-education.jpg";
 
 const Index = () => {
+  const { profile } = useAuth();
+
+  const getWelcomeMessage = () => {
+    const name = profile ? profile.first_name : 'Usuario';
+    switch (profile?.role) {
+      case 'teacher':
+        return `¡Bienvenido, Prof. ${name}!`;
+      case 'admin':
+        return `¡Bienvenido, ${name}!`;
+      case 'parent':
+        return `¡Bienvenido, ${name}!`;
+      default:
+        return `¡Bienvenido, ${name}!`;
+    }
+  };
+
+  const getSubtitle = () => {
+    switch (profile?.role) {
+      case 'teacher':
+        return 'Portal Docente - IE La Campiña';
+      case 'admin':
+        return 'Panel de Administración - IE La Campiña';
+      case 'parent':
+        return 'Portal de Padres - IE La Campiña';
+      default:
+        return 'Aula Virtual - IE La Campiña';
+    }
+  };
+
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full bg-background">
@@ -31,12 +61,19 @@ const Index = () => {
                 <div className="flex items-center gap-3 mb-4">
                   <GraduationCap className="w-8 h-8" />
                   <div>
-                    <h1 className="text-2xl font-bold">¡Bienvenido, Juan!</h1>
-                    <p className="text-white/90">Institución Educativa La Campiña - Aula Virtual</p>
+                    <h1 className="text-2xl font-bold">{getWelcomeMessage()}</h1>
+                    <p className="text-white/90">{getSubtitle()}</p>
                   </div>
                 </div>
                 <p className="text-lg text-white/90 max-w-2xl">
-                  Accede a tus cursos, completa tus tareas y mantente conectado con tu educación desde cualquier lugar.
+                  {profile?.role === 'teacher' 
+                    ? 'Gestiona tus cursos, evalúa a tus estudiantes y mantente conectado con la comunidad educativa.'
+                    : profile?.role === 'admin'
+                    ? 'Administra la plataforma educativa y supervisa el progreso académico institucional.'
+                    : profile?.role === 'parent'
+                    ? 'Mantente informado sobre el progreso académico de tus hijos y la vida escolar.'
+                    : 'Accede a tus cursos, completa tus tareas y mantente conectado con tu educación desde cualquier lugar.'
+                  }
                 </p>
               </div>
             </div>

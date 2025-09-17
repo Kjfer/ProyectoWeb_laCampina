@@ -7,9 +7,12 @@ import {
   MessageSquare, 
   Settings, 
   Users,
-  Library
+  Library,
+  ClipboardList,
+  Brain,
+  HelpCircle
 } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import {
   Sidebar,
@@ -25,15 +28,18 @@ import {
 
 const mainItems = [
   { title: "Dashboard", url: "/", icon: Home },
-  { title: "Mis Cursos", url: "/cursos", icon: BookOpen },
-  { title: "Tareas", url: "/tareas", icon: FileText },
-  { title: "Calendario", url: "/calendario", icon: Calendar },
+  { title: "Cursos", url: "/courses", icon: BookOpen },
+  { title: "Tareas", url: "/assignments", icon: FileText },
+  { title: "Exámenes", url: "/exams", icon: ClipboardList },
+  { title: "Calendario", url: "/calendar", icon: Calendar },
 ];
 
 const resourceItems = [
-  { title: "Biblioteca", url: "/biblioteca", icon: Library },
-  { title: "Mensajes", url: "/mensajes", icon: MessageSquare },
-  { title: "Compañeros", url: "/compañeros", icon: Users },
+  { title: "Biblioteca", url: "/library", icon: Library },
+  { title: "Mensajes", url: "/messages", icon: MessageSquare },
+  { title: "Compañeros", url: "/classmates", icon: Users },
+  { title: "Juegos Mentales", url: "/mental-games", icon: Brain },
+  { title: "Soporte", url: "/support", icon: HelpCircle },
 ];
 
 export function AppSidebar() {
@@ -77,11 +83,11 @@ export function AppSidebar() {
             <SidebarMenu className="space-y-1">
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavCls}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                    <Link to={item.url} className="flex items-center gap-3">
                       <item.icon className="w-4 h-4" />
                       {!collapsed && <span className="text-sm">{item.title}</span>}
-                    </NavLink>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -98,11 +104,11 @@ export function AppSidebar() {
             <SidebarMenu className="space-y-1">
               {resourceItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavCls}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                    <Link to={item.url} className="flex items-center gap-3">
                       <item.icon className="w-4 h-4" />
                       {!collapsed && <span className="text-sm">{item.title}</span>}
-                    </NavLink>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -113,10 +119,12 @@ export function AppSidebar() {
         {/* Settings */}
         {!collapsed && (
           <div className="mt-auto pt-6">
-            <NavLink to="/configuracion" className={getNavCls}>
-              <Settings className="w-4 h-4" />
-              <span className="text-sm">Configuración</span>
-            </NavLink>
+            <SidebarMenuButton asChild isActive={isActive("/settings")}>
+              <Link to="/settings" className="flex items-center gap-3">
+                <Settings className="w-4 h-4" />
+                <span className="text-sm">Configuración</span>
+              </Link>
+            </SidebarMenuButton>
           </div>
         )}
       </SidebarContent>
