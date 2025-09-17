@@ -105,9 +105,11 @@ export function Header() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border/50" />
-              <DropdownMenuItem className="hover:bg-primary/10 cursor-pointer">
-                <User className="mr-2 h-4 w-4" />
-                <span>Perfil</span>
+              <DropdownMenuItem className="hover:bg-primary/10 cursor-pointer" asChild>
+                <a href="/profile" className="flex items-center w-full">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Perfil</span>
+                </a>
               </DropdownMenuItem>
               <DropdownMenuItem className="hover:bg-primary/10 cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
