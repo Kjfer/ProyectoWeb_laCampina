@@ -279,6 +279,144 @@ export type Database = {
           },
         ]
       }
+      course_forum_posts: {
+        Row: {
+          content: string
+          created_at: string | null
+          created_by: string
+          id: string
+          parent_post_id: string | null
+          topic_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          created_by: string
+          id?: string
+          parent_post_id?: string | null
+          topic_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          parent_post_id?: string | null
+          topic_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      course_forum_topics: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          created_by: string
+          description: string | null
+          id: string
+          is_locked: boolean | null
+          is_pinned: boolean | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          id?: string
+          is_locked?: boolean | null
+          is_pinned?: boolean | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          id?: string
+          is_locked?: boolean | null
+          is_pinned?: boolean | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      course_modules: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_published: boolean | null
+          position: number
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          position?: number
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          position?: number
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      course_resources: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          file_size: number | null
+          id: string
+          is_published: boolean | null
+          module_id: string
+          position: number
+          resource_type: string
+          resource_url: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          file_size?: number | null
+          id?: string
+          is_published?: boolean | null
+          module_id: string
+          position?: number
+          resource_type: string
+          resource_url?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          file_size?: number | null
+          id?: string
+          is_published?: boolean | null
+          module_id?: string
+          position?: number
+          resource_type?: string
+          resource_url?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       courses: {
         Row: {
           academic_year: string
@@ -569,6 +707,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      student_progress: {
+        Row: {
+          completed_at: string | null
+          completion_percentage: number | null
+          course_id: string
+          id: string
+          module_id: string | null
+          progress_type: string
+          resource_id: string | null
+          student_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completion_percentage?: number | null
+          course_id: string
+          id?: string
+          module_id?: string | null
+          progress_type: string
+          resource_id?: string | null
+          student_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completion_percentage?: number | null
+          course_id?: string
+          id?: string
+          module_id?: string | null
+          progress_type?: string
+          resource_id?: string | null
+          student_id?: string
+        }
+        Relationships: []
       }
       support_tickets: {
         Row: {

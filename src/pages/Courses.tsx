@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Users, Clock, Plus } from 'lucide-react';
+import { BookOpen, Users, Clock, Plus, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Course {
@@ -24,6 +25,7 @@ interface Course {
 const Courses = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -169,14 +171,10 @@ const Courses = () => {
                   <Button 
                     className="w-full" 
                     variant="outline"
-                    onClick={() => {
-                      toast({
-                        title: "Próximamente",
-                        description: "La vista detallada del curso estará disponible pronto.",
-                      });
-                    }}
+                    onClick={() => navigate(`/courses/${course.id}`)}
                   >
                     Ver Curso
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </CardContent>
