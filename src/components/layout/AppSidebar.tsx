@@ -10,9 +10,14 @@ import {
   Library,
   ClipboardList,
   Brain,
-  HelpCircle
+  HelpCircle,
+  Shield,
+  UserCog,
+  BarChart3,
+  Database
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 import {
   Sidebar,
@@ -42,7 +47,14 @@ const resourceItems = [
   { title: "Soporte", url: "/support", icon: HelpCircle },
 ];
 
+const adminItems = [
+  { title: "Gestión de Usuarios", url: "/admin/users", icon: UserCog },
+  { title: "Reportes", url: "/admin/reports", icon: BarChart3 },
+  { title: "Sistema", url: "/admin/system", icon: Database },
+];
+
 export function AppSidebar() {
+  const { profile } = useAuth();
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
@@ -115,6 +127,34 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Admin Panel - Only for admin users */}
+        {profile?.role === 'admin' && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+              {!collapsed && (
+                <div className="flex items-center gap-2">
+                  <Shield className="w-3 h-3" />
+                  Administración
+                </div>
+              )}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-1">
+                {adminItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                      <Link to={item.url} className="flex items-center gap-3">
+                        <item.icon className="w-4 h-4" />
+                        {!collapsed && <span className="text-sm">{item.title}</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Settings */}
         {!collapsed && (
