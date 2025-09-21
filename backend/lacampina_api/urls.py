@@ -18,8 +18,17 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import JsonResponse
+
+def api_home(request):
+    return JsonResponse({
+        'message': 'La Campina API is running',
+        'status': 'success',
+        'frontend_url': 'http://localhost:5173'
+    })
 
 urlpatterns = [
+    path('', api_home, name='api_home'),  # Página principal
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.authentication.urls')),
     # path('api/profiles/', include('apps.profiles.urls')),

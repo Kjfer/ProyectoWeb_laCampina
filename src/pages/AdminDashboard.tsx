@@ -1,22 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Users, 
-  BookOpen, 
-  FileText, 
-  BarChart3, 
-  UserPlus,
-  Shield,
-  Activity,
-  TrendingUp,
-  AlertTriangle
-} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Users, BookOpen, FileText, Activity, GraduationCap, UserCheck } from 'lucide-react';
+import AdminCourseManagement from './AdminCourseManagement';
+import SimpleCourseManagement from './SimpleCourseManagement';
+import AdminStudentManagement from './AdminStudentManagement';
+import TestForm from './TestForm';
 
 interface AdminStats {
   totalUsers: number;
@@ -95,16 +89,11 @@ const AdminDashboard = () => {
   // Redirect if not admin
   if (profile?.role !== 'admin') {
     return (
-      <div className="p-6">
-        <Card className="bg-gradient-card shadow-card border-0">
-          <CardContent className="p-8 text-center">
-            <AlertTriangle className="w-16 h-16 mx-auto text-destructive mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              Acceso Denegado
-            </h3>
-            <p className="text-muted-foreground">
-              No tienes permisos para acceder al panel de administración.
-            </p>
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="p-6">
+            <h1 className="text-2xl font-bold text-red-600">Acceso Denegado</h1>
+            <p className="mt-2 text-gray-600">No tienes permisos para acceder al panel de administración.</p>
           </CardContent>
         </Card>
       </div>
@@ -127,176 +116,190 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Shield className="w-8 h-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Panel de Administración</h1>
-          <p className="text-muted-foreground">Gestión y supervisión del sistema</p>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Panel de Administración</h1>
+        <p className="mt-2 text-gray-600">
+          Gestiona usuarios, cursos y contenido de La Campiña
+        </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gradient-card shadow-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.activeUsers} activos
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-card shadow-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estudiantes</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.totalStudents}</div>
-            <p className="text-xs text-muted-foreground">
-              {Math.round((stats.totalStudents / stats.totalUsers) * 100)}% del total
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-card shadow-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Docentes</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.totalTeachers}</div>
-            <p className="text-xs text-muted-foreground">
-              {Math.round((stats.totalTeachers / stats.totalUsers) * 100)}% del total
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-card shadow-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cursos</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.totalCourses}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.totalAssignments} tareas creadas
-            </p>
-          </CardContent>
-        </Card>
+      {/* Estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {[
+          {
+            title: "Total Usuarios",
+            value: stats.totalUsers,
+            icon: Users,
+            description: "Usuarios registrados en el sistema",
+            color: "text-blue-600"
+          },
+          {
+            title: "Estudiantes",
+            value: stats.totalStudents,
+            icon: GraduationCap,
+            description: "Estudiantes activos",
+            color: "text-green-600"
+          },
+          {
+            title: "Profesores",
+            value: stats.totalTeachers,
+            icon: UserCheck,
+            description: "Profesores registrados",
+            color: "text-purple-600"
+          },
+          {
+            title: "Cursos",
+            value: stats.totalCourses,
+            icon: BookOpen,
+            description: "Cursos disponibles",
+            color: "text-indigo-600"
+          }
+        ].map((stat, index) => {
+          const IconComponent = stat.icon;
+          return (
+            <Card key={index} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">
+                  {stat.title}
+                </CardTitle>
+                <IconComponent className={`h-4 w-4 ${stat.color}`} />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stat.description}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Admin Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
+      {/* Tabs de gestión */}
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Resumen</TabsTrigger>
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
+          <TabsTrigger value="test">Prueba</TabsTrigger>
           <TabsTrigger value="courses">Cursos</TabsTrigger>
+          <TabsTrigger value="students">Estudiantes</TabsTrigger>
           <TabsTrigger value="reports">Reportes</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
+        <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-gradient-card shadow-card border-0">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-primary" />
-                  Actividad Reciente
-                </CardTitle>
+                <CardTitle>Actividad Reciente</CardTitle>
+                <CardDescription>
+                  Últimas acciones en el sistema
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Nuevos usuarios hoy</span>
-                    <Badge variant="secondary">5</Badge>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="outline">Usuario</Badge>
+                      <span className="text-sm">Nuevo estudiante registrado</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Hace 2 horas</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Tareas enviadas</span>
-                    <Badge variant="secondary">12</Badge>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="outline">Curso</Badge>
+                      <span className="text-sm">Curso actualizado</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Hace 5 horas</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Cursos activos</span>
-                    <Badge variant="secondary">{stats.totalCourses}</Badge>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="outline">Tarea</Badge>
+                      <span className="text-sm">Nueva tarea asignada</span>
+                    </div>
+                    <span className="text-xs text-gray-500">Hace 1 día</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-card shadow-card border-0">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary" />
-                  Estadísticas
-                </CardTitle>
+                <CardTitle>Acciones Rápidas</CardTitle>
+                <CardDescription>
+                  Tareas administrativas comunes
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Tasa de participación</span>
-                    <Badge variant="secondary">85%</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Satisfacción promedio</span>
-                    <Badge variant="secondary">4.2/5</Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Usuarios activos</span>
-                    <Badge variant="secondary">{Math.round((stats.activeUsers / stats.totalUsers) * 100)}%</Badge>
-                  </div>
-                </div>
+              <CardContent className="space-y-3">
+                <Button className="w-full justify-start" variant="outline">
+                  <Users className="mr-2 h-4 w-4" />
+                  Crear nuevo usuario
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  Crear nuevo curso
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Generar reporte
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={fetchAdminStats}
+                >
+                  <Activity className="mr-2 h-4 w-4" />
+                  Actualizar estadísticas
+                </Button>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="users">
-          <Card className="bg-gradient-card shadow-card border-0">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Gestión de Usuarios</CardTitle>
-              <Button className="bg-gradient-primary shadow-glow">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Nuevo Usuario
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Funcionalidad de gestión de usuarios en desarrollo.
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="test">
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold">Formulario de Prueba</h2>
+            <p className="text-gray-600">
+              Este es un formulario simple para probar si el problema de input persiste
+            </p>
+            <TestForm />
+          </div>
         </TabsContent>
 
         <TabsContent value="courses">
-          <Card className="bg-gradient-card shadow-card border-0">
-            <CardHeader>
-              <CardTitle>Gestión de Cursos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Funcionalidad de gestión de cursos en desarrollo.
-              </p>
-            </CardContent>
-          </Card>
+          <SimpleCourseManagement />
         </TabsContent>
 
-        <TabsContent value="reports">
-          <Card className="bg-gradient-card shadow-card border-0">
+        <TabsContent value="students">
+          <AdminStudentManagement />
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-6">
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-primary" />
-                Reportes del Sistema
-              </CardTitle>
+              <CardTitle>Reportes del Sistema</CardTitle>
+              <CardDescription>
+                Genera reportes detallados sobre el uso de la plataforma
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Funcionalidad de reportes en desarrollo.
-              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button variant="outline" className="h-20 flex-col">
+                  <Users className="h-6 w-6 mb-2" />
+                  Reporte de Usuarios
+                </Button>
+                <Button variant="outline" className="h-20 flex-col">
+                  <BookOpen className="h-6 w-6 mb-2" />
+                  Reporte de Cursos
+                </Button>
+                <Button variant="outline" className="h-20 flex-col">
+                  <FileText className="h-6 w-6 mb-2" />
+                  Reporte de Tareas
+                </Button>
+                <Button variant="outline" className="h-20 flex-col">
+                  <Activity className="h-6 w-6 mb-2" />
+                  Reporte de Actividad
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
