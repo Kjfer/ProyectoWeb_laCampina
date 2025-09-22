@@ -149,7 +149,13 @@ const AdminCourseManagement = () => {
 
       if (error) {
         console.error('Error fetching teachers:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los profesores",
+          variant: "destructive",
+        });
       } else {
+        console.log('Profesores cargados:', data);
         setTeachers(data || []);
       }
     } catch (error) {
@@ -160,19 +166,33 @@ const AdminCourseManagement = () => {
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validación básica
+    if (!formData.name || !formData.code || !formData.teacher_id) {
+      toast({
+        title: "Error",
+        description: "Por favor completa todos los campos requeridos",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log('Datos del formulario:', formData);
+    
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('courses')
-        .insert([formData]);
+        .insert([formData])
+        .select();
 
       if (error) {
         console.error('Error creating course:', error);
         toast({
           title: "Error",
-          description: "No se pudo crear el curso",
+          description: `No se pudo crear el curso: ${error.message}`,
           variant: "destructive",
         });
       } else {
+        console.log('Curso creado exitosamente:', data);
         toast({
           title: "Éxito",
           description: "Curso creado exitosamente",
@@ -183,6 +203,11 @@ const AdminCourseManagement = () => {
       }
     } catch (error) {
       console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Ocurrió un error inesperado",
+        variant: "destructive",
+      });
     }
   };
 
@@ -327,7 +352,7 @@ const AdminCourseManagement = () => {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="name">Nombre del Curso</Label>
+          <Label htmlFor="name">Nombre del Curso *</Label>
           <Input
             id="name"
             value={formData.name}
@@ -337,7 +362,7 @@ const AdminCourseManagement = () => {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="code">Código del Curso</Label>
+          <Label htmlFor="code">Código del Curso *</Label>
           <Input
             id="code"
             value={formData.code}
@@ -360,19 +385,30 @@ const AdminCourseManagement = () => {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="teacher">Profesor</Label>
-        <Select value={formData.teacher_id} onValueChange={handleSelectChange('teacher_id')}>
+        <Label htmlFor="teacher">Profesor *</Label>
+        <Select value={formData.teacher_id} onValueChange={handleSelectChange('teacher_id')} required>
           <SelectTrigger>
             <SelectValue placeholder="Seleccionar profesor" />
           </SelectTrigger>
           <SelectContent>
-            {teachers.map((teacher) => (
-              <SelectItem key={teacher.id} value={teacher.id}>
-                {teacher.first_name} {teacher.last_name} ({teacher.email})
+            {teachers.length === 0 ? (
+              <SelectItem value="" disabled>
+                No hay profesores disponibles
               </SelectItem>
-            ))}
+            ) : (
+              teachers.map((teacher) => (
+                <SelectItem key={teacher.id} value={teacher.id}>
+                  {teacher.first_name} {teacher.last_name} ({teacher.email})
+                </SelectItem>
+              ))
+            )}
           </SelectContent>
         </Select>
+        {teachers.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No se encontraron profesores activos. Asegúrate de que haya profesores registrados en el sistema.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -454,15 +490,6 @@ const AdminCourseManagement = () => {
           <Plus className="w-4 h-4 mr-2" />
           Nuevo Curso
         </Button>
-
-        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Crear Nuevo Curso</DialogTitle>
-            </DialogHeader>
-            <CourseForm onSubmit={handleCreateCourse} />
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Filters */}
@@ -672,6 +699,16 @@ const AdminCourseManagement = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Create Modal */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Curso</DialogTitle>
+          </DialogHeader>
+          <CourseForm onSubmit={handleCreateCourse} />
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>

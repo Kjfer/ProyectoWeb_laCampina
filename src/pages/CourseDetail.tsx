@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { 
   BookOpen, 
   Users, 
@@ -227,31 +228,36 @@ const CourseDetail = () => {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/3"></div>
-          <div className="h-4 bg-muted rounded w-2/3"></div>
-          <div className="h-64 bg-muted rounded"></div>
+      <DashboardLayout>
+        <div className="p-6 space-y-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-muted rounded w-1/3"></div>
+            <div className="h-4 bg-muted rounded w-2/3"></div>
+            <div className="h-64 bg-muted rounded"></div>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   if (!course) {
     return (
-      <div className="p-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-4">Curso no encontrado</h1>
-          <Link to="/courses">
-            <Button variant="outline">Volver a cursos</Button>
-          </Link>
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-foreground mb-4">Curso no encontrado</h1>
+            <Link to="/courses">
+              <Button variant="outline">Volver a cursos</Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <DashboardLayout>
+      <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Link to="/courses">
@@ -452,7 +458,8 @@ const CourseDetail = () => {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 

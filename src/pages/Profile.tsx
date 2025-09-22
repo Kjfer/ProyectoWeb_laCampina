@@ -10,9 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/layout/AppSidebar";
-import { Header } from "@/components/layout/Header";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,25 +98,15 @@ export default function Profile() {
 
   if (!profile) {
     return (
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <Header />
-          <main className="flex-1 p-6">
-            <div className="text-center">Cargando perfil...</div>
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
+      <DashboardLayout>
+        <div className="text-center">Cargando perfil...</div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <Header />
-        <main className="flex-1 p-6 bg-gradient-to-br from-background to-muted/30">
-          <div className="max-w-4xl mx-auto space-y-6">
+    <DashboardLayout>
+      <div className="max-w-4xl mx-auto space-y-6 p-6 bg-gradient-to-br from-background to-muted/30 min-h-screen">
             {/* Header del Perfil */}
             <div className="flex items-center gap-4 mb-8">
               <Avatar className="h-20 w-20 border-4 border-primary/20">
@@ -294,8 +282,6 @@ export default function Profile() {
               </div>
             </div>
           </div>
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </DashboardLayout>
   );
 }

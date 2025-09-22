@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -141,130 +142,132 @@ const Assignments = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Tareas</h1>
-        {profile?.role === 'teacher' && (
-          <Button className="bg-gradient-primary shadow-glow">
-            <Plus className="w-4 h-4 mr-2" />
-            Crear Tarea
-          </Button>
-        )}
-      </div>
+    <DashboardLayout>
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-foreground">Tareas</h1>
+          {profile?.role === 'teacher' && (
+            <Button className="bg-gradient-primary shadow-glow">
+              <Plus className="w-4 h-4 mr-2" />
+              Crear Tarea
+            </Button>
+          )}
+        </div>
 
-      {assignments.length === 0 ? (
-        <Card className="bg-gradient-card shadow-card border-0">
-          <CardContent className="p-8 text-center">
-            <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              No hay tareas disponibles
-            </h3>
-            <p className="text-muted-foreground">
-              {profile?.role === 'student' 
-                ? 'No tienes tareas pendientes en este momento.'
-                : 'Aún no has creado ninguna tarea para tus cursos.'
-              }
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {assignments.map((assignment) => {
-            const status = getAssignmentStatus(assignment);
-            
-            return (
-              <Card key={assignment.id} className="bg-gradient-card shadow-card border-0 hover:shadow-glow transition-all duration-300">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-lg font-semibold text-foreground">
-                          {assignment.title}
-                        </CardTitle>
-                        <Badge variant={status.variant} className="text-xs">
-                          {status.label}
-                        </Badge>
+        {assignments.length === 0 ? (
+          <Card className="bg-gradient-card shadow-card border-0">
+            <CardContent className="p-8 text-center">
+              <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                No hay tareas disponibles
+              </h3>
+              <p className="text-muted-foreground">
+                {profile?.role === 'student' 
+                  ? 'No tienes tareas pendientes en este momento.'
+                  : 'Aún no has creado ninguna tarea para tus cursos.'
+                }
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {assignments.map((assignment) => {
+              const status = getAssignmentStatus(assignment);
+              
+              return (
+                <Card key={assignment.id} className="bg-gradient-card shadow-card border-0 hover:shadow-glow transition-all duration-300">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CardTitle className="text-lg font-semibold text-foreground">
+                            {assignment.title}
+                          </CardTitle>
+                          <Badge variant={status.variant} className="text-xs">
+                            {status.label}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Badge variant="secondary" className="text-xs">
+                            {assignment.course.code}
+                          </Badge>
+                          <span>{assignment.course.name}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Badge variant="secondary" className="text-xs">
-                          {assignment.course.code}
-                        </Badge>
-                        <span>{assignment.course.name}</span>
+                      <FileText className="w-6 h-6 text-primary" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                      {assignment.description || 'Sin descripción disponible'}
+                    </p>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>
+                            {format(new Date(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          <span>
+                            {format(new Date(assignment.due_date), "HH:mm")}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="text-sm font-medium text-foreground">
+                        {assignment.max_score} pts
                       </div>
                     </div>
-                    <FileText className="w-6 h-6 text-primary" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                    {assignment.description || 'Sin descripción disponible'}
-                  </p>
-                  
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>
-                          {format(new Date(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
+
+                    {status.status === 'due-soon' && (
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
+                        <AlertCircle className="w-4 h-4 text-destructive" />
+                        <span className="text-sm text-destructive font-medium">
+                          ¡Esta tarea vence pronto!
                         </span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        <span>
-                          {format(new Date(assignment.due_date), "HH:mm")}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="text-sm font-medium text-foreground">
-                      {assignment.max_score} pts
-                    </div>
-                  </div>
+                    )}
 
-                  {status.status === 'due-soon' && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 mb-4">
-                      <AlertCircle className="w-4 h-4 text-destructive" />
-                      <span className="text-sm text-destructive font-medium">
-                        ¡Esta tarea vence pronto!
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Button 
-                      className="flex-1" 
-                      variant="outline"
-                      onClick={() => {
-                        toast({
-                          title: "Próximamente",
-                          description: "La vista detallada de la tarea estará disponible pronto.",
-                        });
-                      }}
-                    >
-                      Ver Detalles
-                    </Button>
-                    
-                    {profile?.role === 'student' && status.status !== 'submitted' && (
+                    <div className="flex gap-2">
                       <Button 
-                        className="bg-gradient-primary shadow-glow"
+                        className="flex-1" 
+                        variant="outline"
                         onClick={() => {
                           toast({
                             title: "Próximamente",
-                            description: "La entrega de tareas estará disponible pronto.",
+                            description: "La vista detallada de la tarea estará disponible pronto.",
                           });
                         }}
                       >
-                        Entregar
+                        Ver Detalles
                       </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-    </div>
+                      
+                      {profile?.role === 'student' && status.status !== 'submitted' && (
+                        <Button 
+                          className="bg-gradient-primary shadow-glow"
+                          onClick={() => {
+                            toast({
+                              title: "Próximamente",
+                              description: "La entrega de tareas estará disponible pronto.",
+                            });
+                          }}
+                        >
+                          Entregar
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
   );
 };
 

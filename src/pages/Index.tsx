@@ -1,10 +1,8 @@
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/layout/AppSidebar";
-import { Header } from "@/components/layout/Header";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { UpcomingClasses } from "@/components/dashboard/UpcomingClasses";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { BookOpen, FileText, GraduationCap, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import heroImage from "@/assets/hero-education.jpg";
@@ -40,14 +38,8 @@ const Index = () => {
   };
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar />
-        
-        <div className="flex-1 flex flex-col">
-          <Header />
-          
-          <main className="flex-1 p-6 space-y-6">
+    <DashboardLayout>
+      <div className="space-y-6">
             {/* Hero Section */}
             <div className="relative overflow-hidden rounded-2xl bg-gradient-hero p-8 text-white shadow-glow">
               <div className="absolute inset-0 opacity-20">
@@ -123,10 +115,8 @@ const Index = () => {
                 <QuickActions />
               </div>
             </div>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
+          </div>
+    </DashboardLayout>
   );
 };
 

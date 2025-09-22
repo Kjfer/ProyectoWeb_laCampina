@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Users, BookOpen, FileText, Activity, GraduationCap, UserCheck } from 'lucide-react';
 import AdminCourseManagement from './AdminCourseManagement';
 import SimpleCourseManagement from './SimpleCourseManagement';
@@ -89,34 +90,39 @@ const AdminDashboard = () => {
   // Redirect if not admin
   if (profile?.role !== 'admin') {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="p-6">
-            <h1 className="text-2xl font-bold text-red-600">Acceso Denegado</h1>
-            <p className="mt-2 text-gray-600">No tienes permisos para acceder al panel de administración.</p>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout>
+        <div className="container mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="p-6">
+              <h1 className="text-2xl font-bold text-red-600">Acceso Denegado</h1>
+              <p className="mt-2 text-gray-600">No tienes permisos para acceder al panel de administración.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/3"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-muted rounded"></div>
-            ))}
+      <DashboardLayout>
+        <div className="p-6 space-y-6">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-muted rounded w-1/3"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-32 bg-muted rounded"></div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <DashboardLayout>
+      <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Panel de Administración</h1>
         <p className="mt-2 text-gray-600">
@@ -304,7 +310,8 @@ const AdminDashboard = () => {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 
