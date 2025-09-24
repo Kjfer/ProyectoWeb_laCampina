@@ -14,7 +14,8 @@ import {
   Shield,
   UserCog,
   BarChart3,
-  Database
+  Database,
+  School
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,6 +34,7 @@ import {
 
 const mainItems = [
   { title: "Dashboard", url: "/", icon: Home },
+  { title: "Aulas Virtuales", url: "/virtual-classrooms", icon: School },
   { title: "Cursos", url: "/courses", icon: BookOpen },
   { title: "Tareas", url: "/assignments", icon: FileText },
   { title: "Exámenes", url: "/exams", icon: ClipboardList },

@@ -420,6 +420,7 @@ export type Database = {
       courses: {
         Row: {
           academic_year: string
+          classroom_id: string | null
           code: string
           created_at: string | null
           description: string | null
@@ -432,6 +433,7 @@ export type Database = {
         }
         Insert: {
           academic_year: string
+          classroom_id?: string | null
           code: string
           created_at?: string | null
           description?: string | null
@@ -444,6 +446,7 @@ export type Database = {
         }
         Update: {
           academic_year?: string
+          classroom_id?: string | null
           code?: string
           created_at?: string | null
           description?: string | null
@@ -455,6 +458,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "courses_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_classrooms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "courses_teacher_id_fkey"
             columns: ["teacher_id"]
@@ -878,11 +888,51 @@ export type Database = {
           },
         ]
       }
+      virtual_classrooms: {
+        Row: {
+          academic_year: string
+          created_at: string | null
+          education_level: Database["public"]["Enums"]["education_level"]
+          grade: string
+          id: string
+          is_active: boolean | null
+          name: string
+          teacher_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          academic_year: string
+          created_at?: string | null
+          education_level: Database["public"]["Enums"]["education_level"]
+          grade: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          teacher_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          academic_year?: string
+          created_at?: string | null
+          education_level?: Database["public"]["Enums"]["education_level"]
+          grade?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          teacher_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_current_profile_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["user_role"]
@@ -897,6 +947,7 @@ export type Database = {
       }
     }
     Enums: {
+      education_level: "primaria" | "secundaria"
       user_role: "admin" | "teacher" | "student" | "parent"
     }
     CompositeTypes: {
@@ -1025,6 +1076,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      education_level: ["primaria", "secundaria"],
       user_role: ["admin", "teacher", "student", "parent"],
     },
   },
