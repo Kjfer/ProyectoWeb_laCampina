@@ -54,57 +54,155 @@ export default function VirtualClassrooms() {
   const fetchClassrooms = async () => {
     try {
       setLoading(true);
+      console.log('🔄 Iniciando carga de aulas virtuales...');
       
-      let query = supabase
-        .from('virtual_classrooms')
-        .select(`
-          *,
-          teacher:profiles!teacher_id(first_name, last_name, email)
-        `)
-        .order('created_at', { ascending: false });
+      // Try Edge Function first
+      try {
+        console.log('📡 Intentando con Edge Function...');
+        
+        // Get the current session to include in the request
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          throw new Error('No estás autenticado');
+        }
 
-      // If user is a teacher, only show their classrooms
-      if (profile?.role === 'teacher') {
-        query = query.eq('teacher_id', profile.id);
+        // Call the Edge Function
+        const { data, error } = await supabase.functions.invoke('get-virtual-classrooms', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (error) {
+          console.error('❌ Error calling Edge Function:', error);
+          throw new Error('Edge Function falló, usando método directo');
+        }
+
+        if (!data.success) {
+          throw new Error(data.error || 'Error en la respuesta del servidor');
+        }
+
+        console.log('✅ Aulas virtuales cargadas con Edge Function:', data.data?.length || 0, 'aulas');
+        console.log('👤 Rol del usuario:', data.user_role);
+        setClassrooms(data.data || []);
+        return; // Success with Edge Function
+        
+      } catch (edgeFunctionError) {
+        console.warn('⚠️ Edge Function falló, usando consulta directa:', edgeFunctionError.message);
+        
+        // Fallback to direct database query
+        console.log('🔄 Usando consulta directa como fallback...');
+        
+        let query = supabase
+          .from('virtual_classrooms')
+          .select(`
+            id,
+            name,
+            grade,
+            education_level,
+            academic_year,
+            teacher_id,
+            is_active,
+            created_at
+          `)
+          .order('created_at', { ascending: false });
+
+        // If user is a teacher, only show their classrooms
+        if (profile?.role === 'teacher') {
+          console.log('👨‍🏫 Usuario es profesor, filtrando aulas...');
+          query = query.eq('teacher_id', profile.id);
+        }
+
+        const { data: classroomsData, error: classroomsError } = await query;
+        
+        if (classroomsError) {
+          console.error('❌ Error en consulta directa:', classroomsError);
+          throw classroomsError;
+        }
+
+        console.log('� Aulas virtuales obtenidas (directo):', classroomsData?.length || 0);
+        
+        // Get teacher info and counts for each classroom
+        const classroomsWithCounts = await Promise.all(
+          (classroomsData || []).map(async (classroom) => {
+            try {
+              // Get teacher info separately
+              let teacher = null;
+              if (classroom.teacher_id) {
+                const { data: teacherData, error: teacherError } = await supabase
+                  .from('profiles')
+                  .select('id, first_name, last_name, email')
+                  .eq('id', classroom.teacher_id)
+                  .single();
+
+                if (!teacherError && teacherData) {
+                  teacher = teacherData;
+                }
+              }
+
+              // Get courses count
+              const { count: coursesCount, error: coursesError } = await supabase
+                .from('courses')
+                .select('id', { count: 'exact', head: true })
+                .eq('classroom_id', classroom.id);
+
+              if (coursesError) {
+                console.error(`❌ Error obteniendo cursos para aula ${classroom.id}:`, coursesError);
+              }
+
+              // Get students count through enrollments
+              const { data: courses, error: coursesDataError } = await supabase
+                .from('courses')
+                .select('id')
+                .eq('classroom_id', classroom.id);
+
+              if (coursesDataError) {
+                console.error(`❌ Error obteniendo datos de cursos para aula ${classroom.id}:`, coursesDataError);
+              }
+
+              let studentsCount = 0;
+              if (courses && courses.length > 0) {
+                const courseIds = courses.map(c => c.id);
+                const { count, error: enrollmentsError } = await supabase
+                  .from('course_enrollments')
+                  .select('student_id', { count: 'exact', head: true })
+                  .in('course_id', courseIds);
+
+                if (enrollmentsError) {
+                  console.error(`❌ Error obteniendo inscripciones para aula ${classroom.id}:`, enrollmentsError);
+                } else {
+                  studentsCount = count || 0;
+                }
+              }
+
+              return {
+                ...classroom,
+                teacher,
+                courses_count: coursesCount || 0,
+                students_count: studentsCount
+              };
+
+            } catch (error) {
+              console.error(`❌ Error procesando aula ${classroom.id}:`, error);
+              return {
+                ...classroom,
+                teacher: null,
+                courses_count: 0,
+                students_count: 0
+              };
+            }
+          })
+        );
+
+        console.log('✅ Aulas virtuales cargadas con consulta directa');
+        setClassrooms(classroomsWithCounts);
       }
-
-      const { data, error } = await query;
       
-      if (error) throw error;
-      
-      // Get courses and students count for each classroom
-      const classroomsWithCounts = await Promise.all(
-        (data || []).map(async (classroom) => {
-          const [coursesResult, studentsResult] = await Promise.all([
-            supabase
-              .from('courses')
-              .select('id', { count: 'exact' })
-              .eq('classroom_id', classroom.id),
-            supabase
-              .from('course_enrollments')
-              .select('student_id', { count: 'exact' })
-              .in('course_id', 
-                (await supabase
-                  .from('courses')
-                  .select('id')
-                  .eq('classroom_id', classroom.id)
-                ).data?.map(c => c.id) || []
-              )
-          ]);
-
-          return {
-            ...classroom,
-            teacher: Array.isArray(classroom.teacher) ? classroom.teacher[0] : classroom.teacher,
-            courses_count: coursesResult.count || 0,
-            students_count: studentsResult.count || 0
-          };
-        })
-      );
-
-      setClassrooms(classroomsWithCounts);
     } catch (error) {
-      console.error('Error fetching classrooms:', error);
-      toast.error('Error al cargar las aulas virtuales');
+      console.error('❌ Error general cargando aulas virtuales:', error);
+      toast.error(`Error al cargar las aulas virtuales: ${error.message}`);
+      setClassrooms([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -119,19 +217,41 @@ export default function VirtualClassrooms() {
     }
 
     try {
-      const { error } = await supabase
-        .from('virtual_classrooms')
-        .insert({
+      console.log('🔄 Creando nueva aula virtual con Edge Function...', formData);
+
+      // Get the current session to include in the request
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error('No estás autenticado');
+        return;
+      }
+
+      // Call the Edge Function
+      const { data, error } = await supabase.functions.invoke('create-virtual-classroom', {
+        body: {
           name: formData.name,
           grade: formData.grade,
           education_level: formData.education_level as 'primaria' | 'secundaria',
           academic_year: formData.academic_year,
-          teacher_id: profile.id
-        });
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error calling Edge Function:', error);
+        throw new Error(error.message || 'Error al llamar a la función');
+      }
 
-      toast.success('Aula virtual creada exitosamente');
+      if (!data.success) {
+        throw new Error(data.error || 'Error en la respuesta del servidor');
+      }
+
+      console.log('✅ Aula virtual creada exitosamente:', data.data);
+
+      toast.success(data.message || 'Aula virtual creada exitosamente');
       setIsCreateDialogOpen(false);
       setFormData({
         name: '',
@@ -139,10 +259,13 @@ export default function VirtualClassrooms() {
         education_level: '',
         academic_year: new Date().getFullYear().toString()
       });
-      fetchClassrooms();
+      
+      // Add the new classroom to the existing list to avoid refetching
+      setClassrooms(prev => [data.data, ...prev]);
+      
     } catch (error) {
-      console.error('Error creating classroom:', error);
-      toast.error('Error al crear el aula virtual');
+      console.error('❌ Error creando aula virtual:', error);
+      toast.error(`Error al crear el aula virtual: ${error.message}`);
     }
   };
 
