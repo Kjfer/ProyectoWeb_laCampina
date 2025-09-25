@@ -38,7 +38,7 @@ serve(async (req: Request) => {
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role, id')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (profileError) {
@@ -159,7 +159,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Error interno del servidor'
+        error: error instanceof Error ? error.message : 'Error interno del servidor'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

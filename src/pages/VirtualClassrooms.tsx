@@ -30,16 +30,25 @@ interface VirtualClassroom {
   students_count?: number;
 }
 
+interface Teacher {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
 export default function VirtualClassrooms() {
   const { user, profile } = useAuth();
   const [classrooms, setClassrooms] = useState<VirtualClassroom[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     grade: '',
     education_level: '' as 'primaria' | 'secundaria' | '',
-    academic_year: new Date().getFullYear().toString()
+    academic_year: new Date().getFullYear().toString(),
+    teacher_id: ''
   });
 
   const grades = {
@@ -49,7 +58,24 @@ export default function VirtualClassrooms() {
 
   useEffect(() => {
     fetchClassrooms();
+    fetchTeachers();
   }, []);
+
+  const fetchTeachers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('role', 'teacher')
+        .eq('is_active', true);
+
+      if (error) throw error;
+      setTeachers(data || []);
+    } catch (error) {
+      console.error('Error fetching teachers:', error);
+      toast.error('Error al cargar la lista de profesores');
+    }
+  };
 
   const fetchClassrooms = async () => {
     try {
@@ -234,6 +260,7 @@ export default function VirtualClassrooms() {
           grade: formData.grade,
           education_level: formData.education_level as 'primaria' | 'secundaria',
           academic_year: formData.academic_year,
+          teacher_id: formData.teacher_id || profile.id,
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -257,7 +284,8 @@ export default function VirtualClassrooms() {
         name: '',
         grade: '',
         education_level: '',
-        academic_year: new Date().getFullYear().toString()
+        academic_year: new Date().getFullYear().toString(),
+        teacher_id: ''
       });
       
       // Add the new classroom to the existing list to avoid refetching
@@ -309,20 +337,20 @@ export default function VirtualClassrooms() {
                   
                   <div>
                     <Label htmlFor="education_level">Nivel Educativo</Label>
-                    <Select 
-                      value={formData.education_level} 
-                      onValueChange={(value: 'primaria' | 'secundaria') => 
-                        setFormData({ ...formData, education_level: value, grade: '' })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar nivel" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="primaria">Primaria</SelectItem>
-                        <SelectItem value="secundaria">Secundaria</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <Select 
+                        value={formData.education_level} 
+                        onValueChange={(value: 'primaria' | 'secundaria') => 
+                          setFormData({ ...formData, education_level: value, grade: '' })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar nivel" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="primaria">Primaria</SelectItem>
+                          <SelectItem value="secundaria">Secundaria</SelectItem>
+                        </SelectContent>
+                      </Select>
                   </div>
 
                   {formData.education_level && (
@@ -354,6 +382,27 @@ export default function VirtualClassrooms() {
                       required
                     />
                   </div>
+
+                  {profile?.role === 'admin' && (
+                    <div>
+                      <Label htmlFor="teacher">Profesor Asignado</Label>
+                      <Select 
+                        value={formData.teacher_id} 
+                        onValueChange={(value) => setFormData({ ...formData, teacher_id: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar profesor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teachers.map((teacher) => (
+                            <SelectItem key={teacher.id} value={teacher.id}>
+                              {teacher.first_name} {teacher.last_name} - {teacher.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   <div className="flex justify-end space-x-2">
                     <Button 

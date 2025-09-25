@@ -37,7 +37,7 @@ serve(async (req) => {
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role, id')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (profileError) {
@@ -50,12 +50,15 @@ serve(async (req) => {
     }
 
     // Get request body
-    const { name, grade, education_level, academic_year } = await req.json()
+    const { name, grade, education_level, academic_year, teacher_id } = await req.json()
 
     // Validate required fields
     if (!name || !grade || !education_level || !academic_year) {
       throw new Error('Todos los campos son requeridos')
     }
+
+    // Determine the teacher_id to use
+    const assignedTeacherId = teacher_id || profile.id
 
     // Validate education_level
     if (!['primaria', 'secundaria'].includes(education_level)) {
@@ -70,7 +73,7 @@ serve(async (req) => {
         grade,
         education_level,
         academic_year,
-        teacher_id: profile.id,
+        teacher_id: assignedTeacherId,
         is_active: true
       })
       .select(`
@@ -116,7 +119,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Error interno del servidor'
+        error: error instanceof Error ? error.message : 'Error interno del servidor'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
