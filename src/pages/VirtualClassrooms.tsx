@@ -473,7 +473,11 @@ export default function VirtualClassrooms() {
                     </div>
                   )}
 
-                  <Button variant="outline" className="w-full">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => window.location.href = `/virtual-classrooms/${classroom.id}`}
+                  >
                     Ver Detalles
                   </Button>
                 </CardContent>
