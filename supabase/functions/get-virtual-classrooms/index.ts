@@ -71,76 +71,91 @@ serve(async (req: Request) => {
       throw classroomsError
     }
 
-    // Get teacher info and counts for each classroom
-    const classroomsWithCounts = await Promise.all(
-      (classrooms || []).map(async (classroom) => {
-        try {
-          // Get teacher info separately
-          let teacher = null
-          if (classroom.teacher_id) {
-            const { data: teacherData, error: teacherError } = await supabaseClient
-              .from('profiles')
-              .select('id, first_name, last_name, email')
-              .eq('id', classroom.teacher_id)
-              .single()
+    // Optimized: Get all data with fewer queries
+    console.log('📊 Optimizando consultas para mejor rendimiento...')
+    
+    // Get all unique teacher IDs
+    const teacherIds = [...new Set(classrooms.map(c => c.teacher_id).filter(Boolean))]
+    
+    // Get all teachers in one query
+    let teachersMap = new Map()
+    if (teacherIds.length > 0) {
+      const { data: teachers, error: teachersError } = await supabaseClient
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', teacherIds)
+      
+      if (!teachersError && teachers) {
+        teachers.forEach(teacher => {
+          teachersMap.set(teacher.id, teacher)
+        })
+      }
+    }
 
-            if (!teacherError && teacherData) {
-              teacher = teacherData
-            }
-          }
+    // Get all classroom IDs
+    const classroomIds = classrooms.map(c => c.id)
+    
+    // Get all courses for all classrooms in one query
+    let coursesMap = new Map()
+    let courseIds = []
+    if (classroomIds.length > 0) {
+      const { data: courses, error: coursesError } = await supabaseClient
+        .from('courses')
+        .select('id, classroom_id')
+        .in('classroom_id', classroomIds)
+      
+      if (!coursesError && courses) {
+        courses.forEach(course => {
+          courseIds.push(course.id)
+          const classroomCourses = coursesMap.get(course.classroom_id) || []
+          classroomCourses.push(course)
+          coursesMap.set(course.classroom_id, classroomCourses)
+        })
+      }
+    }
 
-          // Get courses count
-          const { count: coursesCount, error: coursesError } = await supabaseClient
-            .from('courses')
-            .select('id', { count: 'exact', head: true })
-            .eq('classroom_id', classroom.id)
+    // Get all enrollments for all courses in one query
+    let enrollmentsMap = new Map()
+    if (courseIds.length > 0) {
+      const { data: enrollments, error: enrollmentsError } = await supabaseClient
+        .from('course_enrollments')
+        .select('course_id, student_id')
+        .in('course_id', courseIds)
+      
+      if (!enrollmentsError && enrollments) {
+        enrollments.forEach(enrollment => {
+          const courseEnrollments = enrollmentsMap.get(enrollment.course_id) || []
+          courseEnrollments.push(enrollment)
+          enrollmentsMap.set(enrollment.course_id, courseEnrollments)
+        })
+      }
+    }
 
-          if (coursesError) {
-            console.error('Error getting courses count:', coursesError)
-          }
-
-          // Get courses for enrollment count
-          const { data: courses, error: coursesDataError } = await supabaseClient
-            .from('courses')
-            .select('id')
-            .eq('classroom_id', classroom.id)
-
-          if (coursesDataError) {
-            console.error('Error getting courses:', coursesDataError)
-          }
-
-          let studentsCount = 0
-          if (courses && courses.length > 0) {
-            const courseIds = courses.map(c => c.id)
-            const { count, error: enrollmentsError } = await supabaseClient
-              .from('course_enrollments')
-              .select('student_id', { count: 'exact', head: true })
-              .in('course_id', courseIds)
-
-            if (enrollmentsError) {
-              console.error('Error getting enrollments count:', enrollmentsError)
-            } else {
-              studentsCount = count || 0
-            }
-          }
-
-          return {
-            ...classroom,
-            teacher,
-            courses_count: coursesCount || 0,
-            students_count: studentsCount
-          }
-        } catch (error) {
-          console.error('Error processing classroom:', classroom.id, error)
-          return {
-            ...classroom,
-            teacher: null,
-            courses_count: 0,
-            students_count: 0
-          }
-        }
+    // Build final data structure
+    const classroomsWithCounts = classrooms.map(classroom => {
+      const teacher = teachersMap.get(classroom.teacher_id) || null
+      const classroomCourses = coursesMap.get(classroom.id) || []
+      const coursesCount = classroomCourses.length
+      
+      // Count unique students across all courses in this classroom
+      const uniqueStudents = new Set()
+      classroomCourses.forEach(course => {
+        const courseEnrollments = enrollmentsMap.get(course.id) || []
+        courseEnrollments.forEach(enrollment => {
+          uniqueStudents.add(enrollment.student_id)
+        })
       })
-    )
+
+      return {
+        ...classroom,
+        teacher,
+        courses_count: coursesCount,
+        students_count: uniqueStudents.size
+      }
+    })
+
+    console.log(`⚡ Consultas optimizadas completadas en mucho menos tiempo`)
+    console.log(`📈 Resumen: ${classrooms.length} aulas, ${teacherIds.length} profesores únicos, ${courseIds.length} cursos total`)
 
     return new Response(
       JSON.stringify({ 

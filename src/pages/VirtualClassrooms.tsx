@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, BookOpen, Calendar } from 'lucide-react';
+import { Plus, Users, BookOpen, Calendar, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -43,6 +43,10 @@ export default function VirtualClassrooms() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [lastFetch, setLastFetch] = useState<number>(0);
+
+  // Cache timeout: 5 minutos
+  const CACHE_TIMEOUT = 5 * 60 * 1000;
   const [formData, setFormData] = useState({
     name: '',
     grade: '',
@@ -57,8 +61,13 @@ export default function VirtualClassrooms() {
   };
 
   useEffect(() => {
-    fetchClassrooms();
-    fetchTeachers();
+    // Paralelizar la carga de datos
+    Promise.all([
+      fetchClassrooms(),
+      fetchTeachers()
+    ]).catch(error => {
+      console.error('Error en carga inicial:', error);
+    });
   }, []);
 
   const fetchTeachers = async () => {
@@ -77,153 +86,58 @@ export default function VirtualClassrooms() {
     }
   };
 
-  const fetchClassrooms = async () => {
+  const fetchClassrooms = async (forceRefresh = false) => {
+    const now = Date.now();
+    
+    // Verificar si necesitamos refrescar (cache expirado o forzado)
+    if (!forceRefresh && classrooms.length > 0 && (now - lastFetch) < CACHE_TIMEOUT) {
+      console.log('🔄 Usando datos en cache (válidos por', Math.round((CACHE_TIMEOUT - (now - lastFetch)) / 1000), 'segundos más)');
+      return;
+    }
+
+    const startTime = performance.now();
+    
     try {
       setLoading(true);
-      console.log('🔄 Iniciando carga de aulas virtuales...');
+      console.log('🔄 Iniciando carga optimizada de aulas virtuales...');
       
-      // Try Edge Function first
-      try {
-        console.log('📡 Intentando con Edge Function...');
-        
-        // Get the current session to include in the request
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          throw new Error('No estás autenticado');
-        }
-
-        // Call the Edge Function
-        const { data, error } = await supabase.functions.invoke('get-virtual-classrooms', {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-
-        if (error) {
-          console.error('❌ Error calling Edge Function:', error);
-          throw new Error('Edge Function falló, usando método directo');
-        }
-
-        if (!data.success) {
-          throw new Error(data.error || 'Error en la respuesta del servidor');
-        }
-
-        console.log('✅ Aulas virtuales cargadas con Edge Function:', data.data?.length || 0, 'aulas');
-        console.log('👤 Rol del usuario:', data.user_role);
-        setClassrooms(data.data || []);
-        return; // Success with Edge Function
-        
-      } catch (edgeFunctionError) {
-        console.warn('⚠️ Edge Function falló, usando consulta directa:', edgeFunctionError.message);
-        
-        // Fallback to direct database query
-        console.log('🔄 Usando consulta directa como fallback...');
-        
-        let query = supabase
-          .from('virtual_classrooms')
-          .select(`
-            id,
-            name,
-            grade,
-            education_level,
-            academic_year,
-            teacher_id,
-            is_active,
-            created_at
-          `)
-          .order('created_at', { ascending: false });
-
-        // If user is a teacher, only show their classrooms
-        if (profile?.role === 'teacher') {
-          console.log('👨‍🏫 Usuario es profesor, filtrando aulas...');
-          query = query.eq('teacher_id', profile.id);
-        }
-
-        const { data: classroomsData, error: classroomsError } = await query;
-        
-        if (classroomsError) {
-          console.error('❌ Error en consulta directa:', classroomsError);
-          throw classroomsError;
-        }
-
-        console.log('� Aulas virtuales obtenidas (directo):', classroomsData?.length || 0);
-        
-        // Get teacher info and counts for each classroom
-        const classroomsWithCounts = await Promise.all(
-          (classroomsData || []).map(async (classroom) => {
-            try {
-              // Get teacher info separately
-              let teacher = null;
-              if (classroom.teacher_id) {
-                const { data: teacherData, error: teacherError } = await supabase
-                  .from('profiles')
-                  .select('id, first_name, last_name, email')
-                  .eq('id', classroom.teacher_id)
-                  .single();
-
-                if (!teacherError && teacherData) {
-                  teacher = teacherData;
-                }
-              }
-
-              // Get courses count
-              const { count: coursesCount, error: coursesError } = await supabase
-                .from('courses')
-                .select('id', { count: 'exact', head: true })
-                .eq('classroom_id', classroom.id);
-
-              if (coursesError) {
-                console.error(`❌ Error obteniendo cursos para aula ${classroom.id}:`, coursesError);
-              }
-
-              // Get students count through enrollments
-              const { data: courses, error: coursesDataError } = await supabase
-                .from('courses')
-                .select('id')
-                .eq('classroom_id', classroom.id);
-
-              if (coursesDataError) {
-                console.error(`❌ Error obteniendo datos de cursos para aula ${classroom.id}:`, coursesDataError);
-              }
-
-              let studentsCount = 0;
-              if (courses && courses.length > 0) {
-                const courseIds = courses.map(c => c.id);
-                const { count, error: enrollmentsError } = await supabase
-                  .from('course_enrollments')
-                  .select('student_id', { count: 'exact', head: true })
-                  .in('course_id', courseIds);
-
-                if (enrollmentsError) {
-                  console.error(`❌ Error obteniendo inscripciones para aula ${classroom.id}:`, enrollmentsError);
-                } else {
-                  studentsCount = count || 0;
-                }
-              }
-
-              return {
-                ...classroom,
-                teacher,
-                courses_count: coursesCount || 0,
-                students_count: studentsCount
-              };
-
-            } catch (error) {
-              console.error(`❌ Error procesando aula ${classroom.id}:`, error);
-              return {
-                ...classroom,
-                teacher: null,
-                courses_count: 0,
-                students_count: 0
-              };
-            }
-          })
-        );
-
-        console.log('✅ Aulas virtuales cargadas con consulta directa');
-        setClassrooms(classroomsWithCounts);
+      // Use Edge Function exclusively
+      console.log('📡 Llamando a Edge Function optimizada...');
+      
+      // Get the current session to include in the request
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No estás autenticado. Por favor, inicia sesión.');
       }
+
+      // Call the optimized Edge Function
+      const { data, error } = await supabase.functions.invoke('get-virtual-classrooms', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (error) {
+        console.error('❌ Error calling Edge Function:', error);
+        throw new Error(`Error en Edge Function: ${error.message}`);
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Error en la respuesta del servidor');
+      }
+
+      const endTime = performance.now();
+      const loadTime = Math.round(endTime - startTime);
+      
+      console.log(`⚡ Aulas virtuales cargadas en ${loadTime}ms:`, data.data?.length || 0, 'aulas');
+      console.log('👤 Rol del usuario:', data.user_role);
+      console.log('📊 Rendimiento mejorado con consultas optimizadas');
+      
+      setClassrooms(data.data || []);
+      setLastFetch(now);
       
     } catch (error) {
       console.error('❌ Error general cargando aulas virtuales:', error);
@@ -255,6 +169,7 @@ export default function VirtualClassrooms() {
 
       // Call the Edge Function
       const { data, error } = await supabase.functions.invoke('create-virtual-classroom', {
+        method: 'POST',
         body: {
           name: formData.name,
           grade: formData.grade,
@@ -264,6 +179,7 @@ export default function VirtualClassrooms() {
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
         },
       });
 
@@ -308,14 +224,25 @@ export default function VirtualClassrooms() {
             </p>
           </div>
           
-          {(profile?.role === 'admin' || profile?.role === 'teacher') && (
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Crear Aula Virtual
-                </Button>
-              </DialogTrigger>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => fetchClassrooms(true)}
+              disabled={loading}
+              size="sm"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+            
+            {(profile?.role === 'admin' || profile?.role === 'teacher') && (
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Crear Aula Virtual
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Crear Nueva Aula Virtual</DialogTitle>
@@ -417,7 +344,8 @@ export default function VirtualClassrooms() {
                 </form>
               </DialogContent>
             </Dialog>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -505,5 +433,5 @@ export default function VirtualClassrooms() {
         )}
       </div>
     </DashboardLayout>
-  );
-}
+  )
+};
