@@ -97,7 +97,7 @@ serve(async (req: Request) => {
     
     // Get all courses for all classrooms in one query
     let coursesMap = new Map()
-    let courseIds = []
+    let courseIds: string[] = []
     if (classroomIds.length > 0) {
       const { data: courses, error: coursesError } = await supabaseClient
         .from('courses')
@@ -139,9 +139,9 @@ serve(async (req: Request) => {
       
       // Count unique students across all courses in this classroom
       const uniqueStudents = new Set()
-      classroomCourses.forEach(course => {
+      classroomCourses.forEach((course: any) => {
         const courseEnrollments = enrollmentsMap.get(course.id) || []
-        courseEnrollments.forEach(enrollment => {
+        courseEnrollments.forEach((enrollment: any) => {
           uniqueStudents.add(enrollment.student_id)
         })
       })

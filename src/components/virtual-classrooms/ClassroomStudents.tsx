@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Plus, Users, Mail, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { BulkStudentEnrollment } from './BulkStudentEnrollment';
 
 interface Student {
   id: string;
@@ -175,13 +176,14 @@ export function ClassroomStudents({ classroomId, canManage, onUpdate }: Classroo
         </div>
         
         {canManage && courses.length > 0 && (
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Agregar Estudiante
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Agregar Estudiante
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Agregar Estudiante</DialogTitle>
@@ -241,6 +243,13 @@ export function ClassroomStudents({ classroomId, canManage, onUpdate }: Classroo
               </form>
             </DialogContent>
           </Dialog>
+          
+          <BulkStudentEnrollment 
+            classroomId={classroomId}
+            courses={courses}
+            onUpdate={onUpdate}
+          />
+          </div>
         )}
       </div>
 

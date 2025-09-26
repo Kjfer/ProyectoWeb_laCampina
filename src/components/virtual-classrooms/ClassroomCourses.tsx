@@ -283,7 +283,8 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
           ))
         ) : courses.length > 0 ? (
           courses.map((course) => (
-            <Card key={course.id} className="hover:shadow-md transition-shadow">
+            <Card key={course.id} className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => window.location.href = `/courses/${course.id}`}>
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg">{course.name}</CardTitle>
@@ -318,7 +319,7 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
                   </div>
                 )}
 
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full" onClick={(e) => e.stopPropagation()}>
                   Ver Detalles
                 </Button>
               </CardContent>

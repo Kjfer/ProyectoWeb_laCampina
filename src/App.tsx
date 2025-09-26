@@ -38,7 +38,7 @@ const App = () => (
                 <Courses />
               </ProtectedRoute>
             } />
-            <Route path="/courses/:courseId" element={
+            <Route path="/courses/:id" element={
               <ProtectedRoute>
                 <CourseDetail />
               </ProtectedRoute>

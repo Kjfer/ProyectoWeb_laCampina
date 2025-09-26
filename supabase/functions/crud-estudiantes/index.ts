@@ -170,12 +170,12 @@ serve(async (req: Request) => {
         )
       }
 
-      const updateData = {}
-      if (body.first_name) updateData.first_name = body.first_name.trim()
-      if (body.last_name) updateData.last_name = body.last_name.trim()
-      if (body.email) updateData.email = body.email.trim().toLowerCase()
-      if (body.role) updateData.role = body.role.trim()
-      if (body.is_active !== undefined) updateData.is_active = body.is_active
+      const updateData: any = {}
+      if ((body as any).first_name) updateData.first_name = (body as any).first_name.trim()
+      if ((body as any).last_name) updateData.last_name = (body as any).last_name.trim()
+      if ((body as any).email) updateData.email = (body as any).email.trim().toLowerCase()
+      if ((body as any).role) updateData.role = (body as any).role.trim()
+      if ((body as any).is_active !== undefined) updateData.is_active = (body as any).is_active
 
       if (Object.keys(updateData).length === 0) {
         return new Response(

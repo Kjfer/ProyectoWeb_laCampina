@@ -116,7 +116,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Error interno del servidor'
+        error: (error as Error).message || 'Error interno del servidor'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
