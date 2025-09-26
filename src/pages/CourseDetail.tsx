@@ -8,6 +8,7 @@ import { ArrowLeft, Users, GraduationCap, Clock, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { WeeklyContentManager } from '@/components/course/WeeklyContentManager';
 
 interface Course {
   id: string;
@@ -19,6 +20,7 @@ interface Course {
   is_active: boolean;
   created_at: string;
   teacher?: {
+    id: string;
     first_name: string;
     last_name: string;
     email: string;
@@ -46,6 +48,12 @@ export default function CourseDetail() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Check if user can edit this course
+  const canEdit = profile && course && (
+    profile.role === 'admin' || 
+    (profile.role === 'teacher' && course.teacher && profile.id === course.teacher.id)
+  );
+
   useEffect(() => {
     if (id) {
       fetchCourse();
@@ -60,6 +68,7 @@ export default function CourseDetail() {
         .select(`
           *,
           teacher:profiles!courses_teacher_id_fkey(
+            id,
             first_name,
             last_name,
             email
@@ -213,6 +222,12 @@ export default function CourseDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Weekly Content Section */}
+        <WeeklyContentManager 
+          courseId={course.id} 
+          canEdit={canEdit || false}
+        />
 
         {/* Students Section */}
         <Card>

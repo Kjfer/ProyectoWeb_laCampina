@@ -61,8 +61,8 @@ serve(async (req: Request) => {
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
             )
         }
-        if req.method === 'POST' {
-            const body = await req.json();
+        if (req.method === 'POST') {
+            const courseData = await req.json();
             const {data,error} = await supabase
             .from('courses')
             .insert([courseData])
@@ -92,7 +92,7 @@ serve(async (req: Request) => {
                 )
             }
 
-            console.log('✅ Curso creado exitosamente:', data.id)
+            console.log('✅ Curso creado exitosamente:', data?.[0]?.id)
             return new Response(
                 JSON.stringify({ 
                     success: true, 

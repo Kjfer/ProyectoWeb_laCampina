@@ -417,6 +417,112 @@ export type Database = {
         }
         Relationships: []
       }
+      course_weekly_resources: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          file_size: number | null
+          id: string
+          is_published: boolean | null
+          mime_type: string | null
+          position: number
+          resource_type: string
+          resource_url: string | null
+          section_id: string
+          settings: Json | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          file_size?: number | null
+          id?: string
+          is_published?: boolean | null
+          mime_type?: string | null
+          position?: number
+          resource_type: string
+          resource_url?: string | null
+          section_id: string
+          settings?: Json | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          file_size?: number | null
+          id?: string
+          is_published?: boolean | null
+          mime_type?: string | null
+          position?: number
+          resource_type?: string
+          resource_url?: string | null
+          section_id?: string
+          settings?: Json | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_weekly_resources_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "course_weekly_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_weekly_sections: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          is_published: boolean | null
+          position: number
+          start_date: string | null
+          title: string
+          updated_at: string | null
+          week_number: number
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          is_published?: boolean | null
+          position?: number
+          start_date?: string | null
+          title: string
+          updated_at?: string | null
+          week_number: number
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          is_published?: boolean | null
+          position?: number
+          start_date?: string | null
+          title?: string
+          updated_at?: string | null
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_weekly_sections_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       courses: {
         Row: {
           academic_year: string
