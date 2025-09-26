@@ -6,7 +6,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Users, Clock, Plus, ArrowRight } from 'lucide-react';
+import { BookOpen, Users, Clock, Plus, ArrowRight, GraduationCap, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Course {
@@ -16,11 +16,23 @@ interface Course {
   code: string;
   academic_year: string;
   semester: string;
+  is_active: boolean;
+  created_at: string;
   teacher: {
+    id: string;
     first_name: string;
     last_name: string;
+    email: string;
+  };
+  classroom?: {
+    id: string;
+    name: string;
+    grade: string;
+    education_level: string;
   };
   enrollments?: { count: number }[];
+  enrolled_at?: string; // For students
+  enrollment_status?: string; // For students
 }
 
 const Courses = () => {
@@ -38,38 +50,46 @@ const Courses = () => {
     if (!profile) return;
 
     try {
-      let query = supabase
-        .from('courses')
-        .select(`
-          *,
-          teacher:profiles!courses_teacher_id_fkey (
-            first_name,
-            last_name
-          ),
-          enrollments:course_enrollments (count)
-        `);
-
-      // Filter based on user role
-      if (profile.role === 'student') {
-        query = query.eq('course_enrollments.student_id', profile.id);
-      } else if (profile.role === 'teacher') {
-        query = query.eq('teacher_id', profile.id);
-      }
-
-      const { data, error } = await query;
+      setLoading(true);
+      
+      // Use Edge Function to get courses based on user role
+      const { data, error } = await supabase.functions.invoke('get-student-courses', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
       if (error) {
-        console.error('Error fetching courses:', error);
+        console.error('Error calling get-student-courses function:', error);
         toast({
           title: "Error",
           description: "No se pudieron cargar los cursos",
           variant: "destructive",
         });
-      } else {
-        setCourses(data || []);
+        return;
       }
+
+      if (!data?.success) {
+        console.error('Error in function response:', data?.error);
+        toast({
+          title: "Error",
+          description: data?.error || "Error al obtener los cursos",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log(`✅ Cursos cargados para ${data.user_role}:`, data.count);
+      setCourses(data.data || []);
+
     } catch (error) {
       console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Error interno al cargar los cursos",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -149,6 +169,14 @@ const Courses = () => {
                 </p>
                 
                 <div className="space-y-3">
+                  {/* Aula Virtual info for students */}
+                  {profile?.role === 'student' && course.classroom && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <GraduationCap className="w-4 h-4" />
+                      <span>{course.classroom.name} - {course.classroom.grade}</span>
+                    </div>
+                  )}
+                  
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Users className="w-4 h-4" />
                     <span>
@@ -161,7 +189,16 @@ const Courses = () => {
                     <span>{course.academic_year} - {course.semester}</span>
                   </div>
 
-                  {course.enrollments && course.enrollments[0] && (
+                  {/* Enrollment date for students */}
+                  {profile?.role === 'student' && course.enrolled_at && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="w-4 h-4" />
+                      <span>Inscrito: {new Date(course.enrolled_at).toLocaleDateString()}</span>
+                    </div>
+                  )}
+
+                  {/* Student count for teachers and admins */}
+                  {profile?.role !== 'student' && course.enrollments && course.enrollments[0] && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Users className="w-4 h-4" />
                       <span>{course.enrollments[0].count} estudiantes</span>
