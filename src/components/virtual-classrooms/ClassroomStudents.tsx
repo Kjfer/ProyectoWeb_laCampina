@@ -40,7 +40,6 @@ export function ClassroomStudents({ classroomId, canManage, onUpdate }: Classroo
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [selectedCourseId, setSelectedCourseId] = useState('');
 
   useEffect(() => {
     fetchStudents();
@@ -121,38 +120,60 @@ export function ClassroomStudents({ classroomId, canManage, onUpdate }: Classroo
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedStudentId || !selectedCourseId) {
-      toast.error('Por favor selecciona un estudiante y un curso');
+    if (!selectedStudentId) {
+      toast.error('Por favor selecciona un estudiante');
+      return;
+    }
+
+    if (courses.length === 0) {
+      toast.error('No hay cursos disponibles en esta aula virtual');
       return;
     }
 
     try {
-      // Check if student is already enrolled in the course
-      const { data: existing } = await supabase
+      // Check if student is already enrolled in any course of this classroom
+      const { data: existingEnrollments } = await supabase
         .from('course_enrollments')
-        .select('id')
+        .select('course_id')
         .eq('student_id', selectedStudentId)
-        .eq('course_id', selectedCourseId)
-        .single();
+        .in('course_id', courses.map(c => c.id));
 
-      if (existing) {
-        toast.error('El estudiante ya está inscrito en este curso');
+      // Get courses where student is not enrolled yet
+      const enrolledCourseIds = existingEnrollments?.map(e => e.course_id) || [];
+      const coursesToEnroll = courses.filter(course => !enrolledCourseIds.includes(course.id));
+
+      if (coursesToEnroll.length === 0) {
+        toast.error('El estudiante ya está inscrito en todos los cursos de esta aula virtual');
         return;
       }
 
+      // Enroll student in all available courses of this virtual classroom
+      const enrollmentData = coursesToEnroll.map(course => ({
+        student_id: selectedStudentId,
+        course_id: course.id,
+        enrolled_at: new Date().toISOString()
+      }));
+
       const { error } = await supabase
         .from('course_enrollments')
-        .insert({
-          student_id: selectedStudentId,
-          course_id: selectedCourseId
-        });
+        .insert(enrollmentData);
 
       if (error) throw error;
 
-      toast.success('Estudiante agregado exitosamente');
+      const enrolledCount = coursesToEnroll.length;
+      const skippedCount = courses.length - enrolledCount;
+      
+      let message = `Estudiante agregado exitosamente al aula virtual`;
+      if (enrolledCount > 0) {
+        message += ` (inscrito en ${enrolledCount} curso${enrolledCount !== 1 ? 's' : ''})`;
+      }
+      if (skippedCount > 0) {
+        message += `. Ya estaba inscrito en ${skippedCount} curso${skippedCount !== 1 ? 's' : ''}`;
+      }
+
+      toast.success(message);
       setIsAddDialogOpen(false);
       setSelectedStudentId('');
-      setSelectedCourseId('');
       fetchStudents();
       onUpdate();
     } catch (error) {
@@ -186,61 +207,75 @@ export function ClassroomStudents({ classroomId, canManage, onUpdate }: Classroo
               </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Agregar Estudiante</DialogTitle>
+                <DialogTitle>Agregar Estudiante al Aula Virtual</DialogTitle>
                 <DialogDescription>
-                  Selecciona un estudiante y el curso al que deseas inscribirlo
+                  Selecciona un estudiante para inscribirlo en todos los cursos de esta aula virtual
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleAddStudent} className="space-y-4">
-                <div>
-                  <Label htmlFor="student">Estudiante</Label>
-                  <Select 
-                    value={selectedStudentId} 
-                    onValueChange={setSelectedStudentId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar estudiante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableStudents.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.first_name} {student.last_name} - {student.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              
+              {courses.length === 0 ? (
+                <div className="py-4">
+                  <p className="text-sm text-muted-foreground text-center">
+                    No hay cursos disponibles en esta aula virtual. 
+                    Primero debes crear cursos para poder agregar estudiantes.
+                  </p>
+                  <div className="flex justify-end mt-4">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsAddDialogOpen(false)}
+                    >
+                      Cerrar
+                    </Button>
+                  </div>
                 </div>
+              ) : (
+                <form onSubmit={handleAddStudent} className="space-y-4">
+                  <div>
+                    <Label htmlFor="student">Estudiante</Label>
+                    <Select 
+                      value={selectedStudentId} 
+                      onValueChange={setSelectedStudentId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar estudiante" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableStudents.map((student) => (
+                          <SelectItem key={student.id} value={student.id}>
+                            {student.first_name} {student.last_name} - {student.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div>
-                  <Label htmlFor="course">Curso</Label>
-                  <Select 
-                    value={selectedCourseId} 
-                    onValueChange={setSelectedCourseId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar curso" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses.map((course) => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.name} ({course.code})
-                        </SelectItem>
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Cursos incluidos ({courses.length}):</strong>
+                    </p>
+                    <ul className="text-sm text-muted-foreground mt-1">
+                      {courses.slice(0, 3).map(course => (
+                        <li key={course.id}>• {course.name} ({course.code})</li>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      {courses.length > 3 && (
+                        <li>• ... y {courses.length - 3} curso{courses.length - 3 !== 1 ? 's' : ''} más</li>
+                      )}
+                    </ul>
+                  </div>
 
-                <div className="flex justify-end space-x-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsAddDialogOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit">Agregar Estudiante</Button>
-                </div>
-              </form>
+                  <div className="flex justify-end space-x-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsAddDialogOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button type="submit">Agregar al Aula Virtual</Button>
+                  </div>
+                </form>
+              )}
             </DialogContent>
           </Dialog>
           

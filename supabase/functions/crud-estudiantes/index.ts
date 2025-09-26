@@ -60,7 +60,7 @@ serve(async (req: Request) => {
       )
     }
 
-    // Handle POST requests - Crear estudiante
+    // Handle POST requests - Crear estudiante y asociarlo a aulas virtuales
     if (req.method === 'POST') {
       console.log('➕ Creando estudiante...')
       
@@ -77,7 +77,7 @@ serve(async (req: Request) => {
         )
       }
 
-      const { first_name, last_name, email, role, user_id } = body
+      const { first_name, last_name, email, role, user_id, virtual_classroom_ids, course_ids } = body
 
       // Validar campos requeridos
       if (!first_name || !last_name || !email || !role) {
@@ -85,6 +85,18 @@ serve(async (req: Request) => {
           JSON.stringify({ 
             success: false,
             error: 'Campos requeridos: first_name, last_name, email, role'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        )
+      }
+
+      // Validar que el role sea válido
+      const validRoles = ['student', 'teacher', 'admin']
+      if (!validRoles.includes(role.trim())) {
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Role debe ser: student, teacher o admin'
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         )
@@ -99,16 +111,17 @@ serve(async (req: Request) => {
         is_active: true
       }
 
-      const { data, error } = await supabase
+      // Crear el estudiante
+      const { data: studentData, error: studentError } = await supabase
         .from('profiles')
         .insert([profileData])
         .select()
         .single()
 
-      if (error) {
-        console.error('❌ Error al crear estudiante:', error)
+      if (studentError) {
+        console.error('❌ Error al crear estudiante:', studentError)
         
-        if (error.code === '23505') { // Unique constraint violation
+        if (studentError.code === '23505') { // Unique constraint violation
           return new Response(
             JSON.stringify({ 
               success: false, 
@@ -123,18 +136,115 @@ serve(async (req: Request) => {
           JSON.stringify({ 
             success: false, 
             error: 'Error al crear estudiante',
-            details: error.message 
+            details: studentError.message 
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
         )
       }
 
-      console.log(`✅ Estudiante creado: ${data?.id}`)
+      console.log(`✅ Estudiante creado: ${studentData?.id}`)
+
+      // Asociar estudiante a aulas virtuales si se especifican
+      let enrollmentResults = []
+      if (role.trim() === 'student' && (virtual_classroom_ids || course_ids)) {
+        try {
+          // Si se especifican aulas virtuales, obtener todos sus cursos
+          if (virtual_classroom_ids && Array.isArray(virtual_classroom_ids) && virtual_classroom_ids.length > 0) {
+            console.log(`🔗 Asociando estudiante a ${virtual_classroom_ids.length} aulas virtuales...`)
+            
+            const { data: classroomCourses, error: coursesError } = await supabase
+              .from('courses')
+              .select('id, name, classroom_id')
+              .in('classroom_id', virtual_classroom_ids)
+              .eq('is_active', true)
+
+            if (coursesError) {
+              console.error('❌ Error al obtener cursos de aulas virtuales:', coursesError)
+            } else if (classroomCourses && classroomCourses.length > 0) {
+              // Inscribir estudiante en todos los cursos de las aulas especificadas
+              const enrollmentData = classroomCourses.map(course => ({
+                student_id: studentData.id,
+                course_id: course.id,
+                enrolled_at: new Date().toISOString()
+              }))
+
+              const { data: enrollments, error: enrollmentError } = await supabase
+                .from('course_enrollments')
+                .insert(enrollmentData)
+                .select('*, course:courses(name, classroom_id)')
+
+              if (enrollmentError) {
+                console.error('❌ Error al inscribir en cursos de aulas virtuales:', enrollmentError)
+              } else {
+                enrollmentResults.push(...(enrollments || []))
+                console.log(`✅ Estudiante inscrito en ${enrollments?.length || 0} cursos de aulas virtuales`)
+              }
+            }
+          }
+
+          // Si se especifican cursos específicos adicionales
+          if (course_ids && Array.isArray(course_ids) && course_ids.length > 0) {
+            console.log(`🔗 Asociando estudiante a ${course_ids.length} cursos específicos...`)
+            
+            // Verificar que los cursos existen
+            const { data: existingCourses, error: verifyError } = await supabase
+              .from('courses')
+              .select('id, name, classroom_id')
+              .in('id', course_ids)
+              .eq('is_active', true)
+
+            if (verifyError) {
+              console.error('❌ Error al verificar cursos:', verifyError)
+            } else if (existingCourses && existingCourses.length > 0) {
+              // Filtrar cursos que no fueron inscritos previamente
+              const existingEnrollmentCourses = enrollmentResults.map(e => e.course_id)
+              const newCourseIds = existingCourses
+                .filter(course => !existingEnrollmentCourses.includes(course.id))
+                .map(course => course.id)
+
+              if (newCourseIds.length > 0) {
+                const enrollmentData = newCourseIds.map(courseId => ({
+                  student_id: studentData.id,
+                  course_id: courseId,
+                  enrolled_at: new Date().toISOString()
+                }))
+
+                const { data: additionalEnrollments, error: additionalError } = await supabase
+                  .from('course_enrollments')
+                  .insert(enrollmentData)
+                  .select('*, course:courses(name, classroom_id)')
+
+                if (additionalError) {
+                  console.error('❌ Error al inscribir en cursos específicos:', additionalError)
+                } else {
+                  enrollmentResults.push(...(additionalEnrollments || []))
+                  console.log(`✅ Estudiante inscrito en ${additionalEnrollments?.length || 0} cursos específicos adicionales`)
+                }
+              }
+            }
+          }
+        } catch (associationError) {
+          console.error('❌ Error en proceso de asociación:', associationError)
+          // No retornamos error aquí porque el estudiante ya fue creado exitosamente
+        }
+      }
+
+      // Preparar respuesta con información de inscripciones
+      const responseData = {
+        student: studentData,
+        enrollments: enrollmentResults,
+        summary: {
+          total_enrollments: enrollmentResults.length,
+          virtual_classrooms_associated: virtual_classroom_ids?.length || 0,
+          specific_courses_associated: course_ids?.length || 0
+        }
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
-          data: data,
-          message: 'Estudiante creado exitosamente'
+          data: responseData,
+          message: `Estudiante creado exitosamente${enrollmentResults.length > 0 ? ` e inscrito en ${enrollmentResults.length} curso${enrollmentResults.length !== 1 ? 's' : ''}` : ''}`
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 }
       )

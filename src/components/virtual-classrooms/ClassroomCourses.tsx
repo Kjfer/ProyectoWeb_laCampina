@@ -318,10 +318,6 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
                     Profesor: {course.teacher.first_name} {course.teacher.last_name}
                   </div>
                 )}
-
-                <Button variant="outline" className="w-full" onClick={(e) => e.stopPropagation()}>
-                  Ver Detalles
-                </Button>
               </CardContent>
             </Card>
           ))

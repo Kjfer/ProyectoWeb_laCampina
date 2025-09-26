@@ -40,7 +40,7 @@ serve(async (req: Request) => {
                 .order('created_at', { ascending: false })
 
             if (error) {
-                console.error('❌ Error al obtener cursos:', error)
+                console.error(' Error al obtener cursos:', error)
                 return new Response(
                     JSON.stringify({ 
                         success: false, 
@@ -51,7 +51,7 @@ serve(async (req: Request) => {
                 )
             }
             
-            console.log(`✅ Cursos obtenidos: ${data?.length || 0}`)
+            console.log(`Cursos obtenidos: ${data?.length || 0}`)
             return new Response(
                 JSON.stringify({ 
                     success: true, 
@@ -61,64 +61,12 @@ serve(async (req: Request) => {
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
             )
         }
-
-        // Handle POST requests - Crear nuevo curso
-        if (req.method === 'POST') {
-            console.log('➕ Creando nuevo curso...')
-            
-            // Validar que hay body
-            let body;
-            try {
-                body = await req.json();
-            } catch (parseError) {
-                console.error('❌ Error parseando JSON:', parseError)
-                return new Response(
-                    JSON.stringify({ 
-                        success: false, 
-                        error: 'JSON inválido en el body de la petición',
-                        details: 'El body debe ser un JSON válido'
-                    }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-                )
-            }
-
-            // Validar campos requeridos
-            const requiredFields = ['name', 'description', 'code', 'teacher_id', 'academic_year', 'semester']
-            const missingFields = requiredFields.filter(field => !body[field])
-            
-            if (missingFields.length > 0) {
-                console.error('❌ Campos faltantes:', missingFields)
-                return new Response(
-                    JSON.stringify({ 
-                        success: false, 
-                        error: 'Campos requeridos faltantes',
-                        details: `Los siguientes campos son requeridos: ${missingFields.join(', ')}`,
-                        missingFields
-                    }),
-                    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-                )
-            }
-
-            // Preparar datos del curso
-            const courseData = {
-                name: body.name?.trim(),
-                description: body.description?.trim(),
-                code: body.code?.trim().toUpperCase(),
-                teacher_id: body.teacher_id,
-                academic_year: body.academic_year,
-                semester: body.semester,
-                classroom_id: body.classroom_id || null,
-                is_active: body.is_active !== undefined ? body.is_active : true
-            }
-
-            console.log('📝 Datos del curso a crear:', courseData)
-
-            const { data, error } = await supabase
-                .from('courses')
-                .insert([courseData])
-                .select()
-                .single()
-
+        if req.method === 'POST' {
+            const body = await req.json();
+            const {data,error} = await supabase
+            .from('courses')
+            .insert([courseData])
+            .select();
             if (error) {
                 console.error('❌ Error al crear curso:', error)
                 
