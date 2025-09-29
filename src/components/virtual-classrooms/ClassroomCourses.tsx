@@ -50,7 +50,9 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
     code: '',
     academic_year: new Date().getFullYear().toString(),
     semester: '',
-    teacher_id: ''
+    teacher_id: '',
+    start_date: '',
+    end_date: ''
   });
 
   const semesters = [
@@ -116,14 +118,40 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
           academic_year: formData.academic_year,
           semester: formData.semester,
           teacher_id: formData.teacher_id,
-          classroom_id: classroomId
+          classroom_id: classroomId,
+          start_date: formData.start_date || null,
+          end_date: formData.end_date || null
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      toast.success('Curso creado exitosamente');
+      // Generate weekly sections automatically if dates are provided
+      if (formData.start_date && formData.end_date) {
+        try {
+          const { data: weeksData, error: weeksError } = await supabase.functions.invoke('generate-course-weeks', {
+            body: {
+              courseId: data.id,
+              startDate: formData.start_date,
+              endDate: formData.end_date
+            }
+          });
+
+          if (weeksError) {
+            console.error('Error generating weeks:', weeksError);
+            toast.error('El curso se creó pero no se pudieron generar las semanas automáticamente');
+          } else {
+            toast.success(`Curso creado con ${weeksData.weeksGenerated} semanas generadas automáticamente`);
+          }
+        } catch (weeksError) {
+          console.error('Error calling generate-course-weeks:', weeksError);
+          toast.error('El curso se creó pero no se pudieron generar las semanas automáticamente');
+        }
+      } else {
+        toast.success('Curso creado exitosamente');
+      }
+
       setIsCreateDialogOpen(false);
       setFormData({
         name: '',
@@ -131,7 +159,9 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
         code: '',
         academic_year: new Date().getFullYear().toString(),
         semester: '',
-        teacher_id: ''
+        teacher_id: '',
+        start_date: '',
+        end_date: ''
       });
       fetchCourses();
       onUpdate();
@@ -248,6 +278,33 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="start_date">Fecha de Inicio</Label>
+                    <Input
+                      id="start_date"
+                      type="date"
+                      value={formData.start_date}
+                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="end_date">Fecha de Fin</Label>
+                    <Input
+                      id="end_date"
+                      type="date"
+                      value={formData.end_date}
+                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {formData.start_date && formData.end_date && (
+                  <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+                    <strong>💡 Generación automática:</strong> Se crearán automáticamente las semanas del curso basadas en las fechas seleccionadas.
+                  </div>
+                )}
 
                 <div className="flex justify-end space-x-2">
                   <Button 
