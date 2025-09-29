@@ -75,6 +75,7 @@ const getResourceTypeLabel = (type: string) => {
 export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSection }: CourseWeeklySectionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showResourceForm, setShowResourceForm] = useState(false);
+  const [showQuizForm, setShowQuizForm] = useState(false);
 
   const handleResourceClick = (resource: WeeklyResource) => {
     if (resource.resource_url) {
