@@ -195,6 +195,33 @@ export function StudentSubmissions({
     return { label: 'Entregado', color: 'secondary' };
   };
 
+  const handleDownloadSubmission = async () => {
+    if (!submission?.file_path) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('download-file', {
+        body: {
+          bucket: 'student-submissions',
+          filePath: submission.file_path,
+          fileName: submission.file_name
+        }
+      });
+
+      if (error) throw error;
+
+      // Download the file using the signed URL
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = data.fileName || submission.file_name || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('Error al descargar el archivo');
+    }
+  };
+
   const status = getSubmissionStatus();
 
   if (loading) {
@@ -243,8 +270,15 @@ export function StudentSubmissions({
                 )}
                 {submission.file_name && (
                   <div className="flex items-center gap-2 mt-2">
-                    <Download className="h-4 w-4" />
-                    <span className="text-sm">{submission.file_name}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadSubmission}
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span className="text-sm">{submission.file_name}</span>
+                    </Button>
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">

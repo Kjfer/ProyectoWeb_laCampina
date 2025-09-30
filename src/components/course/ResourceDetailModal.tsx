@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,11 @@ import {
   Clock,
   Target
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { StudentSubmissions } from './StudentSubmissions';
+import { AssignmentSubmissionManager } from './AssignmentSubmissionManager';
+import { toast } from 'sonner';
 
 interface WeeklyResource {
   id: string;
@@ -84,15 +89,37 @@ const formatFileSize = (bytes?: number) => {
 };
 
 export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetailModalProps) {
-  const handleDownload = () => {
-    if (resource.resource_url) {
-      // Create a temporary anchor element to trigger download
-      const link = document.createElement('a');
-      link.href = resource.resource_url;
-      link.download = resource.title;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  const { profile } = useAuth();
+  const [showSubmissions, setShowSubmissions] = useState(false);
+
+  const handleDownload = async () => {
+    try {
+      if (resource.file_path) {
+        // Use edge function for secure downloads
+        const { data, error } = await supabase.functions.invoke('download-file', {
+          body: {
+            bucket: 'course-documents',
+            filePath: resource.file_path,
+            fileName: resource.title
+          }
+        });
+
+        if (error) throw error;
+
+        // Download the file using the signed URL
+        const link = document.createElement('a');
+        link.href = data.signedUrl;
+        link.download = data.fileName || resource.title;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else if (resource.resource_url) {
+        // For external URLs, open in new tab
+        window.open(resource.resource_url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('Error al descargar el archivo');
     }
   };
 
@@ -236,12 +263,34 @@ export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetai
               <Button 
                 variant="secondary"
                 className="flex-1"
+                onClick={() => setShowSubmissions(true)}
               >
                 <ClipboardList className="h-4 w-4 mr-2" />
-                Enviar Tarea
+                {profile?.role === 'student' ? 'Ver/Enviar Tarea' : 'Ver Entregas'}
               </Button>
             )}
           </div>
+
+          {/* Student Submissions Section */}
+          {showSubmissions && resource.resource_type === 'assignment' && (
+            <div className="mt-6 border-t pt-6 space-y-4">
+              {profile?.role === 'student' ? (
+                <StudentSubmissions
+                  resourceId={resource.id}
+                  assignmentTitle={resource.title}
+                  deadline={resource.assignment_deadline}
+                  maxScore={resource.max_score}
+                  canSubmit={resource.allows_student_submissions || false}
+                />
+              ) : (profile?.role === 'teacher' || profile?.role === 'admin') ? (
+                <AssignmentSubmissionManager
+                  resourceId={resource.id}
+                  assignmentTitle={resource.title}
+                  maxScore={resource.max_score}
+                />
+              ) : null}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
