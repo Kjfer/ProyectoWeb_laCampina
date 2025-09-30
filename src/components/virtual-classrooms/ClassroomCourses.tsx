@@ -51,8 +51,7 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
     academic_year: new Date().getFullYear().toString(),
     semester: '',
     teacher_id: '',
-    start_date: '',
-    end_date: ''
+    start_date: ''
   });
 
   const semesters = [
@@ -75,9 +74,11 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
         .eq('is_active', true);
 
       if (error) throw error;
+      console.log('📚 Profesores cargados:', data?.length || 0);
       setTeachers(data || []);
     } catch (error) {
       console.error('Error fetching teachers:', error);
+      toast.error('Error al cargar la lista de profesores');
     }
   };
 
@@ -109,48 +110,90 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
     e.preventDefault();
     
     try {
-      const { data, error } = await supabase
-        .from('courses')
-        .insert({
-          name: formData.name,
-          description: formData.description,
-          code: formData.code,
-          academic_year: formData.academic_year,
-          semester: formData.semester,
-          teacher_id: formData.teacher_id,
-          classroom_id: classroomId,
-          start_date: formData.start_date || null,
-          end_date: formData.end_date || null
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Generate weekly sections automatically if dates are provided
-      if (formData.start_date && formData.end_date) {
-        try {
-          const { data: weeksData, error: weeksError } = await supabase.functions.invoke('generate-course-weeks', {
-            body: {
-              courseId: data.id,
-              startDate: formData.start_date,
-              endDate: formData.end_date
-            }
-          });
-
-          if (weeksError) {
-            console.error('Error generating weeks:', weeksError);
-            toast.error('El curso se creó pero no se pudieron generar las semanas automáticamente');
-          } else {
-            toast.success(`Curso creado con ${weeksData.weeksGenerated} semanas generadas automáticamente`);
-          }
-        } catch (weeksError) {
-          console.error('Error calling generate-course-weeks:', weeksError);
-          toast.error('El curso se creó pero no se pudieron generar las semanas automáticamente');
-        }
-      } else {
-        toast.success('Curso creado exitosamente');
+      // Validar campos requeridos en el frontend
+      if (!formData.name.trim()) {
+        toast.error('El nombre del curso es requerido');
+        return;
       }
+      if (!formData.code.trim()) {
+        toast.error('El código del curso es requerido');
+        return;
+      }
+      if (!formData.academic_year.trim()) {
+        toast.error('El año académico es requerido');
+        return;
+      }
+      if (!formData.semester) {
+        toast.error('El semestre es requerido');
+        return;
+      }
+      if (!formData.teacher_id) {
+        toast.error('Debe seleccionar un profesor');
+        return;
+      }
+
+      // Get session for authentication
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) {
+        toast.error('No estás autenticado');
+        return;
+      }
+
+      // Prepare the body data
+      const bodyData = {
+        name: formData.name,
+        description: formData.description,
+        code: formData.code,
+        academic_year: formData.academic_year,
+        semester: formData.semester,
+        teacher_id: formData.teacher_id,
+        classroom_id: classroomId,
+        start_date: formData.start_date || null
+      };
+
+      console.log('📤 Enviando datos a create-course:', bodyData);
+      console.log('🔑 JWT Token para Postman:', session.session.access_token);
+
+      // Use fetch directly to get better error information
+      const supabaseUrl = 'https://dvucxenjdfxxqtekhqfg.supabase.co';
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-course`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bodyData)
+      });
+
+      let data;
+      const responseText = await response.text();
+      
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('📋 Could not parse response:', responseText);
+        toast.error('Error: Respuesta inválida del servidor');
+        return;
+      }
+
+      if (!response.ok) {
+        console.error(`❌ HTTP ${response.status} Error:`, data);
+        toast.error(data.error || `Error HTTP ${response.status}`);
+        return;
+      }
+
+      if (!data?.success) {
+        console.error('Error in function response:', data?.error);
+        console.error('Full response data:', JSON.stringify(data, null, 2));
+        throw new Error(data?.error || 'Error en la respuesta del servidor');
+      }
+
+      console.log('✅ Curso creado exitosamente:', data.data);
+      console.log('📊 Información de semanas:', {
+        weeks_generated: data.weeks_generated,
+        message: data.message
+      });
+      toast.success(data.message || 'Curso creado exitosamente');
 
       setIsCreateDialogOpen(false);
       setFormData({
@@ -160,8 +203,7 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
         academic_year: new Date().getFullYear().toString(),
         semester: '',
         teacher_id: '',
-        start_date: '',
-        end_date: ''
+        start_date: ''
       });
       fetchCourses();
       onUpdate();
@@ -279,32 +321,23 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="start_date">Fecha de Inicio</Label>
-                    <Input
-                      id="start_date"
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="end_date">Fecha de Fin</Label>
-                    <Input
-                      id="end_date"
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="start_date">Fecha de Inicio (Opcional)</Label>
+                  <Input
+                    id="start_date"
+                    type="date"
+                    value={formData.start_date}
+                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                    placeholder="Si no se especifica, usará 15 de enero"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Si no especificas fecha, se usará el 15 de enero del año académico
+                  </p>
                 </div>
 
-                {formData.start_date && formData.end_date && (
-                  <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg text-sm text-blue-700 dark:text-blue-300">
-                    <strong>💡 Generación automática:</strong> Se crearán automáticamente las semanas del curso basadas en las fechas seleccionadas.
-                  </div>
-                )}
+                <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+                  <strong>📅 Generación automática:</strong> Las semanas se generarán desde la fecha de inicio hasta el 31 de diciembre del año académico seleccionado.
+                </div>
 
                 <div className="flex justify-end space-x-2">
                   <Button 
