@@ -6,16 +6,23 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown, ChevronRight, Plus, FileText, Link2, ClipboardList, Video, FileImage } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { ResourceForm } from './ResourceForm';
+import { ResourceDetailModal } from './ResourceDetailModal';
 
 interface WeeklyResource {
   id: string;
   title: string;
-  description: string;
+  description?: string;
   resource_type: 'material' | 'exam' | 'link' | 'assignment' | 'video' | 'document';
   resource_url?: string;
+  file_path?: string;
+  file_size?: number;
+  mime_type?: string;
   is_published: boolean;
   position: number;
-  settings: any;
+  allows_student_submissions?: boolean;
+  assignment_deadline?: string;
+  max_score?: number;
+  settings?: any;
 }
 
 interface WeeklySection {
@@ -75,12 +82,10 @@ const getResourceTypeLabel = (type: string) => {
 export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSection }: CourseWeeklySectionProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showResourceForm, setShowResourceForm] = useState(false);
-  const [showQuizForm, setShowQuizForm] = useState(false);
+  const [selectedResource, setSelectedResource] = useState<WeeklyResource | null>(null);
 
   const handleResourceClick = (resource: WeeklyResource) => {
-    if (resource.resource_url) {
-      window.open(resource.resource_url, '_blank');
-    }
+    setSelectedResource(resource);
   };
 
   return (
@@ -178,6 +183,15 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                     // Refresh the section data
                     onUpdateSection?.(section);
                   }}
+                />
+              )}
+
+              {/* Resource Detail Modal */}
+              {selectedResource && (
+                <ResourceDetailModal
+                  resource={selectedResource}
+                  isOpen={!!selectedResource}
+                  onClose={() => setSelectedResource(null)}
                 />
               )}
             </div>
