@@ -117,61 +117,55 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
         <CollapsibleContent>
           <CardContent>
             <div className="space-y-4">
-              {/* Add Resource Button for Teachers/Admins */}
-              {canEdit && (
-                <div className="flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowResourceForm(true)}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar Recurso
-                  </Button>
-                </div>
-              )}
-
-              {/* Resources List */}
-              {section.resources && section.resources.length > 0 ? (
-                <div className="grid gap-3">
-                  {section.resources
+              <div className="min-h-[350px] space-y-3">
+                {section.resources && section.resources.length > 0 ? (
+                  section.resources
                     .sort((a, b) => a.position - b.position)
                     .map((resource) => (
                       <div
                         key={resource.id}
-                        className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
                         onClick={() => handleResourceClick(resource)}
                       >
                         <div className="flex items-center gap-2 text-muted-foreground">
                           {getResourceIcon(resource.resource_type)}
                         </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium">{resource.title}</h4>
+                        <div className="flex-1 space-y-2">
+                          <h4 className="font-medium text-base">{resource.title}</h4>
                           {resource.description && (
                             <p className="text-sm text-muted-foreground">{resource.description}</p>
                           )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {getResourceTypeLabel(resource.resource_type)}
-                          </Badge>
-                          {!resource.is_published && canEdit && (
-                            <Badge variant="secondary" className="text-xs">
-                              Borrador
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="text-xs">
+                              {getResourceTypeLabel(resource.resource_type)}
                             </Badge>
-                          )}
+                            {!resource.is_published && canEdit && (
+                              <Badge variant="secondary" className="text-xs">
+                                Borrador
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No hay recursos disponibles en esta semana</p>
-                  {canEdit && (
-                    <p className="text-sm">Haz clic en "Agregar Recurso" para comenzar</p>
-                  )}
-                </div>
+                    ))
+                ) : (
+                  <div className="text-center py-16 text-muted-foreground">
+                    <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg font-medium">No hay recursos en esta semana</p>
+                    <p className="text-sm">Agrega materiales, videos, tareas y más para tus estudiantes</p>
+                  </div>
+                )}
+              </div>
+              
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowResourceForm(true)}
+                  className="w-full h-12 text-base"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Agregar Recurso
+                </Button>
               )}
 
               {/* Resource Form Modal */}

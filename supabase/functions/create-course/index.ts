@@ -269,18 +269,18 @@ serve(async (req: Request) => {
       if (!startDate) {
         const currentYear = parseInt(academic_year || '2025');
         startDate = new Date(currentYear, 0, 15); // January 15th of academic year
-        console.log(`� No fecha de inicio válida, usando: ${startDate.toISOString().split('T')[0]}`);
+        console.log(`📅 No fecha de inicio válida, usando: ${startDate.toISOString().split('T')[0]}`);
       } else {
         console.log(`📅 Fecha de inicio: ${startDate.toISOString().split('T')[0]}`);
       }
       
       // Calculate end date (December 31st of academic year)
-      const academicYear = parseInt(academic_year || '2025');
-      const endDate = new Date(academicYear, 11, 31); // December 31st
+      const academicYearNum = parseInt(academic_year || '2025');
+      const endDate = new Date(academicYearNum, 11, 31); // December 31st
       console.log(`📅 Fecha de fin: ${endDate.toISOString().split('T')[0]}`);
       
-      // Calculate number of weeks
-      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+      // Calculate number of weeks using date difference in milliseconds
+      const diffTime = endDate.getTime() - startDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       const weekCount = Math.min(Math.ceil(diffDays / 7), 52); // Maximum 52 weeks
       
