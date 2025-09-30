@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { FileText, Video, ExternalLink, ClipboardList, GraduationCap, BookOpen } from 'lucide-react';
+import { FileText, Video, ExternalLink, ClipboardList, GraduationCap, BookOpen, Upload, Calendar, Settings } from 'lucide-react';
 
 interface ResourceFormProps {
   sectionId: string;
@@ -25,7 +25,10 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
     resource_type: 'material' as 'material' | 'document' | 'video' | 'link' | 'assignment' | 'exam',
     resource_url: '',
     file_path: '',
-    is_published: false
+    is_published: false,
+    assignment_deadline: '',
+    max_score: 100,
+    allows_student_submissions: false
   });
 
   const resourceTypes = [
@@ -87,7 +90,10 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
           resource_url: formData.resource_url.trim() || null,
           file_path: formData.file_path || null,
           is_published: formData.is_published,
-          position: 0
+          position: 0,
+          assignment_deadline: formData.assignment_deadline || null,
+          max_score: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.max_score : null,
+          allows_student_submissions: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.allows_student_submissions : false
         });
 
       if (error) throw error;
@@ -106,16 +112,19 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Agregar Nuevo Recurso</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Agregar Nuevo Recurso
+          </DialogTitle>
           <DialogDescription>
-            Crea un nuevo recurso para esta semana del curso.
+            Sube archivos o crea actividades para tus estudiantes. Inspirado en Moodle para una experiencia familiar.
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-3">
             <Label>Tipo de Recurso *</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {resourceTypes.map((type) => {
                 const Icon = type.icon;
                 return (
@@ -123,14 +132,35 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
                     key={type.value}
                     type="button"
                     variant={formData.resource_type === type.value ? "default" : "outline"}
-                    className="h-16 flex flex-col gap-1"
+                    className="h-20 flex flex-col gap-1 p-2"
                     onClick={() => setFormData(prev => ({ ...prev, resource_type: type.value as any }))}
                   >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-xs">{type.label}</span>
+                    <Icon className="h-6 w-6" />
+                    <span className="text-xs text-center leading-tight">{type.label}</span>
                   </Button>
                 );
               })}
+            </div>
+            {/* Descripción contextual del tipo seleccionado */}
+            <div className="bg-muted/50 p-3 rounded-lg text-sm">
+              {formData.resource_type === 'material' && (
+                <p><strong>Material de Estudio:</strong> Documentos, presentaciones o recursos educativos para consulta.</p>
+              )}
+              {formData.resource_type === 'document' && (
+                <p><strong>Documento:</strong> Archivos PDF, Word, Excel u otros documentos descargables.</p>
+              )}
+              {formData.resource_type === 'video' && (
+                <p><strong>Video:</strong> Contenido multimedia para clases o explicaciones.</p>
+              )}
+              {formData.resource_type === 'link' && (
+                <p><strong>Enlace Web:</strong> Enlaces a sitios web externos o recursos online.</p>
+              )}
+              {formData.resource_type === 'assignment' && (
+                <p><strong>Tarea:</strong> Actividad con entrega de archivos y calificación.</p>
+              )}
+              {formData.resource_type === 'exam' && (
+                <p><strong>Examen:</strong> Evaluación con fecha límite y puntuación.</p>
+              )}
             </div>
           </div>
 
@@ -157,19 +187,29 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
           </div>
 
           <div className="space-y-2">
-            <Label>Subir Archivo Local</Label>
-            <FileUpload
-              onFileSelect={handleFileUpload}
-              accept={formData.resource_type === 'video' ? 'video/*' : undefined}
-            />
-            {uploading && (
-              <p className="text-sm text-muted-foreground">Subiendo archivo...</p>
-            )}
-            {formData.file_path && (
-              <p className="text-sm text-muted-foreground">
-                ✓ Archivo subido: {formData.file_path.split('/').pop()}
-              </p>
-            )}
+            <Label>📁 Subir Archivo</Label>
+            <div className="border-2 border-dashed border-muted rounded-lg p-4">
+              <FileUpload
+                onFileSelect={handleFileUpload}
+                accept={
+                  formData.resource_type === 'video' ? 'video/*' : 
+                  formData.resource_type === 'document' ? '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx' : 
+                  undefined
+                }
+              />
+              {uploading && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  Subiendo archivo...
+                </div>
+              )}
+              {formData.file_path && (
+                <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
+                  <FileText className="h-4 w-4" />
+                  ✓ Archivo subido: {formData.file_path.split('/').pop()}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -182,6 +222,49 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
               placeholder="https://ejemplo.com/archivo.pdf"
             />
           </div>
+
+          {/* Configuraciones especiales para tareas y exámenes */}
+          {(formData.resource_type === 'assignment' || formData.resource_type === 'exam') && (
+            <div className="space-y-4 border rounded-lg p-4 bg-blue-50/50 dark:bg-blue-950/20">
+              <div className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                <Label className="font-medium">Configuración de Actividad</Label>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="assignment_deadline">Fecha límite</Label>
+                  <Input
+                    id="assignment_deadline"
+                    type="datetime-local"
+                    value={formData.assignment_deadline}
+                    onChange={(e) => setFormData(prev => ({ ...prev, assignment_deadline: e.target.value }))}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="max_score">Puntuación máxima</Label>
+                  <Input
+                    id="max_score"
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={formData.max_score}
+                    onChange={(e) => setFormData(prev => ({ ...prev, max_score: parseInt(e.target.value) || 100 }))}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="allows_submissions"
+                  checked={formData.allows_student_submissions}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allows_student_submissions: checked }))}
+                />
+                <Label htmlFor="allows_submissions">Permitir entregas de estudiantes</Label>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center space-x-2">
             <Switch

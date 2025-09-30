@@ -63,9 +63,13 @@ export type Database = {
           assignment_id: string | null
           content: string | null
           feedback: string | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
           file_url: string | null
           graded_at: string | null
           id: string
+          mime_type: string | null
           score: number | null
           student_id: string | null
           submitted_at: string | null
@@ -74,9 +78,13 @@ export type Database = {
           assignment_id?: string | null
           content?: string | null
           feedback?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
           file_url?: string | null
           graded_at?: string | null
           id?: string
+          mime_type?: string | null
           score?: number | null
           student_id?: string | null
           submitted_at?: string | null
@@ -85,9 +93,13 @@ export type Database = {
           assignment_id?: string | null
           content?: string | null
           feedback?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
           file_url?: string | null
           graded_at?: string | null
           id?: string
+          mime_type?: string | null
           score?: number | null
           student_id?: string | null
           submitted_at?: string | null
@@ -419,11 +431,15 @@ export type Database = {
       }
       course_weekly_resources: {
         Row: {
+          allows_student_submissions: boolean | null
+          assignment_deadline: string | null
           created_at: string | null
           description: string | null
+          file_path: string | null
           file_size: number | null
           id: string
           is_published: boolean | null
+          max_score: number | null
           mime_type: string | null
           position: number
           resource_type: string
@@ -434,11 +450,15 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          allows_student_submissions?: boolean | null
+          assignment_deadline?: string | null
           created_at?: string | null
           description?: string | null
+          file_path?: string | null
           file_size?: number | null
           id?: string
           is_published?: boolean | null
+          max_score?: number | null
           mime_type?: string | null
           position?: number
           resource_type: string
@@ -449,11 +469,15 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          allows_student_submissions?: boolean | null
+          assignment_deadline?: string | null
           created_at?: string | null
           description?: string | null
+          file_path?: string | null
           file_size?: number | null
           id?: string
           is_published?: boolean | null
+          max_score?: number | null
           mime_type?: string | null
           position?: number
           resource_type?: string
@@ -530,10 +554,12 @@ export type Database = {
           code: string
           created_at: string | null
           description: string | null
+          end_date: string | null
           id: string
           is_active: boolean | null
           name: string
           semester: string
+          start_date: string | null
           teacher_id: string
           updated_at: string | null
         }
@@ -543,10 +569,12 @@ export type Database = {
           code: string
           created_at?: string | null
           description?: string | null
+          end_date?: string | null
           id?: string
           is_active?: boolean | null
           name: string
           semester: string
+          start_date?: string | null
           teacher_id: string
           updated_at?: string | null
         }
@@ -556,10 +584,12 @@ export type Database = {
           code?: string
           created_at?: string | null
           description?: string | null
+          end_date?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
           semester?: string
+          start_date?: string | null
           teacher_id?: string
           updated_at?: string | null
         }
@@ -782,6 +812,142 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      quiz_questions: {
+        Row: {
+          correct_answer: string | null
+          created_at: string | null
+          id: string
+          options: Json | null
+          points: number | null
+          position: number
+          question_text: string
+          question_type: string
+          quiz_id: string
+        }
+        Insert: {
+          correct_answer?: string | null
+          created_at?: string | null
+          id?: string
+          options?: Json | null
+          points?: number | null
+          position?: number
+          question_text: string
+          question_type: string
+          quiz_id: string
+        }
+        Update: {
+          correct_answer?: string | null
+          created_at?: string | null
+          id?: string
+          options?: Json | null
+          points?: number | null
+          position?: number
+          question_text?: string
+          question_type?: string
+          quiz_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_questions_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_submissions: {
+        Row: {
+          answers: Json
+          attempt_number: number | null
+          id: string
+          quiz_id: string
+          score: number | null
+          student_id: string
+          submitted_at: string | null
+        }
+        Insert: {
+          answers: Json
+          attempt_number?: number | null
+          id?: string
+          quiz_id: string
+          score?: number | null
+          student_id: string
+          submitted_at?: string | null
+        }
+        Update: {
+          answers?: Json
+          attempt_number?: number | null
+          id?: string
+          quiz_id?: string
+          score?: number | null
+          student_id?: string
+          submitted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_submissions_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quizzes: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          is_published: boolean | null
+          max_attempts: number | null
+          time_limit_minutes: number | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_published?: boolean | null
+          max_attempts?: number | null
+          time_limit_minutes?: number | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_published?: boolean | null
+          max_attempts?: number | null
+          time_limit_minutes?: number | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       reservations: {
         Row: {
@@ -1043,6 +1209,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_weekly_sections: {
+        Args: {
+          course_id_param: string
+          end_date_param: string
+          start_date_param: string
+        }
+        Returns: undefined
+      }
       get_current_profile_id: {
         Args: Record<PropertyKey, never>
         Returns: string

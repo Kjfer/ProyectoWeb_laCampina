@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { ClassroomCourses } from '@/components/virtual-classrooms/ClassroomCourses';
 import { ClassroomStudents } from '@/components/virtual-classrooms/ClassroomStudents';
+import { StudentClassroomCourses } from '@/components/virtual-classrooms/StudentClassroomCourses';
 
 interface VirtualClassroom {
   id: string;
@@ -134,7 +135,7 @@ export default function VirtualClassroomDetail() {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="courses" className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
-              Cursos
+              {profile?.role === 'student' ? 'Mis Cursos' : 'Cursos'}
             </TabsTrigger>
             <TabsTrigger value="students" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -143,11 +144,15 @@ export default function VirtualClassroomDetail() {
           </TabsList>
 
           <TabsContent value="courses">
-            <ClassroomCourses 
-              classroomId={classroom.id} 
-              canManage={canManage}
-              onUpdate={fetchClassroom}
-            />
+            {profile?.role === 'student' ? (
+              <StudentClassroomCourses classroomId={classroom.id} />
+            ) : (
+              <ClassroomCourses 
+                classroomId={classroom.id} 
+                canManage={canManage}
+                onUpdate={fetchClassroom}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="students">
