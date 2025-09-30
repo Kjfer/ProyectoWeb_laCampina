@@ -32,12 +32,12 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
   });
 
   const resourceTypes = [
-    { value: 'material', label: 'Material de Estudio', icon: BookOpen },
-    { value: 'document', label: 'Documento', icon: FileText },
-    { value: 'video', label: 'Video', icon: Video },
-    { value: 'link', label: 'Enlace Web', icon: ExternalLink },
-    { value: 'assignment', label: 'Tarea', icon: ClipboardList },
-    { value: 'exam', label: 'Examen', icon: GraduationCap }
+    { value: 'material', label: 'Material de Estudio', icon: BookOpen, description: 'Contenido educativo como PDFs, presentaciones' },
+    { value: 'document', label: 'Archivo', icon: FileText, description: 'Documentos, hojas de trabajo, referencias' },
+    { value: 'video', label: 'Video/Audio', icon: Video, description: 'Contenido multimedia educativo' },
+    { value: 'link', label: 'Enlace Web', icon: ExternalLink, description: 'Enlaces a recursos externos' },
+    { value: 'assignment', label: 'Tarea', icon: ClipboardList, description: 'Actividad para entrega de estudiantes' },
+    { value: 'exam', label: 'Evaluación', icon: GraduationCap, description: 'Exámenes y cuestionarios' }
   ];
 
   const handleFileUpload = async (files: File[]) => {
@@ -212,16 +212,6 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="resource_url">O URL del Recurso</Label>
-            <Input
-              id="resource_url"
-              type="url"
-              value={formData.resource_url}
-              onChange={(e) => setFormData(prev => ({ ...prev, resource_url: e.target.value }))}
-              placeholder="https://ejemplo.com/archivo.pdf"
-            />
-          </div>
 
           {/* Configuraciones especiales para tareas y exámenes */}
           {(formData.resource_type === 'assignment' || formData.resource_type === 'exam') && (
@@ -266,13 +256,18 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
             </div>
           )}
 
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="is_published"
-              checked={formData.is_published}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_published: checked }))}
-            />
-            <Label htmlFor="is_published">Publicar inmediatamente</Label>
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="is_published"
+                checked={formData.is_published}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_published: checked }))}
+              />
+              <Label htmlFor="is_published">Hacer visible para estudiantes</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Si no está marcado, solo tú podrás ver este recurso hasta que lo publiques
+            </p>
           </div>
 
           <div className="flex justify-end space-x-2">

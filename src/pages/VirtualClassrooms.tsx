@@ -11,6 +11,7 @@ import { Plus, Users, BookOpen, Calendar, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { ClassroomCoursesList } from '@/components/virtual-classrooms/ClassroomCoursesList';
 
 interface VirtualClassroom {
   id: string;
@@ -401,13 +402,23 @@ export default function VirtualClassrooms() {
                     </div>
                   )}
 
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => window.location.href = `/virtual-classrooms/${classroom.id}`}
-                  >
-                    Ver Detalles
-                  </Button>
+                  {profile?.role === 'student' ? (
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => window.location.href = `/virtual-classrooms/${classroom.id}/courses`}
+                    >
+                      Ver Cursos
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => window.location.href = `/virtual-classrooms/${classroom.id}`}
+                    >
+                      Ver Detalles
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))
