@@ -27,7 +27,7 @@ serve(async (req: Request) => {
         JSON.stringify({ 
           success: false, 
           error: 'JSON inválido en el body de la petición',
-          details: parseError.message
+          details: parseError instanceof Error ? parseError.message : 'Error desconocido'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )

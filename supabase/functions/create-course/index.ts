@@ -196,13 +196,13 @@ serve(async (req: Request) => {
     }
     
     // Auto-calculate end date (December 31st of academic year)
-    const academicYear = parseInt(academic_year?.trim() || '2025');
-    const endDateObj = new Date(academicYear, 11, 31); // December 31st
+    const academicYearNum = parseInt(academic_year?.trim() || '2025');
+    const endDateObj = new Date(academicYearNum, 11, 31); // December 31st
     courseEndDate = endDateObj.toISOString().split('T')[0];
     
     // If no start date provided, use January 15th of academic year
     if (!courseStartDate) {
-      const startDateObj = new Date(academicYear, 0, 15); // January 15th
+      const startDateObj = new Date(academicYearNum, 0, 15); // January 15th
       courseStartDate = startDateObj.toISOString().split('T')[0];
     }
     
@@ -267,8 +267,8 @@ serve(async (req: Request) => {
       
       // If no valid start date, use beginning of academic year
       if (!startDate) {
-        const currentYear = parseInt(academic_year || '2025');
-        startDate = new Date(currentYear, 0, 15); // January 15th of academic year
+        const currentYearNum = parseInt(academic_year || '2025');
+        startDate = new Date(currentYearNum, 0, 15); // January 15th of academic year
         console.log(`📅 No fecha de inicio válida, usando: ${startDate.toISOString().split('T')[0]}`);
       } else {
         console.log(`📅 Fecha de inicio: ${startDate.toISOString().split('T')[0]}`);
