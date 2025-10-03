@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { WeeklyContentManager } from '@/components/course/WeeklyContentManager';
 import { AttendanceManager } from '@/components/course/AttendanceManager';
 import { AttendanceRecords } from '@/components/course/AttendanceRecords';
+import { StudentAttendance } from '@/components/profile/StudentAttendance';
 
 interface Course {
   id: string;
@@ -248,13 +249,19 @@ export default function CourseDetail() {
           </TabsContent>
 
           <TabsContent value="attendance">
-            {canEdit ? (
+            {/* Mostrar el registro completo y el manager sólo a admin o al docente propietario. */}
+            {profile?.role === 'admin' || (profile?.role === 'teacher' && course.teacher && profile.id === course.teacher.id) ? (
               <div className="space-y-6">
                 <AttendanceManager courseId={course.id} />
                 <AttendanceRecords courseId={course.id} />
               </div>
+            ) : profile?.role === 'student' ? (
+              // Los estudiantes ven su propio historial
+              <StudentAttendance />
             ) : (
-              <AttendanceRecords courseId={course.id} />
+              <div className="p-6">
+                <p className="text-muted-foreground">No tienes permisos para ver el historial de asistencia de este curso.</p>
+              </div>
             )}
           </TabsContent>
 
