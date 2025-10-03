@@ -8,13 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { User, Camera, Mail, Phone, Calendar, Shield } from "lucide-react";
+import { User, Camera, Mail, Phone, Calendar, Shield, ClipboardCheck } from "lucide-react";
+import { StudentAttendance } from "@/components/profile/StudentAttendance";
 
 const profileFormSchema = z.object({
   first_name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -127,9 +129,21 @@ export default function Profile() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Información del Perfil */}
-              <div className="lg:col-span-1">
+            <Tabs defaultValue="info" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="info">Información Personal</TabsTrigger>
+                {profile.role === 'student' && (
+                  <TabsTrigger value="attendance" className="flex items-center gap-2">
+                    <ClipboardCheck className="h-4 w-4" />
+                    Mi Asistencia
+                  </TabsTrigger>
+                )}
+              </TabsList>
+
+              <TabsContent value="info">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Información del Perfil */}
+                  <div className="lg:col-span-1">
                 <Card className="bg-gradient-card border-border/50 shadow-card">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -281,7 +295,15 @@ export default function Profile() {
                 </Card>
               </div>
             </div>
-          </div>
+          </TabsContent>
+
+          {profile.role === 'student' && (
+            <TabsContent value="attendance">
+              <StudentAttendance />
+            </TabsContent>
+          )}
+        </Tabs>
+      </div>
     </DashboardLayout>
   );
 }

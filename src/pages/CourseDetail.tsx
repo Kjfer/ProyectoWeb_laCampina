@@ -4,11 +4,14 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Users, GraduationCap, Clock, Calendar } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Users, GraduationCap, Clock, Calendar, ClipboardCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { WeeklyContentManager } from '@/components/course/WeeklyContentManager';
+import { AttendanceManager } from '@/components/course/AttendanceManager';
+import { AttendanceRecords } from '@/components/course/AttendanceRecords';
 
 interface Course {
   id: string;
@@ -223,46 +226,74 @@ export default function CourseDetail() {
           </CardContent>
         </Card>
 
-        {/* Weekly Content Section */}
-        <WeeklyContentManager 
-          courseId={course.id} 
-          canEdit={canEdit || false}
-        />
+        {/* Tabs for Content, Attendance, and Students */}
+        <Tabs defaultValue="content" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="content">Contenido</TabsTrigger>
+            <TabsTrigger value="attendance" className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" />
+              Asistencia
+            </TabsTrigger>
+            <TabsTrigger value="students" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Estudiantes
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Students Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Estudiantes Inscritos ({students.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {students.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {students.map((student) => (
-                  <div key={student.id} className="p-4 border rounded-lg">
-                    <h3 className="font-medium">
-                      {student.first_name} {student.last_name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">{student.email}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Inscrito: {new Date(student.enrolled_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
+          <TabsContent value="content">
+            <WeeklyContentManager 
+              courseId={course.id} 
+              canEdit={canEdit || false}
+            />
+          </TabsContent>
+
+          <TabsContent value="attendance">
+            {canEdit ? (
+              <div className="space-y-6">
+                <AttendanceManager courseId={course.id} />
+                <AttendanceRecords courseId={course.id} />
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No hay estudiantes inscritos</h3>
-                <p className="text-muted-foreground">
-                  Este curso aún no tiene estudiantes inscritos.
-                </p>
-              </div>
+              <AttendanceRecords courseId={course.id} />
             )}
-          </CardContent>
-        </Card>
+          </TabsContent>
+
+          <TabsContent value="students">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Estudiantes Inscritos ({students.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {students.length > 0 ? (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {students.map((student) => (
+                      <div key={student.id} className="p-4 border rounded-lg">
+                        <h3 className="font-medium">
+                          {student.first_name} {student.last_name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">{student.email}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Inscrito: {new Date(student.enrolled_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No hay estudiantes inscritos</h3>
+                    <p className="text-muted-foreground">
+                      Este curso aún no tiene estudiantes inscritos.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
