@@ -220,7 +220,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
                     </TableCell>
                     <TableCell>
                       <Select
-                        value={attendance[student.id]?.status}
+                        value={attendance[student.id]?.status || ""}
                         onValueChange={(value) => handleStatusChange(student.id, value as any)}
                       >
                         <SelectTrigger className="w-[180px]">
