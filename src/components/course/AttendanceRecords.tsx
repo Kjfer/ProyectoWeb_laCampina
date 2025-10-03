@@ -38,11 +38,22 @@ export function AttendanceRecords({ courseId }: AttendanceRecordsProps) {
   const fetchAttendance = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('get-course-attendance', {
-        body: { course_id: courseId },
-      });
+      
+      const response = await fetch(
+        `https://dvucxenjdfxxqtekhqfg.supabase.co/functions/v1/get-course-attendance?course_id=${courseId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          },
+        }
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al cargar la asistencia');
+      }
+
+      const data = await response.json();
 
       setRecords(data.records || []);
       setStats(data.stats || null);
