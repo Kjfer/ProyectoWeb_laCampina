@@ -3,6 +3,7 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { UpcomingClasses } from "@/components/dashboard/UpcomingClasses";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Notifications } from "@/components/Notifications";
 import { BookOpen, FileText, GraduationCap, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import heroImage from "@/assets/hero-education.jpg";
@@ -108,6 +109,7 @@ const Index = () => {
               <div className="lg:col-span-2 space-y-6">
                 <UpcomingClasses />
                 <RecentActivity />
+                {profile?.role === 'student' && <Notifications />}
               </div>
               
               {/* Right Column */}

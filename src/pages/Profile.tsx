@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Camera, Mail, Phone, Calendar, Shield, ClipboardCheck } from "lucide-react";
 import { StudentAttendance } from "@/components/profile/StudentAttendance";
+import { Notifications } from "@/components/Notifications";
 
 const profileFormSchema = z.object({
   first_name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -297,12 +298,18 @@ export default function Profile() {
             </div>
           </TabsContent>
 
-          {profile.role === 'student' && (
-            <TabsContent value="attendance">
-              <StudentAttendance />
-            </TabsContent>
-          )}
-        </Tabs>
+                {profile.role === 'student' && (
+                  <>
+                    <TabsContent value="attendance">
+                      <StudentAttendance />
+                    </TabsContent>
+                    
+                    <TabsContent value="notifications">
+                      <Notifications />
+                    </TabsContent>
+                  </>
+                )}
+              </Tabs>
       </div>
     </DashboardLayout>
   );

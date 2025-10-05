@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Profile {
   id: string;
@@ -49,6 +50,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .single();
             
             setProfile(profile);
+            
+            // Fetch unread notifications for students
+            if (profile && profile.role === 'student') {
+              const { data: notifications } = await supabase
+                .from('notifications')
+                .select('id, message, type')
+                .eq('user_id', profile.id)
+                .eq('is_read', false)
+                .order('created_at', { ascending: false })
+                .limit(3);
+
+              if (notifications && notifications.length > 0) {
+                notifications.forEach((notif) => {
+                  toast.info(notif.message, {
+                    description: notif.type === 'overdue' ? 'Tarea vencida' : 'Tarea pendiente',
+                  });
+                });
+              }
+            }
+            
             setLoading(false);
           }, 0);
         } else {
