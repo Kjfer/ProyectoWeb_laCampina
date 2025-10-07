@@ -109,7 +109,7 @@ const Index = () => {
               <div className="lg:col-span-2 space-y-6">
                 <UpcomingClasses />
                 <RecentActivity />
-                {profile?.role === 'student' && <Notifications />}
+                {/** Notifications moved to header dropdown */}
               </div>
               
               {/* Right Column */}

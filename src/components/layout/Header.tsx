@@ -11,6 +11,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Bell, Search, User, Settings, LogOut } from "lucide-react"
+import { Notifications } from "@/components/Notifications";
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/hooks/use-toast"
@@ -18,6 +21,7 @@ import { useToast } from "@/hooks/use-toast"
 export function Header() {
   const { profile, signOut } = useAuth();
   const { toast } = useToast();
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   const handleSignOut = async () => {
     try {
@@ -34,6 +38,47 @@ export function Header() {
       });
     }
   };
+
+  // Fetch unread notifications count
+  const fetchUnreadCount = async () => {
+    try {
+      if (!profile) return;
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', profile.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+      setUnreadCount((data || []).length);
+    } catch (err) {
+      console.error('Error fetching unread count:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!profile) return;
+    fetchUnreadCount();
+
+    // Setup realtime subscription for notifications for this user
+    const channel = supabase.channel(`notifications_user_${profile.id}`);
+
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` }, (payload) => {
+      // new notification: increment
+      setUnreadCount((c) => c + 1);
+    });
+
+    channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` }, (payload) => {
+      // on update (e.g., marked as read) refetch to be safe
+      fetchUnreadCount();
+    });
+
+    channel.subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [profile?.id]);
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -67,16 +112,29 @@ export function Header() {
 
         {/* Right side */}
         <div className="flex items-center gap-3">
-          {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative hover:bg-primary/10">
-            <Bell className="w-5 h-5" />
-            <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-            >
-              3
-            </Badge>
-          </Button>
+            {/* Notifications */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative hover:bg-primary/10">
+                  <Bell className="w-5 h-5" />
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 min-w-[1.25rem] flex items-center justify-center px-1 text-xs"
+                    aria-label={`${unreadCount} notificaciones sin leer`}
+                  >
+                    {unreadCount}
+                  </Badge>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-96 p-0" align="end">
+                <div className="max-h-80 overflow-auto">
+                  <Notifications />
+                </div>
+                <div className="p-2 text-center">
+                  <a href="/profile" className="text-sm underline">Ver más</a>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
           {/* User menu */}
           <DropdownMenu>
@@ -99,9 +157,7 @@ export function Header() {
                   <p className="text-xs leading-none text-muted-foreground">
                     {profile?.email}
                   </p>
-                  <Badge variant="secondary" className="text-xs w-fit">
-                    {profile ? getRoleLabel(profile.role) : 'Usuario'}
-                  </Badge>
+                  <Badge variant="secondary" className="text-xs w-fit">{profile ? getRoleLabel(profile.role) : 'Usuario'}</Badge>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border/50" />
