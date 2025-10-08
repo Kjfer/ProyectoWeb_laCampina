@@ -130,9 +130,9 @@ export function Header() {
                 <div className="max-h-80 overflow-auto">
                   <Notifications />
                 </div>
-                <div className="p-2 text-center">
-                  <a href="/profile" className="text-sm underline">Ver más</a>
-                </div>
+                <DropdownMenuItem asChild>
+                  <a href="/profile?tab=notifications" className="w-full text-center text-sm underline">Ver más</a>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 

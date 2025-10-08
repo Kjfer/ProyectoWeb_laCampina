@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -107,6 +108,19 @@ export default function Profile() {
     );
   }
 
+  const location = useLocation();
+  const navigate = useNavigate();
+  const params = new URLSearchParams(location.search);
+  const initialTab = params.get('tab') || 'info';
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+
+  useEffect(() => {
+    // Keep url in sync when tab changes
+    const p = new URLSearchParams(location.search);
+    p.set('tab', activeTab);
+    navigate({ pathname: location.pathname, search: p.toString() }, { replace: true });
+  }, [activeTab]);
+
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6 p-6 bg-gradient-to-br from-background to-muted/30 min-h-screen">
@@ -130,15 +144,18 @@ export default function Profile() {
               </div>
             </div>
 
-            <Tabs defaultValue="info" className="space-y-6">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="space-y-6">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="info">Información Personal</TabsTrigger>
-                {profile.role === 'student' && (
-                  <TabsTrigger value="attendance" className="flex items-center gap-2">
-                    <ClipboardCheck className="h-4 w-4" />
-                    Mi Asistencia
-                  </TabsTrigger>
-                )}
+                          {profile.role === 'student' ? (
+                            <TabsTrigger value="attendance" className="flex items-center gap-2">
+                              <ClipboardCheck className="h-4 w-4" />
+                              Mi Asistencia
+                            </TabsTrigger>
+                          ) : (
+                            <TabsTrigger value="attendance" disabled className="opacity-50">Mi Asistencia</TabsTrigger>
+                          )}
+                          <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
               </TabsList>
 
               <TabsContent value="info">
@@ -298,17 +315,13 @@ export default function Profile() {
             </div>
           </TabsContent>
 
-                {profile.role === 'student' && (
-                  <>
-                    <TabsContent value="attendance">
-                      <StudentAttendance />
-                    </TabsContent>
-                    
-                    <TabsContent value="notifications">
-                      <Notifications />
-                    </TabsContent>
-                  </>
-                )}
+                <TabsContent value="attendance">
+                  {profile.role === 'student' ? <StudentAttendance /> : <div className="p-4 text-muted-foreground">La sección de asistencia está disponible sólo para estudiantes.</div>}
+                </TabsContent>
+
+                <TabsContent value="notifications">
+                  <Notifications />
+                </TabsContent>
               </Tabs>
       </div>
     </DashboardLayout>
