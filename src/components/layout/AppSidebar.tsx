@@ -1,24 +1,11 @@
 import { 
-  BookOpen, 
-  Calendar, 
-  FileText, 
   GraduationCap, 
-  Home, 
-  MessageSquare, 
   Settings, 
-  Users,
-  Library,
-  ClipboardList,
-  Brain,
-  HelpCircle,
-  Shield,
-  UserCog,
-  BarChart3,
-  Database,
-  School
+  Shield
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { getNavigationForRole, adminNavigationItems } from "@/utils/roleNavigation";
 
 import {
   Sidebar,
@@ -32,29 +19,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const mainItems = [
-  { title: "Dashboard", url: "/", icon: Home },
-  { title: "Aulas Virtuales", url: "/virtual-classrooms", icon: School },
-  { title: "Cursos", url: "/courses", icon: BookOpen },
-  { title: "Tareas", url: "/assignments", icon: FileText },
-  { title: "Exámenes", url: "/exams", icon: ClipboardList },
-  { title: "Calendario", url: "/calendar", icon: Calendar },
-];
-
-const resourceItems = [
-  { title: "Biblioteca", url: "/library", icon: Library },
-  { title: "Mensajes", url: "/messages", icon: MessageSquare },
-  { title: "Compañeros", url: "/classmates", icon: Users },
-  { title: "Juegos Mentales", url: "/mental-games", icon: Brain },
-  { title: "Soporte", url: "/support", icon: HelpCircle },
-];
-
-const adminItems = [
-  { title: "Gestión de Usuarios", url: "/admin/users", icon: UserCog },
-  { title: "Reportes", url: "/admin/reports", icon: BarChart3 },
-  { title: "Sistema", url: "/admin/system", icon: Database },
-];
-
 export function AppSidebar() {
   const { profile } = useAuth();
   const { state } = useSidebar();
@@ -63,12 +27,12 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
 
   const isActive = (path: string) => currentPath === path;
-  const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200 ${
-      isActive 
-        ? "bg-gradient-primary text-primary-foreground shadow-soft font-medium" 
-        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-    }`;
+  
+  // Get navigation items based on user role
+  const navigationItems = profile ? getNavigationForRole(profile.role) : [];
+  const mainItems = navigationItems.filter(item => 
+    !adminNavigationItems.some(adminItem => adminItem.url === item.url)
+  );
 
   return (
     <Sidebar className={`border-r border-border ${collapsed ? "w-16" : "w-64"}`}>
@@ -88,35 +52,14 @@ export function AppSidebar() {
           </div>
         </div>
 
-        {/* Main Navigation */}
+        {/* Navigation */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            {!collapsed && "Principal"}
+            {!collapsed && (profile?.role === 'admin' ? 'Navegación' : 'Principal')}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
               {mainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url} className="flex items-center gap-3">
-                      <item.icon className="w-4 h-4" />
-                      {!collapsed && <span className="text-sm">{item.title}</span>}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Resources */}
-        <SidebarGroup className="mt-6">
-          <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            {!collapsed && "Recursos"}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
-              {resourceItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <Link to={item.url} className="flex items-center gap-3">
@@ -143,7 +86,7 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="space-y-1">
-                {adminItems.map((item) => (
+                {adminNavigationItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
                       <Link to={item.url} className="flex items-center gap-3">

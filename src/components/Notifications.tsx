@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Bell, CheckCircle, AlertCircle } from 'lucide-react';
+import { Bell, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -27,6 +28,7 @@ interface Notification {
 
 export function Notifications() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -192,14 +194,28 @@ export function Notifications() {
                           })}
                         </span>
                       </div>
-                      <p className="text-sm">{notification.message}</p>
+                       <p className="text-sm">{notification.message}</p>
                       {notification.assignments && (
-                        <p className="text-xs text-muted-foreground">
-                          Fecha de entrega:{' '}
-                          {new Date(
-                            notification.assignments.due_date
-                          ).toLocaleDateString('es-ES')}
-                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <p className="text-xs text-muted-foreground">
+                            Fecha de entrega:{' '}
+                            {new Date(
+                              notification.assignments.due_date
+                            ).toLocaleDateString('es-ES')}
+                          </p>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            onClick={() => {
+                              markAsRead(notification.id);
+                              navigate('/assignments');
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Ver tarea
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
