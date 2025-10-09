@@ -3,13 +3,15 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+export type UserRole = 'admin' | 'teacher' | 'student' | 'parent';
+
 interface Profile {
   id: string;
   user_id: string;
   email: string;
   first_name: string;
   last_name: string;
-  role: 'admin' | 'teacher' | 'student' | 'parent';
+  role: UserRole;
   phone?: string;
   avatar_url?: string;
   is_active: boolean;
@@ -43,30 +45,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           // Fetch user profile
           setTimeout(async () => {
-            const { data: profile } = await supabase
+            const { data: profileData } = await supabase
               .from('profiles')
               .select('*')
               .eq('user_id', session.user.id)
               .single();
             
-            setProfile(profile);
-            
-            // Fetch unread notifications for students
-            if (profile && profile.role === 'student') {
-              const { data: notifications } = await supabase
-                .from('notifications')
-                .select('id, message, type')
-                .eq('user_id', profile.id)
-                .eq('is_read', false)
-                .order('created_at', { ascending: false })
-                .limit(3);
+            if (profileData) {
+              // Fetch user roles from user_roles table
+              const { data: rolesData } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', session.user.id);
 
-              if (notifications && notifications.length > 0) {
-                notifications.forEach((notif) => {
-                  toast.info(notif.message, {
-                    description: notif.type === 'overdue' ? 'Tarea vencida' : 'Tarea pendiente',
+              // Use the first role as the primary role
+              const primaryRole = rolesData && rolesData.length > 0 
+                ? rolesData[0].role as UserRole
+                : profileData.role as UserRole;
+
+              const profile = {
+                ...profileData,
+                role: primaryRole
+              };
+              
+              setProfile(profile);
+            
+              // Fetch unread notifications for students
+              if (profile && profile.role === 'student') {
+                const { data: notifications } = await supabase
+                  .from('notifications')
+                  .select('id, message, type')
+                  .eq('user_id', profile.id)
+                  .eq('is_read', false)
+                  .order('created_at', { ascending: false })
+                  .limit(3);
+
+                if (notifications && notifications.length > 0) {
+                  notifications.forEach((notif) => {
+                    toast.info(notif.message, {
+                      description: notif.type === 'overdue' ? 'Tarea vencida' : 'Tarea pendiente',
+                    });
                   });
-                });
+                }
               }
             }
             
@@ -87,13 +107,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         // Fetch user profile
         setTimeout(async () => {
-          const { data: profile } = await supabase
+          const { data: profileData } = await supabase
             .from('profiles')
             .select('*')
             .eq('user_id', session.user.id)
             .single();
           
-          setProfile(profile);
+          if (profileData) {
+            // Fetch user roles from user_roles table
+            const { data: rolesData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id);
+
+            // Use the first role as the primary role
+            const primaryRole = rolesData && rolesData.length > 0 
+              ? rolesData[0].role as UserRole
+              : profileData.role as UserRole;
+
+            setProfile({
+              ...profileData,
+              role: primaryRole
+            });
+          }
+          
           setLoading(false);
         }, 0);
       } else {

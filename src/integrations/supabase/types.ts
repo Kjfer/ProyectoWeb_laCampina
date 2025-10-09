@@ -1205,6 +1205,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       virtual_classrooms: {
         Row: {
           academic_year: string
@@ -1275,7 +1296,17 @@ export type Database = {
         Returns: string[]
       }
       has_role: {
-        Args: { _role: Database["public"]["Enums"]["user_role"] }
+        Args:
+          | { _role: Database["public"]["Enums"]["app_role"]; _user_id: string }
+          | { _role: Database["public"]["Enums"]["user_role"] }
+        Returns: boolean
+      }
+      is_course_teacher: {
+        Args: { _course_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_enrolled_in_course: {
+        Args: { _course_id: string; _user_id: string }
         Returns: boolean
       }
       is_parent_of_student: {
@@ -1284,6 +1315,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "admin" | "teacher" | "student" | "parent"
       education_level: "primaria" | "secundaria"
       user_role: "admin" | "teacher" | "student" | "parent"
     }
@@ -1413,6 +1445,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "teacher", "student", "parent"],
       education_level: ["primaria", "secundaria"],
       user_role: ["admin", "teacher", "student", "parent"],
     },
