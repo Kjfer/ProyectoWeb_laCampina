@@ -52,6 +52,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
       const { data, error } = await supabase
         .from('course_enrollments')
         .select(`
+          student_id,
           student:profiles!course_enrollments_student_id_fkey(
             id,
             first_name,
@@ -63,7 +64,10 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
 
       if (error) throw error;
 
-      const enrolledStudents = data?.map(e => e.student).filter(Boolean) || [];
+      const enrolledStudents = (data || [])
+        .filter(e => e.student)
+        .map(e => e.student) as Student[];
+      
       setStudents(enrolledStudents);
     } catch (error) {
       console.error('Error fetching students:', error);

@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { WeeklyContentManager } from '@/components/course/WeeklyContentManager';
 import { AttendanceManager } from '@/components/course/AttendanceManager';
 import { AttendanceRecords } from '@/components/course/AttendanceRecords';
-import { StudentAttendance } from '@/components/profile/StudentAttendance';
+import { StudentCourseAttendance } from '@/components/course/StudentCourseAttendance';
 import { CourseScheduleManager } from '@/components/course/CourseScheduleManager';
 
 interface Course {
@@ -261,8 +261,8 @@ export default function CourseDetail() {
                 <AttendanceRecords courseId={course.id} />
               </div>
             ) : profile?.role === 'student' ? (
-              // Los estudiantes ven su propio historial
-              <StudentAttendance />
+              // Los estudiantes ven su propio historial de este curso
+              <StudentCourseAttendance courseId={course.id} />
             ) : (
               <div className="p-6">
                 <p className="text-muted-foreground">No tienes permisos para ver el historial de asistencia de este curso.</p>
@@ -307,7 +307,7 @@ export default function CourseDetail() {
           </TabsContent>
 
           <TabsContent value="schedule">
-            <CourseScheduleManager courseId={course.id} canEdit={canEdit || false} />
+            <CourseScheduleManager courseId={course.id} canEdit={false} />
           </TabsContent>
         </Tabs>
       </div>

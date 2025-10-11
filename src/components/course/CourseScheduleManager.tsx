@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Clock, Save } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface CourseScheduleManagerProps {
   courseId: string;
@@ -23,7 +24,11 @@ const WEEKDAYS = [
   { value: 'sunday', label: 'Domingo' },
 ];
 
-export function CourseScheduleManager({ courseId, canEdit }: CourseScheduleManagerProps) {
+export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseScheduleManagerProps) {
+  const { profile } = useAuth();
+  
+  // Solo los administradores pueden editar el horario
+  const canEdit = profile?.role === 'admin';
   const [scheduleDays, setScheduleDays] = useState<string[]>([]);
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');

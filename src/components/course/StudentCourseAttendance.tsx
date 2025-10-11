@@ -7,39 +7,79 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AttendanceStats } from '../course/AttendanceStats';
-import { AttendancePieChart } from '../course/AttendancePieChart';
+import { AttendancePieChart } from './AttendancePieChart';
 
 interface AttendanceRecord {
   id: string;
   date: string;
   status: 'present' | 'late' | 'absent' | 'justified';
   notes: string | null;
-  course: {
-    id: string;
-    name: string;
-    code: string;
-  };
 }
 
-export function StudentAttendance() {
+interface StudentCourseAttendanceProps {
+  courseId: string;
+}
+
+export function StudentCourseAttendance({ courseId }: StudentCourseAttendanceProps) {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchAttendance();
-  }, []);
+  }, [courseId]);
 
   const fetchAttendance = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('get-student-attendance');
+      
+      // Obtener el profile_id del usuario actual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile) throw new Error('Perfil no encontrado');
+
+      // Obtener registros de asistencia del curso específico
+      const { data: attendanceData, error } = await supabase
+        .from('attendance')
+        .select('id, date, status, notes')
+        .eq('course_id', courseId)
+        .eq('student_id', profile.id)
+        .order('date', { ascending: false });
 
       if (error) throw error;
 
-      setRecords(data.records || []);
-      setStats(data.stats || null);
+      const typedRecords: AttendanceRecord[] = (attendanceData || []).map(r => ({
+        id: r.id,
+        date: r.date,
+        status: r.status as AttendanceRecord['status'],
+        notes: r.notes,
+      }));
+
+      setRecords(typedRecords);
+
+      // Calcular estadísticas
+      const total = attendanceData?.length || 0;
+      const present = attendanceData?.filter(r => r.status === 'present').length || 0;
+      const late = attendanceData?.filter(r => r.status === 'late').length || 0;
+      const absent = attendanceData?.filter(r => r.status === 'absent').length || 0;
+      const justified = attendanceData?.filter(r => r.status === 'justified').length || 0;
+      const attendance_rate = total > 0 ? ((present + late) / total) * 100 : 0;
+
+      setStats({
+        total,
+        present,
+        late,
+        absent,
+        justified,
+        attendance_rate,
+      });
     } catch (error) {
       console.error('Error fetching attendance:', error);
       toast.error('Error al cargar tu asistencia');
@@ -73,34 +113,28 @@ export function StudentAttendance() {
 
   return (
     <div className="space-y-6">
-      {stats && (
-        <>
-          <AttendanceStats stats={stats} />
-          <AttendancePieChart stats={stats} />
-        </>
-      )}
+      {stats && <AttendancePieChart stats={stats} courseId={courseId} />}
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Mi Historial de Asistencia
+            Mi Historial de Asistencia en este Curso
           </CardTitle>
           <CardDescription>
-            Registros de tu asistencia en todos los cursos
+            Registros de tu asistencia en este curso
           </CardDescription>
         </CardHeader>
         <CardContent>
           {records.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No tienes registros de asistencia aún
+              No tienes registros de asistencia en este curso aún
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha</TableHead>
-                  <TableHead>Curso</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Notas</TableHead>
                 </TableRow>
@@ -110,12 +144,6 @@ export function StudentAttendance() {
                   <TableRow key={record.id}>
                     <TableCell className="font-medium">
                       {format(new Date(record.date), 'PPP', { locale: es })}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{record.course.name}</div>
-                        <div className="text-xs text-muted-foreground">{record.course.code}</div>
-                      </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(record.status)}</TableCell>
                     <TableCell className="text-muted-foreground">
