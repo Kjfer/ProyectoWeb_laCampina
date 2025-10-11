@@ -124,6 +124,21 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
         return;
       }
 
+      // Verificar si estamos dentro del horario del curso
+      const { data: scheduleCheck, error: scheduleError } = await supabase
+        .rpc('is_within_course_schedule', { p_course_id: courseId });
+
+      if (scheduleError) {
+        console.error('Error checking schedule:', scheduleError);
+        toast.error('Error al verificar el horario del curso');
+        return;
+      }
+
+      if (!scheduleCheck) {
+        toast.error('La asistencia solo puede registrarse durante el horario de clase');
+        return;
+      }
+
       const { error } = await supabase.functions.invoke('create-attendance-records', {
         body: {
           course_id: courseId,

@@ -555,11 +555,14 @@ export type Database = {
           created_at: string | null
           description: string | null
           end_date: string | null
+          end_time: string | null
           id: string
           is_active: boolean | null
           name: string
+          schedule_days: string[] | null
           semester: string
           start_date: string | null
+          start_time: string | null
           teacher_id: string
           updated_at: string | null
         }
@@ -570,11 +573,14 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           end_date?: string | null
+          end_time?: string | null
           id?: string
           is_active?: boolean | null
           name: string
+          schedule_days?: string[] | null
           semester: string
           start_date?: string | null
+          start_time?: string | null
           teacher_id: string
           updated_at?: string | null
         }
@@ -585,11 +591,14 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           end_date?: string | null
+          end_time?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
+          schedule_days?: string[] | null
           semester?: string
           start_date?: string | null
+          start_time?: string | null
           teacher_id?: string
           updated_at?: string | null
         }
@@ -1311,6 +1320,10 @@ export type Database = {
       }
       is_parent_of_student: {
         Args: { _student_id: string }
+        Returns: boolean
+      }
+      is_within_course_schedule: {
+        Args: { p_check_time?: string; p_course_id: string }
         Returns: boolean
       }
     }

@@ -13,6 +13,7 @@ import { WeeklyContentManager } from '@/components/course/WeeklyContentManager';
 import { AttendanceManager } from '@/components/course/AttendanceManager';
 import { AttendanceRecords } from '@/components/course/AttendanceRecords';
 import { StudentAttendance } from '@/components/profile/StudentAttendance';
+import { CourseScheduleManager } from '@/components/course/CourseScheduleManager';
 
 interface Course {
   id: string;
@@ -227,9 +228,9 @@ export default function CourseDetail() {
           </CardContent>
         </Card>
 
-        {/* Tabs for Content, Attendance, and Students */}
+        {/* Tabs for Content, Attendance, Students and Schedule */}
         <Tabs defaultValue="content" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="content">Contenido</TabsTrigger>
             <TabsTrigger value="attendance" className="flex items-center gap-2">
               <ClipboardCheck className="h-4 w-4" />
@@ -238,6 +239,10 @@ export default function CourseDetail() {
             <TabsTrigger value="students" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Estudiantes
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Horario
             </TabsTrigger>
           </TabsList>
 
@@ -299,6 +304,10 @@ export default function CourseDetail() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="schedule">
+            <CourseScheduleManager courseId={course.id} canEdit={canEdit || false} />
           </TabsContent>
         </Tabs>
       </div>
