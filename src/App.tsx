@@ -16,6 +16,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import VirtualClassrooms from "./pages/VirtualClassrooms";
 import VirtualClassroomDetail from "./pages/VirtualClassroomDetail";
 import VirtualClassroomCourses from "./pages/VirtualClassroomCourses";
+import Calendar from "./pages/Calendar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,11 @@ const App = () => (
             <Route path="/virtual-classrooms/:id/courses" element={
               <ProtectedRoute>
                 <VirtualClassroomCourses />
+              </ProtectedRoute>
+            } />
+            <Route path="/calendar" element={
+              <ProtectedRoute>
+                <Calendar />
               </ProtectedRoute>
             } />
             <Route path="/admin/*" element={

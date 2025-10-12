@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_events: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          description: string | null
+          end_date: string
+          event_type: Database["public"]["Enums"]["event_type"]
+          id: string
+          is_published: boolean | null
+          start_date: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          end_date: string
+          event_type?: Database["public"]["Enums"]["event_type"]
+          id?: string
+          is_published?: boolean | null
+          start_date: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          end_date?: string
+          event_type?: Database["public"]["Enums"]["event_type"]
+          id?: string
+          is_published?: boolean | null
+          start_date?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       announcements: {
         Row: {
           author_id: string
@@ -287,6 +326,59 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_events: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          created_by: string
+          description: string | null
+          end_date: string
+          event_type: string
+          id: string
+          is_published: boolean | null
+          location: string | null
+          start_date: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          end_date: string
+          event_type?: string
+          id?: string
+          is_published?: boolean | null
+          location?: string | null
+          start_date: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          end_date?: string
+          event_type?: string
+          id?: string
+          is_published?: boolean | null
+          location?: string | null
+          start_date?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_events_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
             referencedColumns: ["id"]
           },
         ]
@@ -1330,6 +1422,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "teacher" | "student" | "parent"
       education_level: "primaria" | "secundaria"
+      event_type: "vacation" | "holiday" | "exam" | "meeting" | "other"
       user_role: "admin" | "teacher" | "student" | "parent"
     }
     CompositeTypes: {
@@ -1460,6 +1553,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "teacher", "student", "parent"],
       education_level: ["primaria", "secundaria"],
+      event_type: ["vacation", "holiday", "exam", "meeting", "other"],
       user_role: ["admin", "teacher", "student", "parent"],
     },
   },
