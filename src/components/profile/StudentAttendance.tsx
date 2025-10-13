@@ -39,7 +39,14 @@ export function StudentAttendance() {
       if (error) throw error;
 
       setRecords(data.records || []);
-      setStats(data.stats || null);
+      // Convert attendance_rate to number if it's a string
+      const stats = data.stats ? {
+        ...data.stats,
+        attendance_rate: typeof data.stats.attendance_rate === 'string' 
+          ? parseFloat(data.stats.attendance_rate) 
+          : data.stats.attendance_rate
+      } : null;
+      setStats(stats);
     } catch (error) {
       console.error('Error fetching attendance:', error);
       toast.error('Error al cargar tu asistencia');

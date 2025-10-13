@@ -10,7 +10,7 @@ interface AttendancePieChartProps {
     late: number;
     absent: number;
     justified: number;
-    attendance_rate: number;
+    attendance_rate: number | string;
   };
   courseId?: string;
 }
@@ -67,7 +67,7 @@ export function AttendancePieChart({ stats }: AttendancePieChartProps) {
       <CardHeader>
         <CardTitle>Distribución de Asistencia</CardTitle>
         <CardDescription>
-          Total de registros: {stats.total} | Tasa de asistencia: {stats.attendance_rate.toFixed(1)}%
+          Total de registros: {stats.total} | Tasa de asistencia: {typeof stats.attendance_rate === 'number' ? stats.attendance_rate.toFixed(1) : stats.attendance_rate}%
         </CardDescription>
       </CardHeader>
       <CardContent>
