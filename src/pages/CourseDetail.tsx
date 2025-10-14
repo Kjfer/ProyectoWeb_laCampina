@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Users, GraduationCap, Clock, Calendar, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Users, GraduationCap, Clock, Calendar, ClipboardCheck, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import { AttendanceManager } from '@/components/course/AttendanceManager';
 import { AttendanceRecords } from '@/components/course/AttendanceRecords';
 import { StudentCourseAttendance } from '@/components/course/StudentCourseAttendance';
 import { CourseScheduleManager } from '@/components/course/CourseScheduleManager';
+import { ExamForm } from '@/components/course/ExamForm';
 
 interface Course {
   id: string;
@@ -52,6 +53,7 @@ export default function CourseDetail() {
   const [course, setCourse] = useState<Course | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isExamFormOpen, setIsExamFormOpen] = useState(false);
 
   // Check if user can edit this course
   const canEdit = profile && course && (
@@ -228,14 +230,15 @@ export default function CourseDetail() {
           </CardContent>
         </Card>
 
-        {/* Tabs for Content, Attendance, Students and Schedule */}
+        {/* Tabs for Content, Attendance, Students, Exams and Schedule */}
         <Tabs defaultValue="content" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="content">Contenido</TabsTrigger>
             <TabsTrigger value="attendance" className="flex items-center gap-2">
               <ClipboardCheck className="h-4 w-4" />
               Asistencia
             </TabsTrigger>
+            <TabsTrigger value="exams">Exámenes</TabsTrigger>
             <TabsTrigger value="students" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Estudiantes
@@ -268,6 +271,27 @@ export default function CourseDetail() {
                 <p className="text-muted-foreground">No tienes permisos para ver el historial de asistencia de este curso.</p>
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="exams">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Exámenes del Curso</CardTitle>
+                  {canEdit && (
+                    <Button onClick={() => setIsExamFormOpen(true)} className="bg-gradient-primary shadow-glow">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Examen
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Aquí se mostrarán los exámenes del curso. Los exámenes creados también aparecerán en el calendario del curso.
+                </p>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="students">
@@ -310,6 +334,18 @@ export default function CourseDetail() {
             <CourseScheduleManager courseId={course.id} canEdit={false} />
           </TabsContent>
         </Tabs>
+
+        {/* Exam Form Dialog */}
+        {isExamFormOpen && (
+          <ExamForm
+            courseId={course.id}
+            onClose={() => setIsExamFormOpen(false)}
+            onSuccess={() => {
+              setIsExamFormOpen(false);
+              toast.success('El examen se ha agregado al calendario del curso');
+            }}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
