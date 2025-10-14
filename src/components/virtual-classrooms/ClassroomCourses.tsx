@@ -178,14 +178,35 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
 
       if (!response.ok) {
         console.error(`❌ HTTP ${response.status} Error:`, data);
-        toast.error(data.error || `Error HTTP ${response.status}`);
+        
+        // Mostrar mensaje de error más descriptivo
+        let errorMessage = 'Error al crear el curso';
+        if (data.error) {
+          errorMessage = data.error;
+        }
+        if (data.details) {
+          if (data.details.includes('duplicate key') || data.details.includes('already exists')) {
+            errorMessage = `El código "${formData.code}" ya está en uso en esta aula virtual. Por favor, elige otro código.`;
+          } else {
+            errorMessage += `: ${data.details}`;
+          }
+        }
+        
+        toast.error(errorMessage);
         return;
       }
 
       if (!data?.success) {
         console.error('Error in function response:', data?.error);
         console.error('Full response data:', JSON.stringify(data, null, 2));
-        throw new Error(data?.error || 'Error en la respuesta del servidor');
+        
+        let errorMessage = data?.error || 'Error en la respuesta del servidor';
+        if (data?.details && data.details.includes('duplicate key')) {
+          errorMessage = `El código "${formData.code}" ya está en uso. Por favor, elige otro código.`;
+        }
+        
+        toast.error(errorMessage);
+        return;
       }
 
       console.log('✅ Curso creado exitosamente:', data.data);
@@ -251,14 +272,17 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
                 </div>
                 
                 <div>
-                  <Label htmlFor="code">Código del Curso</Label>
+                  <Label htmlFor="code">Código del Curso (único)</Label>
                   <Input
                     id="code"
                     value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="Ej: MAT101"
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                    placeholder="Ej: MAT101, FIS201"
                     required
                   />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Cada curso debe tener un código único en esta aula virtual
+                  </p>
                 </div>
 
                 <div>
