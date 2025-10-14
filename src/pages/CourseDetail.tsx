@@ -287,9 +287,15 @@ export default function CourseDetail() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
-                  Aquí se mostrarán los exámenes del curso. Los exámenes creados también aparecerán en el calendario del curso.
-                </p>
+                {canEdit ? (
+                  <p className="text-muted-foreground">
+                    Haz clic en "Crear Examen" para agregar un nuevo examen. Los exámenes creados también aparecerán en el calendario del curso.
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">
+                    Aquí se mostrarán los exámenes del curso cuando estén disponibles.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -331,7 +337,7 @@ export default function CourseDetail() {
           </TabsContent>
 
           <TabsContent value="schedule">
-            <CourseScheduleManager courseId={course.id} canEdit={false} />
+            <CourseScheduleManager courseId={course.id} canEdit={canEdit || false} />
           </TabsContent>
         </Tabs>
 
