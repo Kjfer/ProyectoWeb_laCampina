@@ -82,15 +82,23 @@ export function AcademicCalendar() {
 
   const getEventsForDate = (date: Date) => {
     const academic = academicEvents.filter(event => {
-      const startDate = parseISO(event.start_date);
-      const endDate = parseISO(event.end_date);
-      return date >= startDate && date <= endDate;
+      const startDate = new Date(event.start_date);
+      const endDate = new Date(event.end_date);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      const checkDate = new Date(date);
+      checkDate.setHours(12, 0, 0, 0);
+      return checkDate >= startDate && checkDate <= endDate;
     });
 
     const course = courseEvents.filter(event => {
-      const startDate = parseISO(event.start_date);
-      const endDate = parseISO(event.end_date);
-      return date >= startDate && date <= endDate;
+      const startDate = new Date(event.start_date);
+      const endDate = new Date(event.end_date);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+      const checkDate = new Date(date);
+      checkDate.setHours(12, 0, 0, 0);
+      return checkDate >= startDate && checkDate <= endDate;
     });
 
     return { academic, course };
