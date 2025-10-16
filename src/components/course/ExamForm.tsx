@@ -385,7 +385,7 @@ export function ExamForm({ courseId, onClose, onSuccess }: ExamFormProps) {
                             <SelectValue placeholder="Seleccionar respuesta correcta" />
                           </SelectTrigger>
                           <SelectContent>
-                            {question.options?.map((option, index) => (
+                            {question.options?.filter(opt => opt.trim() !== '').map((option, index) => (
                               <SelectItem key={index} value={option}>
                                 {String.fromCharCode(65 + index)}. {option}
                               </SelectItem>
