@@ -51,7 +51,9 @@ serve(async (req: Request) => {
     }
 
     // Get request body
-    const { name, grade, education_level, academic_year } = await req.json()
+    const body = await req.json()
+    console.log('📥 Request body:', body)
+    const { name, grade, education_level, academic_year, teacher_id } = body
 
     // Validate required fields
     if (!name || !grade || !education_level || !academic_year) {
@@ -63,7 +65,9 @@ serve(async (req: Request) => {
       throw new Error('Nivel educativo no válido')
     }
 
-    // Insert new virtual classroom
+    // Insert new virtual classroom - use teacher_id from request if admin, otherwise use current user's profile
+    const finalTeacherId = teacher_id || profile.id;
+    
     const { data: newClassroom, error: insertError } = await supabaseClient
       .from('virtual_classrooms')
       .insert({
@@ -71,7 +75,7 @@ serve(async (req: Request) => {
         grade,
         education_level,
         academic_year,
-        teacher_id: profile.id,
+        teacher_id: finalTeacherId,
         is_active: true
       })
       .select(`

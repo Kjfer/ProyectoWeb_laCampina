@@ -170,18 +170,13 @@ export default function VirtualClassrooms() {
 
       // Call the Edge Function
       const { data, error } = await supabase.functions.invoke('create-virtual-classroom', {
-        method: 'POST',
         body: {
           name: formData.name,
           grade: formData.grade,
           education_level: formData.education_level as 'primaria' | 'secundaria',
           academic_year: formData.academic_year,
           teacher_id: formData.teacher_id || profile.id,
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        }
       });
 
       if (error) {
