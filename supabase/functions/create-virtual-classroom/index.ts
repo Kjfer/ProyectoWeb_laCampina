@@ -37,10 +37,11 @@ serve(async (req: Request) => {
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role, id')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .single()
 
     if (profileError) {
+      console.error('Error obteniendo perfil:', profileError)
       throw new Error('Error al obtener el perfil del usuario')
     }
 
