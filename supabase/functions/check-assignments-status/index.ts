@@ -17,9 +17,11 @@ Deno.serve(async (req) => {
 
     console.log('Starting assignment status check...');
 
-    const today = new Date();
-    const twoDaysFromNow = new Date(today);
-    twoDaysFromNow.setDate(today.getDate() + 2);
+    const now = new Date();
+    const oneDayFromNow = new Date(now);
+    oneDayFromNow.setDate(now.getDate() + 1);
+    const twoDaysFromNow = new Date(now);
+    twoDaysFromNow.setDate(now.getDate() + 2);
 
     // Obtener todas las tareas activas
     const { data: assignments, error: assignmentsError } = await supabase
@@ -62,43 +64,83 @@ Deno.serve(async (req) => {
 
         const hasSubmission = submissions && submissions.length > 0;
 
-        // Verificar si ya existe una notificación reciente (últimas 24 horas)
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
-
-        const { data: existingNotifications } = await supabase
-          .from('notifications')
-          .select('id')
-          .eq('user_id', enrollment.student_id)
-          .eq('assignment_id', assignment.id)
-          .gte('created_at', yesterday.toISOString())
-          .limit(1);
-
-        if (existingNotifications && existingNotifications.length > 0) {
-          console.log(`Notification already exists for student ${enrollment.student_id} and assignment ${assignment.id}`);
-          continue;
-        }
-
         // Tarea vencida sin entrega
-        if (dueDate < today && !hasSubmission) {
-          notificationsToCreate.push({
-            user_id: enrollment.student_id,
-            assignment_id: assignment.id,
-            type: 'overdue',
-            message: `La tarea "${assignment.title}" está vencida y no ha sido entregada.`,
-            is_read: false,
-          });
+        if (dueDate < now && !hasSubmission) {
+          // Verificar si ya existe una notificación de vencida (últimas 24 horas)
+          const yesterday = new Date(now);
+          yesterday.setDate(now.getDate() - 1);
+
+          const { data: existingOverdue } = await supabase
+            .from('notifications')
+            .select('id')
+            .eq('user_id', enrollment.student_id)
+            .eq('assignment_id', assignment.id)
+            .eq('type', 'overdue')
+            .gte('created_at', yesterday.toISOString())
+            .limit(1);
+
+          if (!existingOverdue || existingOverdue.length === 0) {
+            notificationsToCreate.push({
+              user_id: enrollment.student_id,
+              assignment_id: assignment.id,
+              type: 'overdue',
+              message: `La tarea "${assignment.title}" está vencida y no ha sido entregada.`,
+              is_read: false,
+            });
+          }
         }
-        // Tarea próxima a vencer (2 días) sin entrega
-        else if (dueDate <= twoDaysFromNow && dueDate >= today && !hasSubmission) {
-          const daysLeft = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          notificationsToCreate.push({
-            user_id: enrollment.student_id,
-            assignment_id: assignment.id,
-            type: 'pending',
-            message: `La tarea "${assignment.title}" vence en ${daysLeft} día(s). No olvides entregarla.`,
-            is_read: false,
-          });
+        // Tarea próxima a vencer sin entrega
+        else if (dueDate >= now && !hasSubmission) {
+          const hoursLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60));
+          const daysLeft = Math.ceil(hoursLeft / 24);
+          
+          let shouldNotify = false;
+          let notificationInterval = 24; // horas
+          
+          // Determinar si debe notificar según el tiempo restante
+          if (hoursLeft <= 24) {
+            // Menos de 1 día: notificar cada hora
+            shouldNotify = true;
+            notificationInterval = 1;
+          } else if (daysLeft <= 2) {
+            // Entre 1 y 2 días: notificar cada 12 horas
+            shouldNotify = true;
+            notificationInterval = 12;
+          }
+          
+          if (shouldNotify) {
+            // Verificar si ya existe una notificación reciente según el intervalo
+            const lastNotificationTime = new Date(now);
+            lastNotificationTime.setHours(now.getHours() - notificationInterval);
+
+            const { data: existingPending } = await supabase
+              .from('notifications')
+              .select('id')
+              .eq('user_id', enrollment.student_id)
+              .eq('assignment_id', assignment.id)
+              .eq('type', 'pending')
+              .gte('created_at', lastNotificationTime.toISOString())
+              .limit(1);
+
+            if (!existingPending || existingPending.length === 0) {
+              let message;
+              if (hoursLeft <= 24) {
+                message = hoursLeft === 1 
+                  ? `La tarea "${assignment.title}" vence en 1 hora. ¡Apúrate!`
+                  : `La tarea "${assignment.title}" vence en ${hoursLeft} hora(s). No olvides entregarla.`;
+              } else {
+                message = `La tarea "${assignment.title}" vence en ${daysLeft} día(s). No olvides entregarla.`;
+              }
+              
+              notificationsToCreate.push({
+                user_id: enrollment.student_id,
+                assignment_id: assignment.id,
+                type: 'pending',
+                message,
+                is_read: false,
+              });
+            }
+          }
         }
       }
     }
