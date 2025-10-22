@@ -119,19 +119,32 @@ export function Notifications() {
   };
 
   const getNotificationIcon = (type: string) => {
-    return type === 'overdue' ? (
-      <AlertCircle className="h-5 w-5 text-destructive" />
-    ) : (
-      <Bell className="h-5 w-5 text-warning" />
-    );
+    switch (type) {
+      case 'overdue':
+        return <AlertCircle className="h-5 w-5 text-destructive" />;
+      case 'assignment_published':
+      case 'exam_published':
+        return <Bell className="h-5 w-5 text-primary" />;
+      case 'pending':
+        return <Bell className="h-5 w-5 text-warning" />;
+      default:
+        return <Bell className="h-5 w-5" />;
+    }
   };
 
   const getNotificationBadge = (type: string) => {
-    return type === 'overdue' ? (
-      <Badge variant="destructive">Vencida</Badge>
-    ) : (
-      <Badge className="bg-warning text-warning-foreground">Pendiente</Badge>
-    );
+    switch (type) {
+      case 'overdue':
+        return <Badge variant="destructive">Vencida</Badge>;
+      case 'assignment_published':
+        return <Badge variant="default">Nueva Tarea</Badge>;
+      case 'exam_published':
+        return <Badge variant="default">Nuevo Examen</Badge>;
+      case 'pending':
+        return <Badge className="bg-warning text-warning-foreground">Pendiente</Badge>;
+      default:
+        return <Badge variant="secondary">Notificación</Badge>;
+    }
   };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;

@@ -1384,24 +1384,28 @@ export type Database = {
         }
         Returns: undefined
       }
-      get_current_profile_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_current_profile_id: { Args: never; Returns: string }
       get_current_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
       get_student_classroom_ids: {
         Args: { student_profile_id: string }
         Returns: string[]
       }
-      has_role: {
-        Args:
-          | { _role: Database["public"]["Enums"]["app_role"]; _user_id: string }
-          | { _role: Database["public"]["Enums"]["user_role"] }
-        Returns: boolean
-      }
+      has_role:
+        | {
+            Args: { _role: Database["public"]["Enums"]["user_role"] }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+      is_active_teacher: { Args: { _profile_id: string }; Returns: boolean }
       is_course_teacher: {
         Args: { _course_id: string; _user_id: string }
         Returns: boolean
@@ -1410,8 +1414,9 @@ export type Database = {
         Args: { _course_id: string; _user_id: string }
         Returns: boolean
       }
-      is_parent_of_student: {
-        Args: { _student_id: string }
+      is_parent_of_student: { Args: { _student_id: string }; Returns: boolean }
+      is_teacher_of_student: {
+        Args: { _student_profile_id: string; _teacher_user_id: string }
         Returns: boolean
       }
       is_within_course_schedule: {
