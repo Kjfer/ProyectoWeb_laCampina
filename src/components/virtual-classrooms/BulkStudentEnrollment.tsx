@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +33,6 @@ interface BulkStudentEnrollmentProps {
 export function BulkStudentEnrollment({ classroomId, courses, onUpdate }: BulkStudentEnrollmentProps) {
   const [availableStudents, setAvailableStudents] = useState<Student[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -84,50 +83,63 @@ export function BulkStudentEnrollment({ classroomId, courses, onUpdate }: BulkSt
   };
 
   const handleBulkEnroll = async () => {
-    if (!selectedCourse || selectedStudents.length === 0) {
-      toast.error('Selecciona un curso y al menos un estudiante');
+    if (selectedStudents.length === 0) {
+      toast.error('Selecciona al menos un estudiante');
+      return;
+    }
+
+    if (courses.length === 0) {
+      toast.error('No hay cursos disponibles en esta aula virtual');
       return;
     }
 
     setLoading(true);
     try {
-      // Check for existing enrollments
+      // Get all course IDs from the classroom
+      const courseIds = courses.map(c => c.id);
+
+      // Check for existing enrollments for all courses
       const { data: existingEnrollments } = await supabase
         .from('course_enrollments')
-        .select('student_id')
-        .eq('course_id', selectedCourse)
+        .select('student_id, course_id')
+        .in('course_id', courseIds)
         .in('student_id', selectedStudents);
 
-      const alreadyEnrolledIds = existingEnrollments?.map(e => e.student_id) || [];
-      const newEnrollments = selectedStudents.filter(id => !alreadyEnrolledIds.includes(id));
+      // Create enrollment records for all students in all courses (excluding existing ones)
+      const enrollmentData = [];
+      for (const studentId of selectedStudents) {
+        for (const courseId of courseIds) {
+          const alreadyEnrolled = existingEnrollments?.some(
+            e => e.student_id === studentId && e.course_id === courseId
+          );
+          
+          if (!alreadyEnrolled) {
+            enrollmentData.push({
+              student_id: studentId,
+              course_id: courseId
+            });
+          }
+        }
+      }
 
-      if (newEnrollments.length === 0) {
-        toast.error('Todos los estudiantes seleccionados ya están inscritos en este curso');
+      if (enrollmentData.length === 0) {
+        toast.error('Todos los estudiantes seleccionados ya están inscritos en todos los cursos');
         return;
       }
 
       // Insert new enrollments
-      const enrollmentData = newEnrollments.map(studentId => ({
-        student_id: studentId,
-        course_id: selectedCourse
-      }));
-
       const { error } = await supabase
         .from('course_enrollments')
         .insert(enrollmentData);
 
       if (error) throw error;
 
-      const skippedCount = selectedStudents.length - newEnrollments.length;
-      let message = `${newEnrollments.length} estudiantes inscritos exitosamente`;
-      if (skippedCount > 0) {
-        message += `. ${skippedCount} ya estaban inscritos`;
-      }
-
-      toast.success(message);
+      const studentsCount = selectedStudents.length;
+      const coursesCount = courses.length;
+      toast.success(`${studentsCount} estudiante${studentsCount !== 1 ? 's' : ''} inscrito${studentsCount !== 1 ? 's' : ''} en ${coursesCount} curso${coursesCount !== 1 ? 's' : ''} exitosamente`);
+      
       setIsDialogOpen(false);
       setSelectedStudents([]);
-      setSelectedCourse('');
       setSearchTerm('');
       onUpdate();
     } catch (error) {
@@ -159,27 +171,25 @@ export function BulkStudentEnrollment({ classroomId, courses, onUpdate }: BulkSt
         <DialogHeader>
           <DialogTitle>Inscripción Masiva de Estudiantes</DialogTitle>
           <DialogDescription>
-            Selecciona un curso y los estudiantes que deseas inscribir de manera masiva
+            Selecciona los estudiantes que deseas inscribir en todos los cursos de esta aula virtual ({courses.length} curso{courses.length !== 1 ? 's' : ''})
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">
-          {/* Course Selection */}
-          <div>
-            <Label htmlFor="course">Curso</Label>
-            <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar curso" />
-              </SelectTrigger>
-              <SelectContent>
-                {courses.map((course) => (
-                  <SelectItem key={course.id} value={course.id}>
-                    {course.name} ({course.code})
-                  </SelectItem>
+          {/* Course Info */}
+          {courses.length > 0 && (
+            <div className="bg-muted/50 p-3 rounded-lg">
+              <p className="text-sm font-medium mb-1">Cursos del aula virtual:</p>
+              <ul className="text-sm text-muted-foreground">
+                {courses.slice(0, 3).map(course => (
+                  <li key={course.id}>• {course.name} ({course.code})</li>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
+                {courses.length > 3 && (
+                  <li>• ... y {courses.length - 3} curso{courses.length - 3 !== 1 ? 's' : ''} más</li>
+                )}
+              </ul>
+            </div>
+          )}
 
           {/* Search and Select All */}
           <div className="space-y-2">
@@ -260,10 +270,10 @@ export function BulkStudentEnrollment({ classroomId, courses, onUpdate }: BulkSt
             </Button>
             <Button 
               onClick={handleBulkEnroll}
-              disabled={!selectedCourse || selectedStudents.length === 0 || loading}
+              disabled={selectedStudents.length === 0 || loading || courses.length === 0}
             >
               <UserPlus className="mr-2 h-4 w-4" />
-              {loading ? 'Inscribiendo...' : `Inscribir ${selectedStudents.length} Estudiantes`}
+              {loading ? 'Inscribiendo...' : `Inscribir ${selectedStudents.length} Estudiante${selectedStudents.length !== 1 ? 's' : ''} en Todos los Cursos`}
             </Button>
           </div>
         </div>
