@@ -5,11 +5,21 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, Calendar, Clock, Plus, AlertCircle } from 'lucide-react';
+import { ClipboardList, Calendar, Clock, Plus, AlertCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, isAfter, isBefore, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
+import { useExamMonitor } from '@/hooks/useExamMonitor';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Exam {
   id: string;
@@ -32,6 +42,34 @@ const Exams = () => {
   const { toast } = useToast();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeExam, setActiveExam] = useState<string | null>(null);
+  const [showClosedDialog, setShowClosedDialog] = useState(false);
+
+  const { abandonCount, maxAbandonAttempts } = useExamMonitor({
+    examId: activeExam || '',
+    isActive: !!activeExam,
+    onExamClosed: () => {
+      setShowClosedDialog(true);
+      setActiveExam(null);
+    },
+    userId: profile?.id || '',
+  });
+
+  const handleStartExam = (examId: string) => {
+    setActiveExam(examId);
+    toast({
+      title: "Examen iniciado",
+      description: `No salgas de esta página o el examen se cerrará automáticamente. Intentos restantes: ${maxAbandonAttempts}`,
+    });
+  };
+
+  const handleEndExam = () => {
+    setActiveExam(null);
+    toast({
+      title: "Examen finalizado",
+      description: "Has completado el examen exitosamente.",
+    });
+  };
 
   useEffect(() => {
     fetchExams();
@@ -274,17 +312,31 @@ const Exams = () => {
                       </Button>
                       
                       {profile?.role === 'student' && status.status === 'in-progress' && (
-                        <Button 
-                          className="bg-gradient-primary shadow-glow"
-                          onClick={() => {
-                            toast({
-                              title: "Próximamente",
-                              description: "La realización de exámenes estará disponible pronto.",
-                            });
-                          }}
-                        >
-                          Iniciar Examen
-                        </Button>
+                        <>
+                          {activeExam === exam.id ? (
+                            <div className="flex-1 flex flex-col gap-2">
+                              <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                                <AlertCircle className="w-4 h-4 text-primary" />
+                                <span className="text-sm text-primary font-medium">
+                                  Examen en curso - No salgas de esta página ({maxAbandonAttempts - abandonCount} intentos restantes)
+                                </span>
+                              </div>
+                              <Button 
+                                className="bg-gradient-primary shadow-glow"
+                                onClick={handleEndExam}
+                              >
+                                Finalizar Examen
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button 
+                              className="bg-gradient-primary shadow-glow"
+                              onClick={() => handleStartExam(exam.id)}
+                            >
+                              Iniciar Examen
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </CardContent>
@@ -294,6 +346,26 @@ const Exams = () => {
           </div>
         )}
       </div>
+
+      <AlertDialog open={showClosedDialog} onOpenChange={setShowClosedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="w-5 h-5" />
+              Examen Cerrado
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              El examen se ha cerrado automáticamente porque saliste de la página demasiadas veces.
+              Esto ha sido registrado en el sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowClosedDialog(false)}>
+              Entendido
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
