@@ -73,6 +73,12 @@ export function ExamForm({ courseId, onClose, onSuccess }: ExamFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!profile?.id) {
+      toast.error('No se pudo obtener tu perfil. Intenta recargar la página');
+      return;
+    }
+
     if (!formData.title.trim()) {
       toast.error('El título es requerido');
       return;
