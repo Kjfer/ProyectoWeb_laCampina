@@ -87,29 +87,38 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
         deadlineISO = new Date(formData.assignment_deadline).toISOString();
       }
 
+      const insertData = {
+        section_id: sectionId,
+        title: formData.title.trim(),
+        description: formData.description.trim() || null,
+        resource_type: formData.resource_type,
+        resource_url: formData.resource_url.trim() || null,
+        file_path: formData.file_path || null,
+        is_published: formData.is_published,
+        position: 0,
+        assignment_deadline: deadlineISO,
+        max_score: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.max_score : null,
+        allows_student_submissions: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.allows_student_submissions : false
+      };
+
+      console.log('📤 Intentando crear recurso:', insertData);
+
       const { error } = await supabase
         .from('course_weekly_resources')
-        .insert({
-          section_id: sectionId,
-          title: formData.title.trim(),
-          description: formData.description.trim() || null,
-          resource_type: formData.resource_type,
-          resource_url: formData.resource_url.trim() || null,
-          file_path: formData.file_path || null,
-          is_published: formData.is_published,
-          position: 0,
-          assignment_deadline: deadlineISO,
-          max_score: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.max_score : null,
-          allows_student_submissions: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.allows_student_submissions : false
-        });
+        .insert(insertData);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error de Supabase:', error);
+        console.error('❌ Detalles completos:', JSON.stringify(error, null, 2));
+        throw error;
+      }
 
+      console.log('✅ Recurso creado exitosamente');
       toast.success('Recurso creado exitosamente');
       onSuccess();
     } catch (error) {
-      console.error('Error creating resource:', error);
-      toast.error('Error al crear el recurso');
+      console.error('❌ Error creating resource:', error);
+      toast.error('Error al crear el recurso. Revisa la consola para más detalles.');
     } finally {
       setLoading(false);
     }
