@@ -2,9 +2,13 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight, Plus, FileText, Link2, ClipboardList, Video, FileImage } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { ResourceForm } from './ResourceForm';
 import { ResourceDetailModal } from './ResourceDetailModal';
 
@@ -83,9 +87,55 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
   const [isOpen, setIsOpen] = useState(false);
   const [showResourceForm, setShowResourceForm] = useState(false);
   const [selectedResource, setSelectedResource] = useState<WeeklyResource | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleResourceClick = (resource: WeeklyResource) => {
     setSelectedResource(resource);
+  };
+
+  const handleToggleSectionPublish = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      setIsUpdating(true);
+      const newPublishState = !section.is_published;
+      
+      const { error } = await supabase
+        .from('course_weekly_sections')
+        .update({ is_published: newPublishState })
+        .eq('id', section.id);
+
+      if (error) throw error;
+
+      toast.success(newPublishState ? 'Semana publicada' : 'Semana despublicada');
+      onUpdateSection?.({ ...section, is_published: newPublishState });
+    } catch (error) {
+      console.error('Error updating section:', error);
+      toast.error('Error al actualizar la semana');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleToggleResourcePublish = async (resource: WeeklyResource, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      const newPublishState = !resource.is_published;
+      
+      const { error } = await supabase
+        .from('course_weekly_resources')
+        .update({ is_published: newPublishState })
+        .eq('id', resource.id);
+
+      if (error) throw error;
+
+      toast.success(newPublishState ? 'Recurso publicado' : 'Recurso despublicado');
+      onUpdateSection?.(section);
+    } catch (error) {
+      console.error('Error updating resource:', error);
+      toast.error('Error al actualizar el recurso');
+    }
   };
 
   return (
@@ -105,7 +155,7 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {section.start_date && section.end_date && (
                   <Badge variant="outline" className="text-xs">
                     {new Date(section.start_date).toLocaleDateString()} - {new Date(section.end_date).toLocaleDateString()}
@@ -114,6 +164,20 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                 <Badge variant={section.is_published ? "default" : "secondary"}>
                   {section.is_published ? "Publicado" : "Borrador"}
                 </Badge>
+                {canEdit && (
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Label htmlFor={`publish-section-${section.id}`} className="text-xs cursor-pointer">
+                      Publicar
+                    </Label>
+                    <Switch
+                      id={`publish-section-${section.id}`}
+                      checked={section.is_published}
+                      onCheckedChange={() => {}}
+                      onClick={handleToggleSectionPublish}
+                      disabled={isUpdating}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -167,6 +231,22 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                             )}
                           </div>
                         </div>
+                        {canEdit && (
+                          <div 
+                            className="flex items-center gap-2 ml-4"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Label htmlFor={`publish-resource-${resource.id}`} className="text-xs cursor-pointer">
+                              Publicar
+                            </Label>
+                            <Switch
+                              id={`publish-resource-${resource.id}`}
+                              checked={resource.is_published}
+                              onCheckedChange={() => {}}
+                              onClick={(e) => handleToggleResourcePublish(resource, e)}
+                            />
+                          </div>
+                        )}
                       </div>
                     ))
                 ) : (
