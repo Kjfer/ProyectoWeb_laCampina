@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import Assignments from "./pages/Assignments";
+import Exams from "./pages/Exams";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/AdminDashboard";
 import VirtualClassrooms from "./pages/VirtualClassrooms";
@@ -48,6 +49,11 @@ const App = () => (
             <Route path="/assignments" element={
               <ProtectedRoute>
                 <Assignments />
+              </ProtectedRoute>
+            } />
+            <Route path="/exams" element={
+              <ProtectedRoute>
+                <Exams />
               </ProtectedRoute>
             } />
             <Route path="/profile" element={
