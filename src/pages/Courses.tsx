@@ -183,7 +183,7 @@ const Courses = () => {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Users className="w-4 h-4" />
                     <span>
-                      Prof. {course.teacher.first_name} {course.teacher.last_name}
+                      Prof. {course.teacher?.first_name || 'Sin asignar'} {course.teacher?.last_name || ''}
                     </span>
                   </div>
                   

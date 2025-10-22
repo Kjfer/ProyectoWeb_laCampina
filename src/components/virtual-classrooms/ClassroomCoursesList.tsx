@@ -204,7 +204,7 @@ export function ClassroomCoursesList({ classroomId, classroomName }: ClassroomCo
                       <CardDescription className="flex items-center gap-4 text-sm">
                         <span className="flex items-center gap-1">
                           <GraduationCap className="h-3 w-3" />
-                          Prof. {course.teacher.first_name} {course.teacher.last_name}
+                          Prof. {course.teacher?.first_name || 'Sin asignar'} {course.teacher?.last_name || ''}
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />

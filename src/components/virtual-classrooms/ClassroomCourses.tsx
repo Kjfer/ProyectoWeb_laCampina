@@ -429,7 +429,7 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
 
                 {course.teacher && (
                   <div className="text-sm text-muted-foreground">
-                    Profesor: {course.teacher.first_name} {course.teacher.last_name}
+                    Profesor: {course.teacher?.first_name || 'Sin nombre'} {course.teacher?.last_name || ''}
                   </div>
                 )}
               </CardContent>

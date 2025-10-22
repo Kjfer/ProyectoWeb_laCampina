@@ -116,10 +116,18 @@ export default function CourseDetail() {
 
       if (error) throw error;
       
-      const enrolledStudents = data?.map(enrollment => ({
-        ...enrollment.student,
-        enrolled_at: enrollment.enrolled_at
-      })) || [];
+      const enrolledStudents = data
+        ?.map(enrollment => {
+          if (!enrollment.student) {
+            console.warn('Enrollment without student data:', enrollment);
+            return null;
+          }
+          return {
+            ...enrollment.student,
+            enrolled_at: enrollment.enrolled_at
+          };
+        })
+        .filter((student): student is Student => student !== null) || [];
       
       setStudents(enrolledStudents);
     } catch (error) {
@@ -197,7 +205,7 @@ export default function CourseDetail() {
                 <div>
                   <p className="text-sm text-muted-foreground">Profesor</p>
                   <p className="font-medium">
-                    {course.teacher?.first_name} {course.teacher?.last_name}
+                    {course.teacher?.first_name || 'Sin asignar'} {course.teacher?.last_name || ''}
                   </p>
                 </div>
               </div>
@@ -308,7 +316,7 @@ export default function CourseDetail() {
                     {students.map((student) => (
                       <div key={student.id} className="p-4 border rounded-lg">
                         <h3 className="font-medium">
-                          {student.first_name} {student.last_name}
+                          {student?.first_name || 'Sin nombre'} {student?.last_name || ''}
                         </h3>
                         <p className="text-sm text-muted-foreground">{student.email}</p>
                         <p className="text-xs text-muted-foreground mt-1">
