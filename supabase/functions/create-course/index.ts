@@ -246,128 +246,15 @@ serve(async (req: Request) => {
     }
 
     console.log(`✅ Curso creado: ${newCourse.id}`)
-
-    // Generate weeks from start_date until end of academic year
-    let weeksGenerated = 0
-    try {
-      console.log(`🗓️ Generando semanas desde fecha de inicio hasta fin del año académico...`)
-      
-      // Parse start_date from body (user input)
-      let startDate = null;
-      if (start_date && start_date.trim() !== '') {
-        try {
-          startDate = new Date(start_date);
-          if (isNaN(startDate.getTime())) {
-            startDate = null;
-          }
-        } catch (e) {
-          startDate = null;
-        }
-      }
-      
-      // If no valid start date, use beginning of academic year
-      if (!startDate) {
-        const currentYearNum = parseInt(academic_year || '2025');
-        startDate = new Date(currentYearNum, 0, 15); // January 15th of academic year
-        console.log(`📅 No fecha de inicio válida, usando: ${startDate.toISOString().split('T')[0]}`);
-      } else {
-        console.log(`📅 Fecha de inicio: ${startDate.toISOString().split('T')[0]}`);
-      }
-      
-      // Calculate end date (December 31st of academic year)
-      const academicYearNum = parseInt(academic_year || '2025');
-      const endDate = new Date(academicYearNum, 11, 31); // December 31st
-      console.log(`📅 Fecha de fin: ${endDate.toISOString().split('T')[0]}`);
-      
-      // Calculate number of weeks using date difference in milliseconds
-      const diffTime = endDate.getTime() - startDate.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      const weekCount = Math.min(Math.ceil(diffDays / 7), 52); // Maximum 52 weeks
-      
-      console.log(`📊 Calculando ${weekCount} semanas (${diffDays} días) desde ${startDate.toISOString().split('T')[0]} hasta ${endDate.toISOString().split('T')[0]}`);
-      
-      const weeklyUpdates = [];
-      
-      for (let week = 1; week <= weekCount; week++) {
-        // Calculate week start and end dates
-        const weekStart = new Date(startDate);
-        weekStart.setDate(startDate.getDate() + (week - 1) * 7);
-        
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        
-        // Don't exceed the academic year end date
-        if (weekEnd > endDate) {
-          weekEnd.setTime(endDate.getTime());
-        }
-        
-        const weekData = {
-          course_id: newCourse.id,
-          week_number: week,
-          title: `Semana ${week}`,
-          description: `Contenido para la semana ${week} del curso (${weekStart.toLocaleDateString('es-ES')} - ${weekEnd.toLocaleDateString('es-ES')})`,
-          start_date: weekStart.toISOString().split('T')[0], // Format as YYYY-MM-DD
-          end_date: weekEnd.toISOString().split('T')[0],     // Format as YYYY-MM-DD
-          position: week,
-          is_published: false
-        };
-
-        weeklyUpdates.push(weekData);
-        
-        // Stop if we've reached the end date
-        if (weekEnd >= endDate) {
-          break;
-        }
-      }
-
-      console.log(`📊 Preparadas ${weeklyUpdates.length} semanas para insertar`)
-      if (weeklyUpdates.length > 0) {
-        console.log(`📋 Primera semana:`, JSON.stringify(weeklyUpdates[0], null, 2))
-        console.log(`📋 Última semana:`, JSON.stringify(weeklyUpdates[weeklyUpdates.length - 1], null, 2))
-      }
-
-      if (weeklyUpdates.length > 0) {
-        // Insert all weekly sections
-        console.log(`💾 Insertando ${weeklyUpdates.length} semanas en course_weekly_sections...`)
-        const { data: weeklyData, error: weeklyError } = await supabaseClient
-          .from('course_weekly_sections')
-          .insert(weeklyUpdates)
-          .select('*');
-
-        if (weeklyError) {
-          console.error('❌ Error insertando secciones semanales:', weeklyError);
-          console.error('❌ Error details:', {
-            message: weeklyError.message,
-            details: weeklyError.details,
-            hint: weeklyError.hint,
-            code: weeklyError.code
-          });
-          // Don't fail course creation, just log the error
-        } else {
-          weeksGenerated = weeklyUpdates.length;
-          console.log(`✅ ${weeksGenerated} semanas insertadas correctamente`);
-          console.log(`✅ Semanas insertadas:`, weeklyData?.length || 'No data returned');
-        }
-      } else {
-        console.warn('⚠️ No hay semanas para insertar');
-      }
-    } catch (weeksError) {
-      console.error('❌ Error general generando semanas:', weeksError)
-      console.error('❌ Stack trace:', weeksError instanceof Error ? weeksError.stack : 'No stack trace')
-      // Don't fail the course creation if weeks generation fails
-    }
+    console.log(`📊 Las semanas se generarán automáticamente mediante el trigger de base de datos`)
 
     // Prepare response message
-    let message = 'Curso creado exitosamente'
-    if (weeksGenerated > 0) {
-      message += ` con ${weeksGenerated} semanas generadas automáticamente`
-    }
+    const message = 'Curso creado exitosamente'
 
     return new Response(
       JSON.stringify({
         success: true,
         data: newCourse,
-        weeks_generated: weeksGenerated,
         message: message
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 201 }
