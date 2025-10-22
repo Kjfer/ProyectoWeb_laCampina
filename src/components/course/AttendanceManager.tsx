@@ -35,9 +35,16 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
   const [attendance, setAttendance] = useState<Record<string, AttendanceRecord>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [courseSchedule, setCourseSchedule] = useState<{
+    schedule_days: string[];
+    start_time: string;
+    end_time: string;
+  } | null>(null);
+  const [isWithinSchedule, setIsWithinSchedule] = useState(false);
 
   useEffect(() => {
     fetchStudents();
+    fetchCourseSchedule();
   }, [courseId]);
 
   useEffect(() => {
@@ -45,6 +52,52 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
       loadExistingAttendance();
     }
   }, [selectedDate, students]);
+
+  useEffect(() => {
+    checkSchedule();
+    const interval = setInterval(checkSchedule, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [courseSchedule]);
+
+  const fetchCourseSchedule = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('schedule_days, start_time, end_time')
+        .eq('id', courseId)
+        .single();
+
+      if (error) throw error;
+      setCourseSchedule(data);
+    } catch (error) {
+      console.error('Error fetching course schedule:', error);
+    }
+  };
+
+  const checkSchedule = () => {
+    if (!courseSchedule) return;
+
+    const now = new Date();
+    const currentDay = now.toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase();
+    const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
+
+    const dayMap: Record<string, string> = {
+      'lunes': 'monday',
+      'martes': 'tuesday',
+      'miércoles': 'wednesday',
+      'jueves': 'thursday',
+      'viernes': 'friday',
+      'sábado': 'saturday',
+      'domingo': 'sunday'
+    };
+
+    const englishDay = dayMap[currentDay];
+    const isDayMatch = courseSchedule.schedule_days?.includes(englishDay);
+    const isTimeMatch = courseSchedule.start_time && courseSchedule.end_time &&
+      currentTime >= courseSchedule.start_time && currentTime <= courseSchedule.end_time;
+
+    setIsWithinSchedule(isDayMatch && isTimeMatch);
+  };
 
   const fetchStudents = async () => {
     try {
@@ -117,6 +170,11 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
   };
 
   const handleSaveAttendance = async () => {
+    if (!isWithinSchedule) {
+      toast.error('La asistencia solo puede registrarse durante el horario de clase');
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -125,21 +183,6 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
 
       if (attendanceRecords.length === 0) {
         toast.error('Debe registrar al menos una asistencia');
-        return;
-      }
-
-      // Verificar si estamos dentro del horario del curso
-      const { data: scheduleCheck, error: scheduleError } = await supabase
-        .rpc('is_within_course_schedule', { p_course_id: courseId });
-
-      if (scheduleError) {
-        console.error('Error checking schedule:', scheduleError);
-        toast.error('Error al verificar el horario del curso');
-        return;
-      }
-
-      if (!scheduleCheck) {
-        toast.error('La asistencia solo puede registrarse durante el horario de clase');
         return;
       }
 
@@ -214,6 +257,31 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {!isWithinSchedule && courseSchedule && (
+          <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+              <Clock className="h-5 w-5" />
+              <div>
+                <p className="font-medium">Fuera del horario de clase</p>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  El registro de asistencia está disponible durante el horario del curso:
+                  {courseSchedule.schedule_days?.map(day => {
+                    const dayNames: Record<string, string> = {
+                      'monday': 'Lunes',
+                      'tuesday': 'Martes',
+                      'wednesday': 'Miércoles',
+                      'thursday': 'Jueves',
+                      'friday': 'Viernes',
+                      'saturday': 'Sábado',
+                      'sunday': 'Domingo'
+                    };
+                    return dayNames[day];
+                  }).join(', ')} de {courseSchedule.start_time} a {courseSchedule.end_time}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {students.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No hay estudiantes inscritos en este curso
@@ -279,7 +347,11 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
             </Table>
 
             <div className="flex justify-end mt-4">
-              <Button onClick={handleSaveAttendance} disabled={saving} className="gap-2">
+              <Button 
+                onClick={handleSaveAttendance} 
+                disabled={saving || !isWithinSchedule} 
+                className="gap-2"
+              >
                 <Save className="h-4 w-4" />
                 {saving ? 'Guardando...' : 'Guardar Asistencia'}
               </Button>
