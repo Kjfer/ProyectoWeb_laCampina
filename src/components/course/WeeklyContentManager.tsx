@@ -67,7 +67,12 @@ export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManager
         resources: section.resources?.sort((a: any, b: any) => a.position - b.position) || []
       })) || [];
 
-      setSections(sectionsWithSortedResources as WeeklySection[]);
+      // Filter to show only published sections for students
+      const filteredSections = canEdit 
+        ? sectionsWithSortedResources 
+        : sectionsWithSortedResources.filter(section => section.is_published);
+
+      setSections(filteredSections as WeeklySection[]);
     } catch (error) {
       console.error('Error fetching sections:', error);
       toast.error('Error al cargar las secciones semanales');

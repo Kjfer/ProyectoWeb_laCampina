@@ -15,6 +15,7 @@ import { AttendanceRecords } from '@/components/course/AttendanceRecords';
 import { StudentCourseAttendance } from '@/components/course/StudentCourseAttendance';
 import { CourseScheduleManager } from '@/components/course/CourseScheduleManager';
 import { ExamForm } from '@/components/course/ExamForm';
+import { ExamsList } from '@/components/course/ExamsList';
 
 interface Course {
   id: string;
@@ -274,30 +275,23 @@ export default function CourseDetail() {
           </TabsContent>
 
           <TabsContent value="exams">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Exámenes del Curso</CardTitle>
-                  {canEdit && (
-                    <Button onClick={() => setIsExamFormOpen(true)} className="bg-gradient-primary shadow-glow">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Crear Examen
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {canEdit ? (
-                  <p className="text-muted-foreground">
-                    Haz clic en "Crear Examen" para agregar un nuevo examen. Los exámenes creados también aparecerán en el calendario del curso.
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground">
-                    Aquí se mostrarán los exámenes del curso cuando estén disponibles.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              {canEdit && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Exámenes del Curso</CardTitle>
+                      <Button onClick={() => setIsExamFormOpen(true)} className="bg-gradient-primary shadow-glow">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Crear Examen
+                      </Button>
+                    </div>
+                  </CardHeader>
+                </Card>
+              )}
+              
+              <ExamsList courseId={course.id} canEdit={canEdit || false} />
+            </div>
           </TabsContent>
 
           <TabsContent value="students">

@@ -125,6 +125,7 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
               <div className="min-h-[350px] space-y-3">
                 {section.resources && section.resources.length > 0 ? (
                   section.resources
+                    .filter(resource => canEdit || resource.is_published)
                     .sort((a, b) => a.position - b.position)
                     .map((resource) => (
                       <div
@@ -140,13 +141,28 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                           {resource.description && (
                             <p className="text-sm text-muted-foreground">{resource.description}</p>
                           )}
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
                             <Badge variant="outline" className="text-xs">
                               {getResourceTypeLabel(resource.resource_type)}
                             </Badge>
                             {!resource.is_published && canEdit && (
                               <Badge variant="secondary" className="text-xs">
                                 Borrador
+                              </Badge>
+                            )}
+                            {resource.resource_type === 'assignment' && resource.assignment_deadline && (
+                              <Badge variant="outline" className="text-xs">
+                                Entrega: {new Date(resource.assignment_deadline).toLocaleDateString('es', { 
+                                  day: 'numeric', 
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </Badge>
+                            )}
+                            {resource.max_score && (
+                              <Badge variant="outline" className="text-xs">
+                                {resource.max_score} pts
                               </Badge>
                             )}
                           </div>
