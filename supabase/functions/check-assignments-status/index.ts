@@ -23,12 +23,21 @@ Deno.serve(async (req) => {
     const twoDaysFromNow = new Date(now);
     twoDaysFromNow.setDate(now.getDate() + 2);
 
-    // Obtener todas las tareas activas
+    // Obtener todas las tareas activas desde course_weekly_resources
     const { data: assignments, error: assignmentsError } = await supabase
-      .from('assignments')
-      .select('id, title, course_id, due_date')
+      .from('course_weekly_resources')
+      .select(`
+        id, 
+        title, 
+        assignment_deadline,
+        section_id,
+        course_weekly_sections!inner (
+          course_id
+        )
+      `)
+      .eq('resource_type', 'assignment')
       .eq('is_published', true)
-      .not('due_date', 'is', null);
+      .not('assignment_deadline', 'is', null);
 
     if (assignmentsError) {
       console.error('Error fetching assignments:', assignmentsError);
@@ -40,21 +49,22 @@ Deno.serve(async (req) => {
     const notificationsToCreate = [];
 
     for (const assignment of assignments || []) {
-      const dueDate = new Date(assignment.due_date);
+      const dueDate = new Date(assignment.assignment_deadline);
+      const courseId = assignment.course_weekly_sections.course_id;
 
       // Obtener estudiantes inscritos en el curso
       const { data: enrollments, error: enrollmentsError } = await supabase
         .from('course_enrollments')
         .select('student_id')
-        .eq('course_id', assignment.course_id);
+        .eq('course_id', courseId);
 
       if (enrollmentsError) {
-        console.error(`Error fetching enrollments for course ${assignment.course_id}:`, enrollmentsError);
+        console.error(`Error fetching enrollments for course ${courseId}:`, enrollmentsError);
         continue;
       }
 
       for (const enrollment of enrollments || []) {
-        // Verificar si ya existe una entrega
+        // Verificar si ya existe una entrega - usando assignment_id que debe referenciar la tarea
         const { data: submissions } = await supabase
           .from('assignment_submissions')
           .select('id')
@@ -74,15 +84,14 @@ Deno.serve(async (req) => {
             .from('notifications')
             .select('id')
             .eq('user_id', enrollment.student_id)
-            .eq('assignment_id', assignment.id)
             .eq('type', 'overdue')
+            .ilike('message', `%${assignment.title}%`)
             .gte('created_at', yesterday.toISOString())
             .limit(1);
 
           if (!existingOverdue || existingOverdue.length === 0) {
             notificationsToCreate.push({
               user_id: enrollment.student_id,
-              assignment_id: assignment.id,
               type: 'overdue',
               message: `La tarea "${assignment.title}" está vencida y no ha sido entregada.`,
               is_read: false,
@@ -117,8 +126,8 @@ Deno.serve(async (req) => {
               .from('notifications')
               .select('id')
               .eq('user_id', enrollment.student_id)
-              .eq('assignment_id', assignment.id)
               .eq('type', 'pending')
+              .ilike('message', `%${assignment.title}%`)
               .gte('created_at', lastNotificationTime.toISOString())
               .limit(1);
 
@@ -134,7 +143,6 @@ Deno.serve(async (req) => {
               
               notificationsToCreate.push({
                 user_id: enrollment.student_id,
-                assignment_id: assignment.id,
                 type: 'pending',
                 message,
                 is_read: false,
