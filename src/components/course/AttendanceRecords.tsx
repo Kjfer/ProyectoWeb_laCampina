@@ -19,7 +19,7 @@ interface AttendanceRecord {
     first_name: string;
     last_name: string;
     email: string;
-  };
+  } | null;
 }
 
 interface AttendanceRecordsProps {
@@ -121,7 +121,9 @@ export function AttendanceRecords({ courseId }: AttendanceRecordsProps) {
                       {format(new Date(record.date), 'PPP', { locale: es })}
                     </TableCell>
                     <TableCell>
-                      {record.student.first_name} {record.student.last_name}
+                      {record.student 
+                        ? `${record.student.first_name} ${record.student.last_name}` 
+                        : 'Estudiante no disponible'}
                     </TableCell>
                     <TableCell>{getStatusBadge(record.status)}</TableCell>
                     <TableCell className="text-muted-foreground">
