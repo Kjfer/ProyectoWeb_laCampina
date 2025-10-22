@@ -49,6 +49,8 @@ export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManager
     try {
       setLoading(true);
 
+      console.log('📚 Fetching weekly sections for course:', courseId, 'canEdit:', canEdit);
+
       // Fetch sections with their resources
       const { data: sectionsData, error: sectionsError } = await supabase
         .from('course_weekly_sections')
@@ -61,16 +63,22 @@ export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManager
 
       if (sectionsError) throw sectionsError;
 
+      console.log('📊 Raw sections data:', sectionsData);
+
       // Sort resources by position within each section
       const sectionsWithSortedResources = sectionsData?.map(section => ({
         ...section,
         resources: section.resources?.sort((a: any, b: any) => a.position - b.position) || []
       })) || [];
 
+      console.log('📝 Sections with sorted resources:', sectionsWithSortedResources);
+
       // Filter to show only published sections for students
       const filteredSections = canEdit 
         ? sectionsWithSortedResources 
         : sectionsWithSortedResources.filter(section => section.is_published);
+
+      console.log('✅ Filtered sections (canEdit=' + canEdit + '):', filteredSections);
 
       setSections(filteredSections as WeeklySection[]);
     } catch (error) {
