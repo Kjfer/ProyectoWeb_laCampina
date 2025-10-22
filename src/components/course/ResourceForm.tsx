@@ -80,6 +80,13 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
 
     setLoading(true);
     try {
+      // Convertir la fecha al formato ISO con zona horaria
+      let deadlineISO = null;
+      if (formData.assignment_deadline) {
+        // El datetime-local devuelve "YYYY-MM-DDTHH:mm", lo convertimos a ISO con zona horaria
+        deadlineISO = new Date(formData.assignment_deadline).toISOString();
+      }
+
       const { error } = await supabase
         .from('course_weekly_resources')
         .insert({
@@ -91,7 +98,7 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
           file_path: formData.file_path || null,
           is_published: formData.is_published,
           position: 0,
-          assignment_deadline: formData.assignment_deadline || null,
+          assignment_deadline: deadlineISO,
           max_score: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.max_score : null,
           allows_student_submissions: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.allows_student_submissions : false
         });
