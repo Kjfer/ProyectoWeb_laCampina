@@ -45,15 +45,33 @@ export function BulkStudentEnrollment({ classroomId, courses, onUpdate }: BulkSt
 
   const fetchAvailableStudents = async () => {
     try {
-      const { data, error } = await supabase
+      // Get all students
+      const { data: students, error: studentsError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, email, is_active')
         .eq('role', 'student')
         .eq('is_active', true)
         .order('last_name', { ascending: true });
 
-      if (error) throw error;
-      setAvailableStudents(data || []);
+      if (studentsError) throw studentsError;
+
+      // Get existing enrollments for these courses
+      const courseIds = courses.map(c => c.id);
+      const { data: enrollments, error: enrollError } = await supabase
+        .from('course_enrollments')
+        .select('student_id, course_id')
+        .in('course_id', courseIds);
+
+      if (enrollError) throw enrollError;
+
+      // Filter students who are not enrolled in ALL courses
+      const studentsNotFullyEnrolled = students?.filter(student => {
+        const studentEnrollments = enrollments?.filter(e => e.student_id === student.id) || [];
+        // Show student if they're not enrolled in all courses
+        return studentEnrollments.length < courses.length;
+      }) || [];
+
+      setAvailableStudents(studentsNotFullyEnrolled);
     } catch (error) {
       console.error('Error fetching available students:', error);
       toast.error('Error al cargar estudiantes disponibles');
