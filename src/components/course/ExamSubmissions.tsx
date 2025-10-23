@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Eye, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Eye, CheckCircle, Clock, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -19,7 +20,6 @@ import { es } from 'date-fns/locale';
 interface ExamSubmissionsProps {
   examId: string;
   courseId: string;
-  onViewSubmission: (submissionId: string, studentName: string) => void;
 }
 
 interface Submission {
@@ -36,7 +36,8 @@ interface Submission {
   hasUngradedQuestions: boolean;
 }
 
-export function ExamSubmissions({ examId, courseId, onViewSubmission }: ExamSubmissionsProps) {
+export function ExamSubmissions({ examId, courseId }: ExamSubmissionsProps) {
+  const navigate = useNavigate();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [enrolledStudents, setEnrolledStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,7 +109,7 @@ export function ExamSubmissions({ examId, courseId, onViewSubmission }: ExamSubm
       const submissionsWithStatus = (submissionsData || []).map(sub => {
         const answers = sub.answers as Record<string, any>;
         const hasUngraded = Object.values(answers).some(
-          (ans: any) => ans.requires_grading && !ans.points_earned
+          (ans: any) => ans.requires_grading && ans.points_earned === undefined
         );
         
         return {
@@ -233,12 +234,22 @@ export function ExamSubmissions({ examId, courseId, onViewSubmission }: ExamSubm
                     <TableCell className="text-right">
                       {submission ? (
                         <Button
-                          variant="ghost"
+                          variant={submission.hasUngradedQuestions ? "default" : "ghost"}
                           size="sm"
-                          onClick={() => onViewSubmission(submission.id, `${student.first_name} ${student.last_name}`)}
+                          onClick={() => navigate(`/exam-grading/${submission.id}?courseId=${courseId}&examId=${examId}`)}
+                          className={submission.hasUngradedQuestions ? "bg-gradient-primary shadow-glow" : ""}
                         >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Ver respuestas
+                          {submission.hasUngradedQuestions ? (
+                            <>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Calificar
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Ver respuestas
+                            </>
+                          )}
                         </Button>
                       ) : (
                         <span className="text-sm text-muted-foreground">No disponible</span>

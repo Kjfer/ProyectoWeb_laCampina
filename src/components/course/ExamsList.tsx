@@ -8,7 +8,6 @@ import { format, isAfter, isBefore, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ExamSubmissions } from './ExamSubmissions';
-import { ExamGrading } from './ExamGrading';
 
 interface Exam {
   id: string;
@@ -29,7 +28,6 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedExam, setSelectedExam] = useState<string | null>(null);
-  const [selectedSubmission, setSelectedSubmission] = useState<{ id: string; studentName: string } | null>(null);
 
   useEffect(() => {
     fetchExams();
@@ -212,23 +210,8 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
           <ExamSubmissions
             examId={selectedExam}
             courseId={courseId}
-            onViewSubmission={(submissionId, studentName) => {
-              setSelectedSubmission({ id: submissionId, studentName });
-            }}
           />
         </div>
-      )}
-
-      {selectedSubmission && (
-        <ExamGrading
-          submissionId={selectedSubmission.id}
-          studentName={selectedSubmission.studentName}
-          onClose={() => setSelectedSubmission(null)}
-          onUpdate={() => {
-            setSelectedSubmission(null);
-            fetchExams();
-          }}
-        />
       )}
     </>
   );
