@@ -65,10 +65,16 @@ export function BulkStudentEnrollment({ classroomId, courses, onUpdate }: BulkSt
 
       if (enrollError) throw enrollError;
 
+      console.log('📚 Courses:', courses.length, courseIds);
+      console.log('📋 All enrollments:', enrollments);
+      console.log('👥 All students:', students);
+
       // Add missing courses count to each student
       const studentsWithInfo = students?.map(student => {
         const studentEnrollments = enrollments?.filter(e => e.student_id === student.id) || [];
         const missingCoursesCount = courses.length - studentEnrollments.length;
+        
+        console.log(`👤 ${student.first_name} ${student.last_name}: ${studentEnrollments.length}/${courses.length} cursos (falta ${missingCoursesCount})`);
         
         return {
           ...student,
@@ -76,6 +82,7 @@ export function BulkStudentEnrollment({ classroomId, courses, onUpdate }: BulkSt
         };
       }).filter(s => s.missing_courses_count > 0) || [];
 
+      console.log('✅ Students to show:', studentsWithInfo.map(s => `${s.first_name} ${s.last_name}`));
       setAvailableStudents(studentsWithInfo);
     } catch (error) {
       console.error('Error fetching available students:', error);
