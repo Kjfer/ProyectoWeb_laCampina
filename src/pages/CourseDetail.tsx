@@ -69,7 +69,8 @@ export default function CourseDetail() {
   // Check if user can edit this course
   const canEdit = profile && course && (
     profile.role === 'admin' || 
-    (profile.role === 'teacher' && course.teacher && profile.id === course.teacher.id)
+    (profile.role === 'teacher' && course.teacher && profile.id === course.teacher.id) ||
+    (profile.role === 'teacher' && additionalTeachers.some(t => t.id === profile.id))
   );
 
   useEffect(() => {
@@ -322,8 +323,10 @@ export default function CourseDetail() {
           </TabsContent>
 
           <TabsContent value="attendance">
-            {/* Mostrar el registro completo y el manager sólo a admin o al docente propietario. */}
-            {profile?.role === 'admin' || (profile?.role === 'teacher' && course.teacher && profile.id === course.teacher.id) ? (
+            {/* Mostrar el registro completo y el manager a admin o cualquier docente del curso */}
+            {profile?.role === 'admin' || 
+             (profile?.role === 'teacher' && course.teacher && profile.id === course.teacher.id) ||
+             (profile?.role === 'teacher' && additionalTeachers.some(t => t.id === profile.id)) ? (
               <div className="space-y-6">
                 <AttendanceManager courseId={course.id} />
                 <AttendanceRecords courseId={course.id} />
