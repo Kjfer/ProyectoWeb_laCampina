@@ -16,6 +16,7 @@ interface Student {
   last_name: string;
   email: string;
   is_active: boolean;
+  missing_courses_count?: number;
 }
 
 interface Course {
@@ -64,14 +65,18 @@ export function BulkStudentEnrollment({ classroomId, courses, onUpdate }: BulkSt
 
       if (enrollError) throw enrollError;
 
-      // Filter students who are not enrolled in ALL courses
-      const studentsNotFullyEnrolled = students?.filter(student => {
+      // Add missing courses count to each student
+      const studentsWithInfo = students?.map(student => {
         const studentEnrollments = enrollments?.filter(e => e.student_id === student.id) || [];
-        // Show student if they're not enrolled in all courses
-        return studentEnrollments.length < courses.length;
-      }) || [];
+        const missingCoursesCount = courses.length - studentEnrollments.length;
+        
+        return {
+          ...student,
+          missing_courses_count: missingCoursesCount
+        };
+      }).filter(s => s.missing_courses_count > 0) || [];
 
-      setAvailableStudents(studentsNotFullyEnrolled);
+      setAvailableStudents(studentsWithInfo);
     } catch (error) {
       console.error('Error fetching available students:', error);
       toast.error('Error al cargar estudiantes disponibles');
@@ -253,13 +258,20 @@ export function BulkStudentEnrollment({ classroomId, courses, onUpdate }: BulkSt
                         onCheckedChange={() => handleStudentToggle(student.id)}
                       />
                       <label htmlFor={student.id} className="flex-1 cursor-pointer">
-                        <div>
-                          <p className="font-medium">
-                            {student.first_name} {student.last_name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {student.email}
-                          </p>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">
+                              {student.first_name} {student.last_name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {student.email}
+                            </p>
+                          </div>
+                          {student.missing_courses_count !== undefined && student.missing_courses_count > 0 && (
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                              {student.missing_courses_count} curso{student.missing_courses_count !== 1 ? 's' : ''} pendiente{student.missing_courses_count !== 1 ? 's' : ''}
+                            </span>
+                          )}
                         </div>
                       </label>
                     </div>
