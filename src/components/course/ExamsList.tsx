@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, ClipboardList, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calendar, Clock, AlertCircle, ClipboardList, Eye } from 'lucide-react';
+import { format, isAfter, isBefore, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'sonner';
+import { ExamSubmissions } from './ExamSubmissions';
+import { ExamGrading } from './ExamGrading';
 
 interface Exam {
   id: string;
   title: string;
-  description?: string;
+  description: string;
   start_time: string;
   duration_minutes: number;
   max_score: number;
@@ -25,6 +28,8 @@ interface ExamsListProps {
 export function ExamsList({ courseId, canEdit }: ExamsListProps) {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedExam, setSelectedExam] = useState<string | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<{ id: string; studentName: string } | null>(null);
 
   useEffect(() => {
     fetchExams();
@@ -56,10 +61,10 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
 
   const getExamStatus = (exam: Exam) => {
     const now = new Date();
-    const examDate = new Date(exam.start_time);
-    const examEndTime = new Date(examDate.getTime() + exam.duration_minutes * 60000);
+    const startTime = new Date(exam.start_time);
+    const endTime = addMinutes(startTime, exam.duration_minutes);
 
-    if (isAfter(now, examEndTime)) {
+    if (isAfter(now, endTime)) {
       return {
         status: 'completed',
         label: 'Finalizado',
@@ -68,29 +73,20 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
       };
     }
 
-    if (isBefore(now, examDate) && isAfter(now, addDays(examDate, -1))) {
+    if (isBefore(now, startTime)) {
       return {
         status: 'upcoming',
         label: 'Próximo',
-        variant: 'destructive' as const,
-        color: 'text-destructive'
-      };
-    }
-
-    if (isBefore(now, examDate)) {
-      return {
-        status: 'scheduled',
-        label: 'Programado',
-        variant: 'outline' as const,
-        color: 'text-muted-foreground'
+        variant: 'default' as const,
+        color: 'text-primary'
       };
     }
 
     return {
       status: 'in-progress',
-      label: 'En Progreso',
-      variant: 'default' as const,
-      color: 'text-primary'
+      label: 'En progreso',
+      variant: 'destructive' as const,
+      color: 'text-destructive'
     };
   };
 
@@ -131,67 +127,109 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
   }
 
   return (
-    <div className="space-y-4">
-      {exams.map((exam) => {
-        const status = getExamStatus(exam);
-        
-        return (
-          <Card key={exam.id} className="bg-gradient-card shadow-card border-0 hover:shadow-glow transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-lg font-semibold text-foreground">
-                      {exam.title}
-                    </h3>
-                    <Badge variant={status.variant} className="text-xs">
-                      {status.label}
-                    </Badge>
-                    {!exam.is_published && canEdit && (
-                      <Badge variant="secondary" className="text-xs">
-                        Borrador
+    <>
+      <div className="space-y-4">
+        {exams.map((exam) => {
+          const status = getExamStatus(exam);
+          
+          return (
+            <Card key={exam.id} className="bg-gradient-card shadow-card border-0 hover:shadow-glow transition-all duration-300">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CardTitle className="text-lg font-semibold text-foreground">
+                        {exam.title}
+                      </CardTitle>
+                      <Badge variant={status.variant} className="text-xs">
+                        {status.label}
                       </Badge>
-                    )}
+                    </div>
                   </div>
-                  {exam.description && (
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {exam.description}
-                    </p>
-                  )}
+                  <ClipboardList className="w-6 h-6 text-primary" />
                 </div>
-                <ClipboardList className="w-6 h-6 text-primary" />
-              </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                  {exam.description || 'Sin descripción disponible'}
+                </p>
+                
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      <span>
+                        {format(new Date(exam.start_time), "d 'de' MMMM, yyyy", { locale: es })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      <span>
+                        {format(new Date(exam.start_time), "HH:mm")} ({exam.duration_minutes} min)
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="text-sm font-medium text-foreground">
+                    {exam.max_score} pts
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4" />
-                  <span>
-                    {format(new Date(exam.start_time), "d 'de' MMMM, yyyy", { locale: es })}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="w-4 h-4" />
-                  <span>
-                    {format(new Date(exam.start_time), "HH:mm")} ({exam.duration_minutes} min)
-                  </span>
-                </div>
-                <div className="text-sm font-medium text-foreground">
-                  Puntuación: {exam.max_score} pts
-                </div>
-              </div>
+                {status.status === 'upcoming' && canEdit && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20 mb-4">
+                    <AlertCircle className="w-4 h-4 text-primary" />
+                    <span className="text-sm text-primary font-medium">
+                      Programado para {format(new Date(exam.start_time), "d 'de' MMMM 'a las' HH:mm", { locale: es })}
+                    </span>
+                  </div>
+                )}
 
-              {status.status === 'upcoming' && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 mt-4">
-                  <AlertCircle className="w-4 h-4 text-destructive" />
-                  <span className="text-sm text-destructive font-medium">
-                    ¡Este examen será pronto!
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+                {!exam.is_published && canEdit && (
+                  <Badge variant="secondary" className="mb-4">
+                    Borrador (no visible para estudiantes)
+                  </Badge>
+                )}
+
+                {canEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedExam(exam.id)}
+                    className="w-full mt-4"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    Ver Respuestas de Estudiantes
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {selectedExam && (
+        <div className="mt-6">
+          <ExamSubmissions
+            examId={selectedExam}
+            courseId={courseId}
+            onViewSubmission={(submissionId, studentName) => {
+              setSelectedSubmission({ id: submissionId, studentName });
+            }}
+          />
+        </div>
+      )}
+
+      {selectedSubmission && (
+        <ExamGrading
+          submissionId={selectedSubmission.id}
+          studentName={selectedSubmission.studentName}
+          onClose={() => setSelectedSubmission(null)}
+          onUpdate={() => {
+            setSelectedSubmission(null);
+            fetchExams();
+          }}
+        />
+      )}
+    </>
   );
 }

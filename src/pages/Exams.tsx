@@ -5,7 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, Calendar, Clock, Plus, AlertCircle, XCircle } from 'lucide-react';
+import { ClipboardList, Calendar, Clock, Plus, AlertCircle, XCircle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, isAfter, isBefore, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -35,6 +35,9 @@ interface Exam {
     name: string;
     code: string;
   };
+  submission?: {
+    score: number;
+  } | null;
 }
 
 const Exams = () => {
@@ -55,20 +58,28 @@ const Exams = () => {
     userId: profile?.id || '',
   });
 
-  const handleStartExam = (examId: string) => {
-    setActiveExam(examId);
-    toast({
-      title: "Examen iniciado",
-      description: `No salgas de esta página o el examen se cerrará automáticamente. Intentos restantes: ${maxAbandonAttempts}`,
-    });
-  };
+  const checkExamSubmission = async (examId: string, quizTitle: string, courseId: string) => {
+    if (!profile?.id) return null;
 
-  const handleEndExam = () => {
-    setActiveExam(null);
-    toast({
-      title: "Examen finalizado",
-      description: "Has completado el examen exitosamente.",
-    });
+    // Find quiz by exam title
+    const { data: quizData } = await supabase
+      .from('quizzes')
+      .select('id')
+      .eq('course_id', courseId)
+      .eq('title', quizTitle)
+      .single();
+
+    if (!quizData) return null;
+
+    // Check if already submitted
+    const { data: submission } = await supabase
+      .from('quiz_submissions')
+      .select('score')
+      .eq('quiz_id', quizData.id)
+      .eq('student_id', profile.id)
+      .single();
+
+    return submission;
   };
 
   useEffect(() => {
@@ -114,33 +125,51 @@ const Exams = () => {
 
       if (weeklyError) throw weeklyError;
 
-      // Combine both sources
-      const combinedExams: Exam[] = [
-        ...(examsData || []).map(exam => ({
-          id: exam.id,
-          title: exam.title,
-          description: exam.description || '',
-          start_time: exam.start_time,
-          duration_minutes: exam.duration_minutes,
-          max_score: exam.max_score,
-          course_id: exam.course_id,
-          source: 'exam' as const,
-          course: exam.course
-        })),
-        ...(weeklyExams || []).map(resource => ({
-          id: resource.id,
-          title: resource.title,
-          description: resource.description || '',
-          start_time: resource.assignment_deadline || new Date().toISOString(),
-          duration_minutes: 60, // Default duration
-          max_score: resource.max_score || 100,
-          course_id: resource.section.course.id,
-          source: 'weekly_resource' as const,
-          course: resource.section.course
-        }))
-      ].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+      // Combine both sources and check submissions for students
+      const combinedExams: Exam[] = await Promise.all([
+        ...(examsData || []).map(async exam => {
+          const submission = profile?.role === 'student' 
+            ? await checkExamSubmission(exam.id, exam.title, exam.course_id)
+            : null;
+          
+          return {
+            id: exam.id,
+            title: exam.title,
+            description: exam.description || '',
+            start_time: exam.start_time,
+            duration_minutes: exam.duration_minutes,
+            max_score: exam.max_score,
+            course_id: exam.course_id,
+            source: 'exam' as const,
+            course: exam.course,
+            submission
+          };
+        }),
+        ...(weeklyExams || []).map(async resource => {
+          const submission = profile?.role === 'student'
+            ? await checkExamSubmission(resource.id, resource.title, resource.section.course.id)
+            : null;
+          
+          return {
+            id: resource.id,
+            title: resource.title,
+            description: resource.description || '',
+            start_time: resource.assignment_deadline || new Date().toISOString(),
+            duration_minutes: 60, // Default duration
+            max_score: resource.max_score || 100,
+            course_id: resource.section.course.id,
+            source: 'weekly_resource' as const,
+            course: resource.section.course,
+            submission
+          };
+        })
+      ]);
 
-      setExams(combinedExams);
+      const sortedExams = combinedExams.sort((a, b) => 
+        new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+      );
+
+      setExams(sortedExams);
     } catch (error) {
       console.error('Error fetching exams:', error);
       toast({
@@ -311,29 +340,23 @@ const Exams = () => {
                         </Link>
                       </Button>
                       
-                      {profile?.role === 'student' && status.status === 'in-progress' && (
+                      {profile?.role === 'student' && (
                         <>
-                          {activeExam === exam.id ? (
-                            <div className="flex-1 flex flex-col gap-2">
-                              <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
-                                <AlertCircle className="w-4 h-4 text-primary" />
-                                <span className="text-sm text-primary font-medium">
-                                  Examen en curso - No salgas de esta página ({maxAbandonAttempts - abandonCount} intentos restantes)
-                                </span>
-                              </div>
-                              <Button 
-                                className="bg-gradient-primary shadow-glow"
-                                onClick={handleEndExam}
-                              >
-                                Finalizar Examen
-                              </Button>
+                          {exam.submission ? (
+                            <div className="flex-1 p-3 rounded-lg bg-primary/10 border border-primary/20 text-center">
+                              <CheckCircle className="w-5 h-5 text-primary mx-auto mb-1" />
+                              <p className="text-sm font-medium text-primary">
+                                Completado - {exam.submission.score.toFixed(1)} / {exam.max_score} pts
+                              </p>
                             </div>
-                          ) : (
+                          ) : status.status === 'in-progress' && (
                             <Button 
                               className="bg-gradient-primary shadow-glow"
-                              onClick={() => handleStartExam(exam.id)}
+                              asChild
                             >
-                              Iniciar Examen
+                              <Link to={`/exams/${exam.id}/take`}>
+                                Iniciar Examen
+                              </Link>
                             </Button>
                           )}
                         </>
