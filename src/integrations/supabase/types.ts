@@ -521,6 +521,45 @@ export type Database = {
         }
         Relationships: []
       }
+      course_teachers: {
+        Row: {
+          course_id: string
+          created_at: string | null
+          id: string
+          is_primary: boolean | null
+          teacher_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          teacher_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_teachers_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_teachers_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_weekly_resources: {
         Row: {
           allows_student_submissions: boolean | null
@@ -1406,6 +1445,10 @@ export type Database = {
             Returns: boolean
           }
       is_active_teacher: { Args: { _profile_id: string }; Returns: boolean }
+      is_any_course_teacher: {
+        Args: { _course_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_course_teacher: {
         Args: { _course_id: string; _user_id: string }
         Returns: boolean

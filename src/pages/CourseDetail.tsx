@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Users, GraduationCap, Clock, Calendar, ClipboardCheck, Plus } from 'lucide-react';
+import { ArrowLeft, Users, GraduationCap, Clock, Calendar, ClipboardCheck, Plus, Edit, UserCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import { StudentCourseAttendance } from '@/components/course/StudentCourseAttend
 import { CourseScheduleManager } from '@/components/course/CourseScheduleManager';
 import { ExamForm } from '@/components/course/ExamForm';
 import { ExamsList } from '@/components/course/ExamsList';
+import { CourseEditDialog } from '@/components/course/CourseEditDialog';
 
 interface Course {
   id: string;
@@ -39,6 +40,13 @@ interface Course {
   };
 }
 
+interface Teacher {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
 interface Student {
   id: string;
   first_name: string;
@@ -55,6 +63,8 @@ export default function CourseDetail() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [isExamFormOpen, setIsExamFormOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [additionalTeachers, setAdditionalTeachers] = useState<Teacher[]>([]);
 
   // Check if user can edit this course
   const canEdit = profile && course && (
@@ -66,6 +76,7 @@ export default function CourseDetail() {
     if (id) {
       fetchCourse();
       fetchStudents();
+      fetchAdditionalTeachers();
     }
   }, [id]);
 
@@ -138,6 +149,27 @@ export default function CourseDetail() {
     }
   };
 
+  const fetchAdditionalTeachers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('course_teachers')
+        .select(`
+          teacher:profiles!course_teachers_teacher_id_fkey(
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('course_id', id);
+
+      if (error) throw error;
+      setAdditionalTeachers(data?.map(item => item.teacher).filter(Boolean) || []);
+    } catch (error) {
+      console.error('Error fetching additional teachers:', error);
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -180,7 +212,7 @@ export default function CourseDetail() {
         <Card>
           <CardHeader>
             <div className="flex justify-between items-start">
-              <div>
+              <div className="flex-1">
                 <CardTitle className="text-2xl">{course.name}</CardTitle>
                 <CardDescription className="mt-2">
                   <span className="font-mono text-sm bg-muted px-2 py-1 rounded">
@@ -193,20 +225,44 @@ export default function CourseDetail() {
                   </p>
                 )}
               </div>
-              <Badge variant={course.is_active ? "default" : "secondary"}>
-                {course.is_active ? "Activo" : "Inactivo"}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant={course.is_active ? "default" : "secondary"}>
+                  {course.is_active ? "Activo" : "Inactivo"}
+                </Badge>
+                {canEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditDialogOpen(true)}
+                    className="gap-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Editar
+                  </Button>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="flex items-center gap-2">
                 <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Profesor</p>
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">Profesores</p>
                   <p className="font-medium">
                     {course.teacher?.first_name || 'Sin asignar'} {course.teacher?.last_name || ''}
+                    {course.teacher && <Badge variant="secondary" className="ml-2">Principal</Badge>}
                   </p>
+                  {additionalTeachers.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {additionalTeachers.map((teacher) => (
+                        <Badge key={teacher.id} variant="outline" className="gap-1 text-xs">
+                          <UserCheck className="h-3 w-3" />
+                          {teacher.first_name} {teacher.last_name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -354,6 +410,17 @@ export default function CourseDetail() {
             }}
           />
         )}
+
+        {/* Course Edit Dialog */}
+        <CourseEditDialog
+          courseId={course.id}
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          onSuccess={() => {
+            fetchCourse();
+            fetchAdditionalTeachers();
+          }}
+        />
       </div>
     </DashboardLayout>
   );
