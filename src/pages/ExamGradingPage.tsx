@@ -147,6 +147,7 @@ const ExamGradingPage = () => {
 
       // Update answers with grades
       const updatedAnswers = { ...(submission.answers as Record<string, any>) };
+      let totalScore = 0;
 
       Object.keys(updatedAnswers).forEach(questionId => {
         const answer = updatedAnswers[questionId];
@@ -154,10 +155,17 @@ const ExamGradingPage = () => {
         if (answer.requires_grading && grades[questionId]) {
           answer.points_earned = grades[questionId].score;
           answer.feedback = grades[questionId].feedback;
+          totalScore += grades[questionId].score || 0;
+        } else {
+          totalScore += answer.points_earned || 0;
         }
       });
 
-      const totalScore = calculateTotalScore();
+      console.log('Saving submission:', {
+        submissionId,
+        updatedAnswers,
+        totalScore
+      });
 
       // Update submission
       const { error } = await supabase
@@ -168,12 +176,17 @@ const ExamGradingPage = () => {
         })
         .eq('id', submissionId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       toast.success('Calificación guardada exitosamente');
       
-      // Navigate back to course detail
-      if (courseId) {
+      // Navigate back to exam submissions list
+      if (examId && courseId) {
+        navigate(`/exam-submissions/${examId}?courseId=${courseId}`);
+      } else if (courseId) {
         navigate(`/courses/${courseId}`);
       } else {
         navigate(-1);
