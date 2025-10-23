@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, AlertCircle, ClipboardList, Eye } from 'lucide-react';
+import { Calendar, Clock, AlertCircle, ClipboardList, Users } from 'lucide-react';
 import { format, isAfter, isBefore, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { ExamSubmissions } from './ExamSubmissions';
 
 interface Exam {
   id: string;
@@ -25,9 +25,9 @@ interface ExamsListProps {
 }
 
 export function ExamsList({ courseId, canEdit }: ExamsListProps) {
+  const navigate = useNavigate();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedExam, setSelectedExam] = useState<string | null>(null);
 
   useEffect(() => {
     fetchExams();
@@ -192,10 +192,10 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setSelectedExam(exam.id)}
+                    onClick={() => navigate(`/exam-submissions/${exam.id}?courseId=${courseId}`)}
                     className="w-full mt-4"
                   >
-                    <Eye className="w-4 h-4 mr-2" />
+                    <Users className="w-4 h-4 mr-2" />
                     Ver Respuestas de Estudiantes
                   </Button>
                 )}
@@ -204,15 +204,6 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
           );
         })}
       </div>
-
-      {selectedExam && (
-        <div className="mt-6">
-          <ExamSubmissions
-            examId={selectedExam}
-            courseId={courseId}
-          />
-        </div>
-      )}
     </>
   );
 }

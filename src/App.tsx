@@ -13,6 +13,7 @@ import CourseDetail from "./pages/CourseDetail";
 import Assignments from "./pages/Assignments";
 import Exams from "./pages/Exams";
 import ExamTaking from "./pages/ExamTaking";
+import ExamSubmissionsPage from "./pages/ExamSubmissionsPage";
 import ExamGradingPage from "./pages/ExamGradingPage";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -61,6 +62,11 @@ const App = () => (
             <Route path="/exams/:examId/take" element={
               <ProtectedRoute>
                 <ExamTaking />
+              </ProtectedRoute>
+            } />
+            <Route path="/exam-submissions/:examId" element={
+              <ProtectedRoute>
+                <ExamSubmissionsPage />
               </ProtectedRoute>
             } />
             <Route path="/exam-grading/:submissionId" element={
