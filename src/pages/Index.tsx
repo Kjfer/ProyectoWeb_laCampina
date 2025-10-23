@@ -1,15 +1,120 @@
+import { useState, useEffect } from "react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
-import { UpcomingClasses } from "@/components/dashboard/UpcomingClasses";
+import { StudentCourses } from "@/components/dashboard/StudentCourses";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Notifications } from "@/components/Notifications";
 import { BookOpen, FileText, GraduationCap, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-education.jpg";
+
+interface DashboardStats {
+  coursesCount: number;
+  pendingAssignments: number;
+  upcomingExams: number;
+  attendanceRate: number;
+}
 
 const Index = () => {
   const { profile } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
+    coursesCount: 0,
+    pendingAssignments: 0,
+    upcomingExams: 0,
+    attendanceRate: 0,
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  useEffect(() => {
+    if (profile?.id) {
+      fetchDashboardStats();
+    }
+  }, [profile]);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoadingStats(true);
+
+      // Get courses count
+      const { count: coursesCount } = await supabase
+        .from('course_enrollments')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', profile!.id);
+
+      // Get pending assignments
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('course_id')
+        .eq('student_id', profile!.id);
+
+      const courseIds = enrollments?.map(e => e.course_id) || [];
+
+      let pendingAssignments = 0;
+      if (courseIds.length > 0) {
+        // Get all assignments in enrolled courses
+        const { data: assignments } = await supabase
+          .from('assignments')
+          .select('id')
+          .in('course_id', courseIds)
+          .eq('is_published', true)
+          .gt('due_date', new Date().toISOString());
+
+        const assignmentIds = assignments?.map(a => a.id) || [];
+
+        if (assignmentIds.length > 0) {
+          // Get submitted assignments
+          const { data: submissions } = await supabase
+            .from('assignment_submissions')
+            .select('assignment_id')
+            .eq('student_id', profile!.id)
+            .in('assignment_id', assignmentIds);
+
+          const submittedIds = new Set(submissions?.map(s => s.assignment_id) || []);
+          pendingAssignments = assignmentIds.filter(id => !submittedIds.has(id)).length;
+        }
+      }
+
+      // Get upcoming exams
+      let upcomingExams = 0;
+      if (courseIds.length > 0) {
+        const { count: examsCount } = await supabase
+          .from('exams')
+          .select('*', { count: 'exact', head: true })
+          .in('course_id', courseIds)
+          .eq('is_published', true)
+          .gt('start_time', new Date().toISOString());
+
+        upcomingExams = examsCount || 0;
+      }
+
+      // Get attendance rate
+      const { data: attendance } = await supabase
+        .from('attendance')
+        .select('status')
+        .eq('student_id', profile!.id);
+
+      let attendanceRate = 0;
+      if (attendance && attendance.length > 0) {
+        const presentCount = attendance.filter(a => 
+          a.status === 'present' || a.status === 'late'
+        ).length;
+        attendanceRate = Math.round((presentCount / attendance.length) * 100);
+      }
+
+      setStats({
+        coursesCount: coursesCount || 0,
+        pendingAssignments,
+        upcomingExams,
+        attendanceRate,
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const getWelcomeMessage = () => {
     const name = profile ? profile.first_name : 'Usuario';
@@ -74,31 +179,31 @@ const Index = () => {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatsCard
-                title="Cursos Activos"
-                value="6"
+                title="Mis Cursos"
+                value={loadingStats ? "..." : stats.coursesCount.toString()}
                 icon={BookOpen}
-                description="En progreso este semestre"
+                description="Cursos inscritos"
                 color="primary"
               />
               <StatsCard
                 title="Tareas Pendientes"
-                value="3"
+                value={loadingStats ? "..." : stats.pendingAssignments.toString()}
                 icon={FileText}
-                description="Por entregar esta semana"
+                description="Por entregar próximamente"
                 color="accent"
               />
               <StatsCard
-                title="Promedio General"
-                value="8.7"
+                title="Exámenes Próximos"
+                value={loadingStats ? "..." : stats.upcomingExams.toString()}
                 icon={TrendingUp}
-                description="Calificación actual"
+                description="Próximos a rendir"
                 color="secondary"
               />
               <StatsCard
-                title="Días de Asistencia"
-                value="92%"
+                title="Asistencia"
+                value={loadingStats ? "..." : `${stats.attendanceRate}%`}
                 icon={GraduationCap}
-                description="Este mes"
+                description="Tasa de asistencia"
                 color="primary"
               />
             </div>
@@ -107,9 +212,8 @@ const Index = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column */}
               <div className="lg:col-span-2 space-y-6">
-                <UpcomingClasses />
+                <StudentCourses />
                 <RecentActivity />
-                {/** Notifications moved to header dropdown */}
               </div>
               
               {/* Right Column */}

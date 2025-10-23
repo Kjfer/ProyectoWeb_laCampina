@@ -1,31 +1,36 @@
-import { BookOpen, FileText, MessageSquare, Video } from "lucide-react";
+import { BookOpen, FileText, Calendar, ClipboardList } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const quickActions = [
   {
-    title: "Nuevo Curso",
-    description: "Explorar cursos disponibles",
+    title: "Mis Cursos",
+    description: "Ver todos mis cursos",
     icon: BookOpen,
     color: "primary" as const,
+    link: "/courses",
   },
   {
-    title: "Subir Tarea",
-    description: "Entregar assignment pendiente",
+    title: "Tareas",
+    description: "Ver tareas pendientes",
     icon: FileText,
     color: "secondary" as const,
+    link: "/assignments",
   },
   {
-    title: "Mensajes",
-    description: "Chatear con profesores",
-    icon: MessageSquare,
+    title: "Exámenes",
+    description: "Revisar exámenes",
+    icon: ClipboardList,
     color: "accent" as const,
+    link: "/exams",
   },
   {
-    title: "Clase Virtual",
-    description: "Unirse a sesión en vivo",
-    icon: Video,
+    title: "Calendario",
+    description: "Ver calendario académico",
+    icon: Calendar,
     color: "primary" as const,
+    link: "/calendar",
   },
 ];
 
@@ -48,17 +53,18 @@ export function QuickActions() {
             };
 
             return (
-              <Button
-                key={action.title}
-                variant="outline"
-                className={`h-auto p-4 flex flex-col gap-2 border-0 ${colorClasses[action.color]} transition-all duration-300`}
-              >
-                <Icon className="w-5 h-5" />
-                <div className="text-center">
-                  <div className="text-sm font-medium">{action.title}</div>
-                  <div className="text-xs opacity-90">{action.description}</div>
-                </div>
-              </Button>
+              <Link key={action.title} to={action.link}>
+                <Button
+                  variant="outline"
+                  className={`h-auto p-4 flex flex-col gap-2 border-0 w-full ${colorClasses[action.color]} transition-all duration-300`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <div className="text-center">
+                    <div className="text-sm font-medium">{action.title}</div>
+                    <div className="text-xs opacity-90">{action.description}</div>
+                  </div>
+                </Button>
+              </Link>
             );
           })}
         </div>
