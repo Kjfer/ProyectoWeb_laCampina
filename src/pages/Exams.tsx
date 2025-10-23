@@ -37,6 +37,8 @@ interface Exam {
   };
   submission?: {
     score: number;
+    answers: any;
+    submitted_at: string;
   } | null;
 }
 
@@ -67,17 +69,17 @@ const Exams = () => {
       .select('id')
       .eq('course_id', courseId)
       .eq('title', quizTitle)
-      .single();
+      .maybeSingle();
 
     if (!quizData) return null;
 
     // Check if already submitted
     const { data: submission } = await supabase
       .from('quiz_submissions')
-      .select('score')
+      .select('score, answers, submitted_at')
       .eq('quiz_id', quizData.id)
       .eq('student_id', profile.id)
-      .single();
+      .maybeSingle();
 
     return submission;
   };
@@ -343,15 +345,39 @@ const Exams = () => {
                       {profile?.role === 'student' && (
                         <>
                           {exam.submission ? (
-                            <div className="flex-1 p-3 rounded-lg bg-primary/10 border border-primary/20 text-center">
-                              <CheckCircle className="w-5 h-5 text-primary mx-auto mb-1" />
-                              <p className="text-sm font-medium text-primary">
-                                Completado - {exam.submission.score.toFixed(1)} / {exam.max_score} pts
-                              </p>
+                            <div className="flex-1 space-y-2">
+                              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-center">
+                                <CheckCircle className="w-5 h-5 text-primary mx-auto mb-1" />
+                                <p className="text-sm font-medium text-primary">
+                                  Completado - {exam.submission.score.toFixed(1)} / {exam.max_score} pts
+                                </p>
+                              </div>
+                              {(() => {
+                                const answers = exam.submission.answers || {};
+                                const hasUngradedQuestions = Object.values(answers).some(
+                                  (answer: any) => answer.requires_grading === true && answer.points_earned === undefined
+                                );
+                                
+                                return hasUngradedQuestions ? (
+                                  <div className="p-2 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center gap-2">
+                                    <Clock className="w-4 h-4 text-accent" />
+                                    <span className="text-xs font-medium text-accent">
+                                      Pendiente de revisión
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center gap-2">
+                                    <CheckCircle className="w-4 h-4 text-primary" />
+                                    <span className="text-xs font-medium text-primary">
+                                      Revisado por el profesor
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           ) : status.status === 'in-progress' && (
                             <Button 
-                              className="bg-gradient-primary shadow-glow"
+                              className="bg-gradient-primary shadow-glow flex-1"
                               asChild
                             >
                               <Link to={`/exams/${exam.id}/take`}>
