@@ -122,8 +122,10 @@ serve(async (req: Request) => {
       })) || []
 
     } else if (profile.role === 'teacher') {
-      // For teachers: get courses they teach
-      const { data, error } = await supabaseClient
+      // For teachers: get courses they teach (primary or additional)
+      
+      // Get courses where they are the primary teacher
+      const { data: primaryCourses, error: primaryError } = await supabaseClient
         .from('courses')
         .select(`
           *,
@@ -143,21 +145,57 @@ serve(async (req: Request) => {
         `)
         .eq('teacher_id', profile.id)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error('❌ Error obteniendo cursos del profesor:', error)
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'Error al obtener cursos del profesor',
-            details: error.message 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-        )
+      if (primaryError) {
+        console.error('❌ Error obteniendo cursos principales del profesor:', primaryError)
       }
 
-      coursesData = data || []
+      // Get courses where they are an additional teacher
+      const { data: additionalCourses, error: additionalError } = await supabaseClient
+        .from('course_teachers')
+        .select(`
+          course:courses (
+            *,
+            teacher:profiles!courses_teacher_id_fkey (
+              id,
+              first_name,
+              last_name,
+              email
+            ),
+            classroom:virtual_classrooms!courses_classroom_id_fkey (
+              id,
+              name,
+              grade,
+              education_level
+            ),
+            enrollments:course_enrollments (count)
+          )
+        `)
+        .eq('teacher_id', profile.id)
+        .eq('course.is_active', true)
+
+      if (additionalError) {
+        console.error('❌ Error obteniendo cursos adicionales del profesor:', additionalError)
+      }
+
+      // Combine both arrays and remove duplicates
+      const allCourses = [
+        ...(primaryCourses || []),
+        ...(additionalCourses?.map(ct => ct.course).filter(Boolean) || [])
+      ]
+
+      // Remove duplicates based on course id
+      const uniqueCourses = allCourses.reduce((acc, course) => {
+        if (!acc.find(c => c.id === course.id)) {
+          acc.push(course)
+        }
+        return acc
+      }, [] as any[])
+
+      // Sort by created_at
+      coursesData = uniqueCourses.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
 
     } else if (profile.role === 'admin') {
       // For admins: get all courses

@@ -6,8 +6,18 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Users, Clock, Plus, ArrowRight, GraduationCap, Calendar } from 'lucide-react';
+import { BookOpen, Users, Clock, Plus, ArrowRight, GraduationCap, Calendar, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Course {
   id: string;
@@ -41,6 +51,7 @@ const Courses = () => {
   const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [courseToDelete, setCourseToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCourses();
@@ -92,6 +103,33 @@ const Courses = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Curso eliminado",
+        description: "El curso ha sido eliminado exitosamente",
+      });
+
+      fetchCourses();
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el curso",
+        variant: "destructive",
+      });
+    } finally {
+      setCourseToDelete(null);
     }
   };
 
@@ -209,21 +247,54 @@ const Courses = () => {
                   )}
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-border/50">
+                <div className="mt-6 pt-4 border-t border-border/50 flex gap-2">
                   <Button 
-                    className="w-full" 
+                    className="flex-1" 
                     variant="outline"
                     onClick={() => navigate(`/courses/${course.id}`)}
                   >
                     Ver Curso
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
+                  {profile?.role === 'admin' && (
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCourseToDelete(course.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!courseToDelete} onOpenChange={() => setCourseToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Esto eliminará permanentemente el curso
+              y todos los datos asociados (tareas, exámenes, asistencias, etc.).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => courseToDelete && handleDeleteCourse(courseToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
     </DashboardLayout>
   );
