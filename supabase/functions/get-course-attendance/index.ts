@@ -50,13 +50,13 @@ serve(async (req) => {
 
     // Verify permissions
     if (profile.role === 'teacher') {
-      const { data: course } = await supabaseClient
-        .from('courses')
-        .select('teacher_id')
-        .eq('id', course_id)
-        .single();
+      const { data: isTeacher } = await supabaseClient
+        .rpc('is_any_course_teacher', { 
+          _course_id: course_id, 
+          _user_id: user.id 
+        });
 
-      if (!course || course.teacher_id !== profile.id) {
+      if (!isTeacher) {
         throw new Error('No tiene permisos para ver este curso');
       }
     } else if (profile.role !== 'admin') {
