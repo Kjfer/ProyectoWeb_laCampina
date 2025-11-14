@@ -5,12 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronRight, Plus, FileText, Link2, ClipboardList, Video, FileImage } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, FileText, Link2, ClipboardList, Video, FileImage, Edit } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ResourceForm } from './ResourceForm';
 import { ResourceDetailModal } from './ResourceDetailModal';
+import { SectionEditForm } from './SectionEditForm';
+import { ResourceEditForm } from './ResourceEditForm';
 
 interface WeeklyResource {
   id: string;
@@ -88,6 +90,8 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
   const [showResourceForm, setShowResourceForm] = useState(false);
   const [selectedResource, setSelectedResource] = useState<WeeklyResource | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showSectionEditForm, setShowSectionEditForm] = useState(false);
+  const [editingResource, setEditingResource] = useState<WeeklyResource | null>(null);
 
   const handleResourceClick = (resource: WeeklyResource) => {
     setSelectedResource(resource);
@@ -166,6 +170,17 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                 </Badge>
                 {canEdit && (
                   <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowSectionEditForm(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
                     <Label htmlFor={`publish-section-${section.id}`} className="text-xs cursor-pointer">
                       Publicar
                     </Label>
@@ -236,6 +251,17 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                             className="flex items-center gap-2 ml-4"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingResource(resource);
+                              }}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Editar
+                            </Button>
                             <Label htmlFor={`publish-resource-${resource.id}`} className="text-xs cursor-pointer">
                               Publicar
                             </Label>
@@ -288,6 +314,32 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                   resource={selectedResource}
                   isOpen={!!selectedResource}
                   onClose={() => setSelectedResource(null)}
+                />
+              )}
+
+              {/* Section Edit Form */}
+              {showSectionEditForm && (
+                <SectionEditForm
+                  section={section}
+                  courseId={courseId}
+                  onClose={() => setShowSectionEditForm(false)}
+                  onSuccess={() => {
+                    setShowSectionEditForm(false);
+                    onUpdateSection?.(section);
+                  }}
+                />
+              )}
+
+              {/* Resource Edit Form */}
+              {editingResource && (
+                <ResourceEditForm
+                  resource={editingResource}
+                  sectionId={section.id}
+                  onClose={() => setEditingResource(null)}
+                  onSuccess={() => {
+                    setEditingResource(null);
+                    onUpdateSection?.(section);
+                  }}
                 />
               )}
             </div>
