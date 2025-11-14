@@ -45,24 +45,55 @@ const Assignments = () => {
     if (!profile) return;
 
     try {
-      // Fetch from assignments table
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('assignments')
-        .select(`
-          *,
-          course:courses (
-            id,
-            name,
-            code
-          ),
-          submissions:assignment_submissions (
-            id,
-            score,
-            submitted_at
-          )
-        `)
-        .eq('is_published', true)
-        .order('due_date', { ascending: true });
+      let assignmentsData = null;
+      let assignmentsError = null;
+
+      // For teachers, fetch all assignments from their courses
+      if (profile.role === 'teacher' || profile.role === 'admin') {
+        const { data, error } = await supabase
+          .from('assignments')
+          .select(`
+            *,
+            course:courses!inner (
+              id,
+              name,
+              code
+            ),
+            submissions:assignment_submissions (
+              id,
+              score,
+              submitted_at,
+              student_id
+            )
+          `)
+          .eq('is_published', true)
+          .order('due_date', { ascending: true });
+
+        assignmentsData = data;
+        assignmentsError = error;
+      } else {
+        // For students, fetch only their enrolled courses' assignments
+        const { data, error } = await supabase
+          .from('assignments')
+          .select(`
+            *,
+            course:courses (
+              id,
+              name,
+              code
+            ),
+            submissions:assignment_submissions (
+              id,
+              score,
+              submitted_at
+            )
+          `)
+          .eq('is_published', true)
+          .order('due_date', { ascending: true });
+
+        assignmentsData = data;
+        assignmentsError = error;
+      }
 
       if (assignmentsError) throw assignmentsError;
 
@@ -290,18 +321,34 @@ const Assignments = () => {
                         </Link>
                       </Button>
                       
-                      {profile?.role === 'student' && status.status !== 'submitted' && (
+                      {profile?.role === 'teacher' || profile?.role === 'admin' ? (
                         <Button 
                           className="bg-gradient-primary shadow-glow"
-                          onClick={() => {
-                            toast({
-                              title: "Próximamente",
-                              description: "La entrega de tareas estará disponible pronto.",
-                            });
-                          }}
+                          asChild
                         >
-                          Entregar
+                          <Link to={`/assignments/${assignment.id}/review`}>
+                            Revisar Entregas
+                            {assignment.submissions && assignment.submissions.length > 0 && (
+                              <Badge variant="secondary" className="ml-2">
+                                {assignment.submissions.length}
+                              </Badge>
+                            )}
+                          </Link>
                         </Button>
+                      ) : (
+                        profile?.role === 'student' && status.status !== 'submitted' && (
+                          <Button 
+                            className="bg-gradient-primary shadow-glow"
+                            onClick={() => {
+                              toast({
+                                title: "Próximamente",
+                                description: "La entrega de tareas estará disponible pronto.",
+                              });
+                            }}
+                          >
+                            Entregar
+                          </Button>
+                        )
                       )}
                     </div>
                   </CardContent>
