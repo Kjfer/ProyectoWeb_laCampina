@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import Assignments from "./pages/Assignments";
+import AssignmentReview from "./pages/AssignmentReview";
 import Exams from "./pages/Exams";
 import ExamTaking from "./pages/ExamTaking";
 import ExamSubmissionsPage from "./pages/ExamSubmissionsPage";
@@ -52,6 +53,11 @@ const App = () => (
             <Route path="/assignments" element={
               <ProtectedRoute>
                 <Assignments />
+              </ProtectedRoute>
+            } />
+            <Route path="/assignments/:assignmentId/review" element={
+              <ProtectedRoute>
+                <AssignmentReview />
               </ProtectedRoute>
             } />
             <Route path="/exams" element={
