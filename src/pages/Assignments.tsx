@@ -5,11 +5,13 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, Clock, Plus, AlertCircle } from 'lucide-react';
+import { FileText, Calendar, Clock, Plus, AlertCircle, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Assignment {
   id: string;
@@ -36,6 +38,9 @@ const Assignments = () => {
   const { toast } = useToast();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [courseFilter, setCourseFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchAssignments();
@@ -97,52 +102,20 @@ const Assignments = () => {
 
       if (assignmentsError) throw assignmentsError;
 
-      // Fetch from weekly resources (assignment type)
-      const { data: weeklyAssignments, error: weeklyError } = await supabase
-        .from('course_weekly_resources')
-        .select(`
-          *,
-          section:course_weekly_sections!inner (
-            course:courses (
-              id,
-              name,
-              code
-            )
-          )
-        `)
-        .eq('resource_type', 'assignment')
-        .eq('is_published', true)
-        .order('assignment_deadline', { ascending: true });
+      // Only use assignments from the assignments table (no duplicates from weekly resources)
+      const formattedAssignments: Assignment[] = (assignmentsData || []).map(assignment => ({
+        id: assignment.id,
+        title: assignment.title,
+        description: assignment.description || '',
+        due_date: assignment.due_date,
+        max_score: assignment.max_score,
+        course_id: assignment.course_id,
+        source: 'assignment' as const,
+        course: assignment.course,
+        submissions: assignment.submissions
+      })).sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
-      if (weeklyError) throw weeklyError;
-
-      // Combine both sources
-      const combinedAssignments: Assignment[] = [
-        ...(assignmentsData || []).map(assignment => ({
-          id: assignment.id,
-          title: assignment.title,
-          description: assignment.description || '',
-          due_date: assignment.due_date,
-          max_score: assignment.max_score,
-          course_id: assignment.course_id,
-          source: 'assignment' as const,
-          course: assignment.course,
-          submissions: assignment.submissions
-        })),
-        ...(weeklyAssignments || []).map(resource => ({
-          id: resource.id,
-          title: resource.title,
-          description: resource.description || '',
-          due_date: resource.assignment_deadline || new Date().toISOString(),
-          max_score: resource.max_score || 100,
-          course_id: resource.section.course.id,
-          source: 'weekly_resource' as const,
-          course: resource.section.course,
-          submissions: []
-        }))
-      ].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-
-      setAssignments(combinedAssignments);
+      setAssignments(formattedAssignments);
     } catch (error) {
       console.error('Error fetching assignments:', error);
       toast({
@@ -196,6 +169,25 @@ const Assignments = () => {
     };
   };
 
+  // Get unique courses for filter
+  const uniqueCourses = Array.from(new Set(assignments.map(a => a.course_id)))
+    .map(courseId => assignments.find(a => a.course_id === courseId)?.course)
+    .filter(Boolean);
+
+  // Apply filters
+  const filteredAssignments = assignments.filter(assignment => {
+    const matchesSearch = assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         assignment.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         assignment.course.name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCourse = courseFilter === 'all' || assignment.course_id === courseFilter;
+    
+    const status = getAssignmentStatus(assignment).status;
+    const matchesStatus = statusFilter === 'all' || status === statusFilter;
+
+    return matchesSearch && matchesCourse && matchesStatus;
+  });
+
   if (loading) {
     return (
       <div className="p-6 space-y-6">
@@ -232,7 +224,49 @@ const Assignments = () => {
           )}
         </div>
 
-        {assignments.length === 0 ? (
+        {/* Search and Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar tareas..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <Select value={courseFilter} onValueChange={setCourseFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos los cursos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los cursos</SelectItem>
+              {uniqueCourses.map(course => (
+                <SelectItem key={course!.id} value={course!.id}>
+                  {course!.code} - {course!.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos los estados" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="pending">Pendiente</SelectItem>
+              <SelectItem value="due-soon">Por vencer</SelectItem>
+              <SelectItem value="overdue">Vencida</SelectItem>
+              {profile?.role === 'student' && (
+                <SelectItem value="submitted">Entregada</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {filteredAssignments.length === 0 ? (
           <Card className="bg-gradient-card shadow-card border-0">
             <CardContent className="p-8 text-center">
               <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
@@ -240,16 +274,18 @@ const Assignments = () => {
                 No hay tareas disponibles
               </h3>
               <p className="text-muted-foreground">
-                {profile?.role === 'student' 
-                  ? 'No tienes tareas pendientes en este momento.'
-                  : 'Aún no has creado ninguna tarea para tus cursos.'
+                {searchTerm || courseFilter !== 'all' || statusFilter !== 'all'
+                  ? 'No se encontraron tareas con los filtros aplicados.'
+                  : profile?.role === 'student' 
+                    ? 'No tienes tareas pendientes en este momento.'
+                    : 'Aún no has creado ninguna tarea para tus cursos.'
                 }
               </p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
-            {assignments.map((assignment) => {
+            {filteredAssignments.map((assignment) => {
               const status = getAssignmentStatus(assignment);
               
               return (
