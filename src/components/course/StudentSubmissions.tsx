@@ -128,47 +128,34 @@ export function StudentSubmissions({
         mimeType = file.type;
       }
 
-      // Create assignment if it doesn't exist
-      let assignmentId;
-      const { data: existingAssignment } = await supabase
-        .from('assignments')
-        .select('id')
-        .eq('title', assignmentTitle)
-        .maybeSingle();
+      // Get course_id from resource
+      const { data: resource, error: resourceError } = await supabase
+        .from('course_weekly_resources')
+        .select('section:course_weekly_sections!inner(course_id)')
+        .eq('id', resourceId)
+        .single();
 
-      if (existingAssignment) {
-        assignmentId = existingAssignment.id;
-      } else {
-        const { data: newAssignment, error: assignmentError } = await supabase
-          .from('assignments')
-          .insert({
-            title: assignmentTitle,
-            description: `Tarea generada automáticamente para: ${assignmentTitle}`,
-            due_date: deadline,
-            max_score: maxScore || 100,
-            is_published: true
-          })
-          .select()
-          .single();
+      if (resourceError) throw resourceError;
 
-        if (assignmentError) throw assignmentError;
-        assignmentId = newAssignment.id;
-      }
+      const courseId = (resource.section as any).course_id;
 
-      // Create submission
-      const { error: submissionError } = await supabase
-        .from('assignment_submissions')
-        .insert({
-          assignment_id: assignmentId,
-          student_id: profile.id,
-          content: content.trim() || null,
-          file_path: filePath,
-          file_name: fileName,
-          file_size: fileSize,
-          mime_type: mimeType
-        });
+      // Use edge function to handle assignment creation and submission
+      const { data, error } = await supabase.functions.invoke('submit-assignment', {
+        body: {
+          resourceId,
+          assignmentTitle,
+          deadline,
+          maxScore,
+          content: content.trim(),
+          filePath,
+          fileName,
+          fileSize,
+          mimeType,
+          courseId
+        }
+      });
 
-      if (submissionError) throw submissionError;
+      if (error) throw error;
 
       toast.success('Entrega realizada exitosamente');
       fetchSubmission();
