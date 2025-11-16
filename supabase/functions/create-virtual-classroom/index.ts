@@ -134,8 +134,16 @@ serve(async (req: Request) => {
 
     // Create standard courses for the classroom
     const coursesToInsert = standardCourses.map((courseName, index) => {
-      const prefix = courseName.substring(0, 3).toUpperCase();
-      const code = `${prefix}-${grade}-${section}-${academic_year}-${String(newClassroom.id).slice(0, 8)}`;
+      // Build a short, more unique prefix (initials of words, max 3 chars)
+      const initials = courseName
+        .split(/\s+/)
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 3)
+        .toUpperCase();
+      const idPart = String(newClassroom.id).replace(/-/g, '').slice(0, 8);
+      // Append index to avoid collisions for subjects with same initials
+      const code = `${initials}-${grade}-${section}-${academic_year}-${idPart}-${index + 1}`;
       return {
         name: courseName,
         code,
