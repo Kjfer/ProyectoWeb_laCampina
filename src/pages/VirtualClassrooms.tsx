@@ -7,11 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, BookOpen, Calendar, RefreshCw } from 'lucide-react';
+import { Plus, Users, BookOpen, Calendar, RefreshCw, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { ClassroomCoursesList } from '@/components/virtual-classrooms/ClassroomCoursesList';
+import { EditClassroomDialog } from '@/components/virtual-classrooms/EditClassroomDialog';
+import { DeleteClassroomDialog } from '@/components/virtual-classrooms/DeleteClassroomDialog';
 
 interface VirtualClassroom {
   id: string;
@@ -46,6 +48,8 @@ export default function VirtualClassrooms() {
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [lastFetch, setLastFetch] = useState<number>(0);
+  const [editingClassroom, setEditingClassroom] = useState<VirtualClassroom | null>(null);
+  const [deletingClassroom, setDeletingClassroom] = useState<VirtualClassroom | null>(null);
 
   // Cache timeout: 5 minutos
   const CACHE_TIMEOUT = 5 * 60 * 1000;
@@ -391,9 +395,37 @@ export default function VirtualClassrooms() {
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg">{classroom.name}</CardTitle>
-                    <Badge variant={classroom.is_active ? "default" : "secondary"}>
-                      {classroom.is_active ? "Activo" : "Inactivo"}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={classroom.is_active ? "default" : "secondary"}>
+                        {classroom.is_active ? "Activo" : "Inactivo"}
+                      </Badge>
+                      {(profile?.role === 'admin' || profile?.role === 'teacher') && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingClassroom(classroom);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingClassroom(classroom);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <CardDescription>
                     {classroom.grade} {classroom.section} - {classroom.education_level.charAt(0).toUpperCase() + classroom.education_level.slice(1)}
@@ -463,6 +495,22 @@ export default function VirtualClassrooms() {
           </Card>
         )}
       </div>
+
+      <EditClassroomDialog
+        classroom={editingClassroom}
+        open={!!editingClassroom}
+        onOpenChange={(open) => !open && setEditingClassroom(null)}
+        onSuccess={() => fetchClassrooms(true)}
+        teachers={teachers}
+        isAdmin={profile?.role === 'admin'}
+      />
+
+      <DeleteClassroomDialog
+        classroom={deletingClassroom}
+        open={!!deletingClassroom}
+        onOpenChange={(open) => !open && setDeletingClassroom(null)}
+        onSuccess={() => fetchClassrooms(true)}
+      />
     </DashboardLayout>
   )
 };
