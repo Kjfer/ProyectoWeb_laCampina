@@ -691,7 +691,6 @@ export type Database = {
           is_active: boolean | null
           name: string
           schedule_days: string[] | null
-          semester: string
           start_date: string | null
           start_time: string | null
           teacher_id: string
@@ -709,7 +708,6 @@ export type Database = {
           is_active?: boolean | null
           name: string
           schedule_days?: string[] | null
-          semester: string
           start_date?: string | null
           start_time?: string | null
           teacher_id: string
@@ -727,7 +725,6 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           schedule_days?: string[] | null
-          semester?: string
           start_date?: string | null
           start_time?: string | null
           teacher_id?: string

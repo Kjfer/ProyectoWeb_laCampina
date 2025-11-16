@@ -32,7 +32,6 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
     name: '',
     code: '',
     description: '',
-    semester: '',
     academic_year: '',
     teacher_id: '',
     start_date: '',
@@ -64,7 +63,6 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
         name: data.name || '',
         code: data.code || '',
         description: data.description || '',
-        semester: data.semester || '',
         academic_year: data.academic_year || '',
         teacher_id: data.teacher_id || '',
         start_date: data.start_date || '',
@@ -170,7 +168,6 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
           name: formData.name,
           code: formData.code,
           description: formData.description,
-          semester: formData.semester,
           academic_year: formData.academic_year,
           teacher_id: formData.teacher_id,
           start_date: formData.start_date || null,
@@ -255,7 +252,7 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
           </div>
 
           {/* Academic Info */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="academic_year">Año Académico *</Label>
               <Input
@@ -264,23 +261,6 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
                 onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
                 required
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="semester">Semestre *</Label>
-              <Select
-                value={formData.semester}
-                onValueChange={(value) => setFormData({ ...formData, semester: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar semestre" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="primer-semestre">Primer Semestre</SelectItem>
-                  <SelectItem value="segundo-semestre">Segundo Semestre</SelectItem>
-                  <SelectItem value="verano">Verano</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
 

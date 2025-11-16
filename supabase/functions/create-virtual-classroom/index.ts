@@ -169,7 +169,6 @@ serve(async (req: Request) => {
         classroom_id: newClassroom.id,
         teacher_id: finalTeacherId,
         academic_year: academic_year,
-        semester: '1',
         is_active: true
       };
     });

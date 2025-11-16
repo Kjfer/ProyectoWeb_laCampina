@@ -31,7 +31,6 @@ interface Course {
   code: string;
   teacher_id: string;
   academic_year: string;
-  semester: string;
   is_active: boolean;
   created_at: string;
   teacher?: {
@@ -56,7 +55,6 @@ interface CourseFormData {
   code: string;
   teacher_id: string;
   academic_year: string;
-  semester: string;
 }
 
 const AdminCourseManagement = () => {
@@ -78,8 +76,7 @@ const AdminCourseManagement = () => {
     description: '',
     code: '',
     teacher_id: '',
-    academic_year: '2024',
-    semester: 'primer-semestre'
+    academic_year: '2024'
   });
 
   // Redirect if not admin
@@ -307,8 +304,7 @@ const AdminCourseManagement = () => {
       description: course.description || '',
       code: course.code,
       teacher_id: course.teacher_id,
-      academic_year: course.academic_year,
-      semester: course.semester
+      academic_year: course.academic_year
     });
     setIsEditModalOpen(true);
   };
@@ -319,8 +315,7 @@ const AdminCourseManagement = () => {
       description: '',
       code: '',
       teacher_id: '',
-      academic_year: '2024',
-      semester: 'primer-semestre'
+      academic_year: '2024'
     });
   }, []);
 
@@ -331,10 +326,9 @@ const AdminCourseManagement = () => {
                          course.teacher?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          course.teacher?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesSemester = filterSemester === 'all' || course.semester === filterSemester;
     const matchesYear = filterYear === 'all' || course.academic_year === filterYear;
     
-    return matchesSearch && matchesSemester && matchesYear;
+    return matchesSearch && matchesYear;
   });
 
   // Memoized form handlers to prevent re-renders
@@ -422,18 +416,6 @@ const AdminCourseManagement = () => {
               <SelectItem value="2024">2024</SelectItem>
               <SelectItem value="2025">2025</SelectItem>
               <SelectItem value="2026">2026</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="semester">Semestre</Label>
-          <Select value={formData.semester} onValueChange={handleSelectChange('semester')}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar semestre" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="primer-semestre">Primer Semestre</SelectItem>
-              <SelectItem value="segundo-semestre">Segundo Semestre</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -647,7 +629,7 @@ const AdminCourseManagement = () => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
-                        <span>{course.academic_year} - {course.semester}</span>
+                        <span>{course.academic_year}</span>
                       </div>
                     </TableCell>
                     <TableCell>

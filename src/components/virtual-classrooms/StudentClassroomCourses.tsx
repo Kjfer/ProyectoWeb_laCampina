@@ -13,7 +13,6 @@ interface Course {
   description: string;
   code: string;
   academic_year: string;
-  semester: string;
   is_active: boolean;
   teacher?: {
     first_name: string;
@@ -181,7 +180,7 @@ export function StudentClassroomCourses({ classroomId }: StudentClassroomCourses
                       )}
                     </CardTitle>
                     <CardDescription>
-                      {course.code} | {getSemesterLabel(course.semester)}
+                      {course.code}
                     </CardDescription>
                   </div>
                   <Badge variant={course.is_enrolled ? "default" : "secondary"}>

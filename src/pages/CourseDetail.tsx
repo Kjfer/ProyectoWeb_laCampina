@@ -24,7 +24,6 @@ interface Course {
   code: string;
   description: string;
   academic_year: string;
-  semester: string;
   is_active: boolean;
   created_at: string;
   teacher?: {
@@ -285,13 +284,6 @@ export default function CourseDetail() {
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Semestre</p>
-                  <p className="font-medium">{course.semester}</p>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>

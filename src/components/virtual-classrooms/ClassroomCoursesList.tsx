@@ -14,7 +14,6 @@ interface Course {
   name: string;
   code: string;
   description: string;
-  semester: string;
   academic_year: string;
   start_date: string;
   end_date: string;
@@ -208,7 +207,7 @@ export function ClassroomCoursesList({ classroomId, classroomName }: ClassroomCo
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {course.semester} {course.academic_year}
+                          {course.academic_year}
                         </span>
                       </CardDescription>
                     </div>
