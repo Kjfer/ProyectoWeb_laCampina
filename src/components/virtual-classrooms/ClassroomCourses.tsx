@@ -17,7 +17,6 @@ interface Course {
   description: string;
   code: string;
   academic_year: string;
-  semester: string;
   is_active: boolean;
   teacher?: {
     first_name: string;
@@ -49,16 +48,10 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
     description: '',
     code: '',
     academic_year: new Date().getFullYear().toString(),
-    semester: '',
     teacher_id: '',
     start_date: ''
   });
 
-  const semesters = [
-    { value: 'primer-semestre', label: 'Primer Semestre' },
-    { value: 'segundo-semestre', label: 'Segundo Semestre' },
-    { value: 'anual', label: 'Anual' }
-  ];
 
   useEffect(() => {
     fetchCourses();
@@ -123,10 +116,6 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
         toast.error('El año académico es requerido');
         return;
       }
-      if (!formData.semester) {
-        toast.error('El semestre es requerido');
-        return;
-      }
       if (!formData.teacher_id) {
         toast.error('Debe seleccionar un profesor');
         return;
@@ -145,7 +134,6 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
         description: formData.description,
         code: formData.code,
         academic_year: formData.academic_year,
-        semester: formData.semester,
         teacher_id: formData.teacher_id,
         classroom_id: classroomId,
         start_date: formData.start_date || null
@@ -222,7 +210,6 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
         description: '',
         code: '',
         academic_year: new Date().getFullYear().toString(),
-        semester: '',
         teacher_id: '',
         start_date: ''
       });
@@ -294,25 +281,6 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
                     placeholder="Descripción del curso"
                     rows={3}
                   />
-                </div>
-
-                <div>
-                  <Label htmlFor="semester">Semestre</Label>
-                  <Select 
-                    value={formData.semester} 
-                    onValueChange={(value) => setFormData({ ...formData, semester: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar semestre" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {semesters.map((semester) => (
-                        <SelectItem key={semester.value} value={semester.value}>
-                          {semester.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 <div>
@@ -407,7 +375,7 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
                   </Badge>
                 </div>
                 <CardDescription>
-                  {course.code} | {course.semester}
+                  {course.code}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

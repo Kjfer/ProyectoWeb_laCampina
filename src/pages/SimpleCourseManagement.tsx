@@ -19,7 +19,6 @@ interface Course {
   code: string;
   teacher_id: string;
   academic_year: string;
-  semester: string;
   is_active: boolean;
   created_at: string;
   teacher?: {
@@ -43,7 +42,6 @@ interface CourseFormData {
   code: string;
   teacher_id: string;
   academic_year: string;
-  semester: string;
 }
 
 const SimpleCourseManagement = () => {
@@ -60,8 +58,7 @@ const SimpleCourseManagement = () => {
     description: '',
     code: '',
     teacher_id: '',
-    academic_year: '2024',
-    semester: 'primer-semestre'
+    academic_year: '2024'
   });
 
   useEffect(() => {
@@ -149,8 +146,7 @@ const SimpleCourseManagement = () => {
       description: '',
       code: '',
       teacher_id: '',
-      academic_year: '2024',
-      semester: 'primer-semestre'
+      academic_year: '2024'
     });
   };
 
@@ -213,7 +209,7 @@ const SimpleCourseManagement = () => {
                       }
                     </TableCell>
                     <TableCell>
-                      {course.academic_year} - {course.semester.replace('-', ' ')}
+                      {course.academic_year}
                     </TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-full text-xs ${
@@ -316,21 +312,6 @@ const SimpleCourseManagement = () => {
                     <SelectItem value="2024">2024</SelectItem>
                     <SelectItem value="2025">2025</SelectItem>
                     <SelectItem value="2026">2026</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="semester">Semestre</Label>
-                <Select 
-                  value={formData.semester} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, semester: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar semestre" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="primer-semestre">Primer Semestre</SelectItem>
-                    <SelectItem value="segundo-semestre">Segundo Semestre</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
