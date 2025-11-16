@@ -133,15 +133,19 @@ serve(async (req: Request) => {
         ];
 
     // Create standard courses for the classroom
-    const coursesToInsert = standardCourses.map((courseName, index) => ({
-      name: courseName,
-      code: `${courseName.substring(0, 3).toUpperCase()}-${grade}-${section}`,
-      classroom_id: newClassroom.id,
-      teacher_id: finalTeacherId,
-      academic_year: academic_year,
-      semester: '1',
-      is_active: true
-    }));
+    const coursesToInsert = standardCourses.map((courseName, index) => {
+      const prefix = courseName.substring(0, 3).toUpperCase();
+      const code = `${prefix}-${grade}-${section}-${academic_year}-${String(newClassroom.id).slice(0, 8)}`;
+      return {
+        name: courseName,
+        code,
+        classroom_id: newClassroom.id,
+        teacher_id: finalTeacherId,
+        academic_year: academic_year,
+        semester: '1',
+        is_active: true
+      };
+    });
 
     const { data: createdCourses, error: coursesError } = await supabaseClient
       .from('courses')
