@@ -956,40 +956,61 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          birth_date: string | null
           created_at: string | null
+          document_number: string | null
+          document_type: string | null
           email: string
           first_name: string
+          gender: string | null
           id: string
           is_active: boolean | null
           last_name: string
+          maternal_surname: string | null
+          paternal_surname: string | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
+          student_code: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
+          birth_date?: string | null
           created_at?: string | null
+          document_number?: string | null
+          document_type?: string | null
           email: string
           first_name: string
+          gender?: string | null
           id?: string
           is_active?: boolean | null
           last_name: string
+          maternal_surname?: string | null
+          paternal_surname?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          student_code?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           avatar_url?: string | null
+          birth_date?: string | null
           created_at?: string | null
+          document_number?: string | null
+          document_type?: string | null
           email?: string
           first_name?: string
+          gender?: string | null
           id?: string
           is_active?: boolean | null
           last_name?: string
+          maternal_surname?: string | null
+          paternal_surname?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          student_code?: string | null
           updated_at?: string | null
           user_id?: string
         }

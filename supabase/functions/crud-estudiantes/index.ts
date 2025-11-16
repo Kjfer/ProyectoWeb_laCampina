@@ -60,9 +60,9 @@ serve(async (req: Request) => {
       )
     }
 
-    // Handle POST requests - Crear estudiante y asociarlo a aulas virtuales
+    // Handle POST requests - Crear estudiante(s) y asociarlo a aulas virtuales
     if (req.method === 'POST') {
-      console.log('➕ Creando estudiante...')
+      console.log('➕ Procesando solicitud POST...')
       
       let body;
       try {
@@ -77,6 +77,97 @@ serve(async (req: Request) => {
         )
       }
 
+      // Handle bulk import from Excel
+      if (body.students && Array.isArray(body.students)) {
+        const { students, courseIds = [] } = body;
+        console.log(`📊 Importación masiva: ${students.length} estudiantes`);
+
+        const results = {
+          success: [],
+          errors: []
+        };
+
+        for (const studentData of students) {
+          try {
+            const email = `${studentData.student_code}@estudiante.edu.pe`;
+            const password = studentData.document_number || 'Temporal123';
+
+            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+              email,
+              password,
+              email_confirm: true,
+            });
+
+            if (authError) {
+              console.error(`❌ Auth error for ${studentData.student_code}:`, authError);
+              results.errors.push({ student_code: studentData.student_code, error: authError.message });
+              continue;
+            }
+
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert({
+                user_id: authData.user.id,
+                email,
+                first_name: studentData.first_name,
+                last_name: studentData.first_name,
+                paternal_surname: studentData.paternal_surname,
+                maternal_surname: studentData.maternal_surname,
+                student_code: studentData.student_code,
+                document_type: studentData.document_type,
+                document_number: studentData.document_number,
+                gender: studentData.gender,
+                birth_date: studentData.birth_date,
+                role: 'student',
+                is_active: true,
+              });
+
+            if (profileError) {
+              console.error(`❌ Profile error for ${studentData.student_code}:`, profileError);
+              results.errors.push({ student_code: studentData.student_code, error: profileError.message });
+              continue;
+            }
+
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('user_id', authData.user.id)
+              .single();
+
+            if (profileData && courseIds.length > 0) {
+              const enrollments = courseIds.map(courseId => ({
+                student_id: profileData.id,
+                course_id: courseId,
+              }));
+
+              const { error: enrollError } = await supabase
+                .from('course_enrollments')
+                .insert(enrollments);
+
+              if (enrollError) {
+                console.error(`⚠️ Enrollment error for ${studentData.student_code}:`, enrollError);
+              }
+            }
+
+            results.success.push(studentData.student_code);
+            console.log(`✅ Estudiante creado: ${studentData.student_code}`);
+          } catch (error) {
+            console.error(`❌ Error processing ${studentData.student_code}:`, error);
+            results.errors.push({ student_code: studentData.student_code, error: String(error) });
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: `Importados ${results.success.length} estudiantes, ${results.errors.length} errores`,
+            results
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+
+      // Handle single student creation
       const { first_name, last_name, email, role, user_id, virtual_classroom_ids, course_ids } = body
 
       // Validar campos requeridos
