@@ -38,6 +38,31 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
   const [studentsToImport, setStudentsToImport] = useState<StudentData[]>([]);
   const [importStatus, setImportStatus] = useState<'idle' | 'preview' | 'importing' | 'completed'>('idle');
 
+  const downloadTemplate = () => {
+    const template = [
+      {
+        'TIPO DE DOCUMENTO': 'DNI',
+        'NÚMERO DE DOCUMENTO': '12345678',
+        'CÓDIGO DEL ESTUDIANTE': 'EST001',
+        'APELLIDO PATERNO': 'García',
+        'APELLIDO MATERNO': 'López',
+        'NOMBRES': 'Juan Carlos',
+        'SEXO': 'M',
+        'FECHA DE NACIMIENTO': '2010-05-15'
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Plantilla');
+    XLSX.writeFile(wb, 'plantilla_estudiantes.xlsx');
+
+    toast({
+      title: "Plantilla descargada",
+      description: "Usa este formato para importar estudiantes",
+    });
+  };
+
   const processExcelFile = async (files: File[]) => {
     if (files.length === 0) return;
 
@@ -51,28 +76,38 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
       const jsonData = XLSX.utils.sheet_to_json(firstSheet);
 
       const students: StudentData[] = jsonData.map((row: any) => ({
-        document_type: row['TIPO DE DOCUMENTO'] || '',
-        document_number: String(row['NÚMERO DE DOCUMENTO'] || ''),
-        student_code: String(row['CÓDIGO DEL ESTUDIANTE'] || ''),
-        paternal_surname: row['APELLIDO PATERNO'] || '',
-        maternal_surname: row['APELLIDO MATERNO'] || '',
-        first_name: row['NOMBRES'] || '',
-        gender: row['SEXO'] || '',
+        document_type: String(row['TIPO DE DOCUMENTO'] || '').trim(),
+        document_number: String(row['NÚMERO DE DOCUMENTO'] || '').trim(),
+        student_code: String(row['CÓDIGO DEL ESTUDIANTE'] || '').trim(),
+        paternal_surname: String(row['APELLIDO PATERNO'] || '').trim(),
+        maternal_surname: String(row['APELLIDO MATERNO'] || '').trim(),
+        first_name: String(row['NOMBRES'] || '').trim(),
+        gender: String(row['SEXO'] || '').trim().toUpperCase(),
         birth_date: row['FECHA DE NACIMIENTO'] ? formatExcelDate(row['FECHA DE NACIMIENTO']) : '',
-      })).filter(student => student.document_number && student.student_code);
+      })).filter(student => student.document_number && student.student_code && student.first_name);
+
+      if (students.length === 0) {
+        toast({
+          title: "Error",
+          description: "No se encontraron estudiantes válidos. Verifica que el formato sea correcto.",
+          variant: "destructive",
+        });
+        setIsProcessing(false);
+        return;
+      }
 
       setStudentsToImport(students);
       setImportStatus('preview');
 
       toast({
         title: "Archivo procesado",
-        description: `Se encontraron ${students.length} estudiantes en el archivo`,
+        description: `Se encontraron ${students.length} estudiantes válidos`,
       });
     } catch (error) {
       console.error('Error processing Excel:', error);
       toast({
         title: "Error",
-        description: "No se pudo procesar el archivo Excel",
+        description: "No se pudo procesar el archivo Excel. Verifica que uses la plantilla correcta.",
         variant: "destructive",
       });
     } finally {
@@ -145,18 +180,30 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
       <CardContent className="space-y-4">
         {importStatus === 'idle' && (
           <>
-            <div className="text-sm text-muted-foreground mb-2">
-              El archivo Excel debe contener las siguientes columnas:
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>TIPO DE DOCUMENTO</li>
-                <li>NÚMERO DE DOCUMENTO</li>
-                <li>CÓDIGO DEL ESTUDIANTE</li>
-                <li>APELLIDO PATERNO</li>
-                <li>APELLIDO MATERNO</li>
-                <li>NOMBRES</li>
-                <li>SEXO</li>
-                <li>FECHA DE NACIMIENTO</li>
-              </ul>
+            <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+              <div className="flex justify-between items-start">
+                <div className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">Formato requerido:</strong>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>TIPO DE DOCUMENTO (DNI, CE, etc.)</li>
+                    <li>NÚMERO DE DOCUMENTO</li>
+                    <li>CÓDIGO DEL ESTUDIANTE</li>
+                    <li>APELLIDO PATERNO</li>
+                    <li>APELLIDO MATERNO</li>
+                    <li>NOMBRES</li>
+                    <li>SEXO (M/F)</li>
+                    <li>FECHA DE NACIMIENTO (YYYY-MM-DD)</li>
+                  </ul>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadTemplate}
+                  className="shrink-0"
+                >
+                  Descargar Plantilla
+                </Button>
+              </div>
             </div>
             <FileUpload
               onFileSelect={processExcelFile}

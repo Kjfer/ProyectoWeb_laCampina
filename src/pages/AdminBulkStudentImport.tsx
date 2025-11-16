@@ -74,7 +74,7 @@ const AdminBulkStudentImport = () => {
           variant: "destructive",
         });
       } else {
-        // Fetch enrollment counts separately
+        // Fetch unique student counts separately
         const classroomsWithEnrollments = await Promise.all(
           (data || []).map(async (classroom) => {
             const { data: courses } = await supabase
@@ -85,12 +85,15 @@ const AdminBulkStudentImport = () => {
             const courseIds = courses?.map(c => c.id) || [];
             
             if (courseIds.length > 0) {
-              const { count } = await supabase
+              const { data: enrollments } = await supabase
                 .from('course_enrollments')
-                .select('*', { count: 'exact', head: true })
+                .select('student_id')
                 .in('course_id', courseIds);
               
-              return { ...classroom, enrollments: [{ count: count || 0 }] };
+              // Count unique students
+              const uniqueStudents = new Set(enrollments?.map(e => e.student_id) || []);
+              
+              return { ...classroom, enrollments: [{ count: uniqueStudents.size }] };
             }
             
             return { ...classroom, enrollments: [{ count: 0 }] };
