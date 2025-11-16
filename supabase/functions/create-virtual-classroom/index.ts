@@ -106,15 +106,64 @@ serve(async (req: Request) => {
       throw insertError
     }
 
+    // Define standard courses based on education level
+    const standardCourses = education_level === 'primaria' 
+      ? [
+          'Matemática',
+          'Ciencias',
+          'Inglés',
+          'Personal Social',
+          'Arte',
+          'Religión',
+          'Computación',
+          'Tutoría',
+          'Comunicación',
+          'Plan Lector'
+        ]
+      : [ // secundaria
+          'Ciencias Sociales',
+          'Desarrollo Personal Ciudadanía y Cívica',
+          'Ciencia y Tecnología',
+          'Arte y Cultura',
+          'Educación para el Trabajo',
+          'Matemática',
+          'Comunicación',
+          'Inglés',
+          'Religión'
+        ];
+
+    // Create standard courses for the classroom
+    const coursesToInsert = standardCourses.map((courseName, index) => ({
+      name: courseName,
+      code: `${courseName.substring(0, 3).toUpperCase()}-${grade}-${section}`,
+      classroom_id: newClassroom.id,
+      teacher_id: finalTeacherId,
+      academic_year: academic_year,
+      semester: '1',
+      is_active: true
+    }));
+
+    const { data: createdCourses, error: coursesError } = await supabaseClient
+      .from('courses')
+      .insert(coursesToInsert)
+      .select('id');
+
+    if (coursesError) {
+      console.error('Error creating courses:', coursesError);
+      // Don't throw error, just log it - classroom was created successfully
+    }
+
+    console.log(`✅ Created ${createdCourses?.length || 0} standard courses for classroom ${newClassroom.id}`);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         data: {
           ...newClassroom,
-          courses_count: 0,
+          courses_count: createdCourses?.length || 0,
           students_count: 0
         },
-        message: 'Aula virtual creada exitosamente'
+        message: `Aula virtual creada exitosamente con ${createdCourses?.length || 0} cursos`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
