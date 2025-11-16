@@ -1375,6 +1375,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
+          section: string
           teacher_id: string
           updated_at: string | null
         }
@@ -1386,6 +1387,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
+          section?: string
           teacher_id: string
           updated_at?: string | null
         }
@@ -1397,6 +1399,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
+          section?: string
           teacher_id?: string
           updated_at?: string | null
         }
