@@ -54,6 +54,7 @@ serve(async (req: Request) => {
         grade,
         education_level,
         academic_year,
+        section,
         teacher_id,
         is_active,
         created_at
