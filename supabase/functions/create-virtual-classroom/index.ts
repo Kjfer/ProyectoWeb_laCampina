@@ -53,16 +53,21 @@ serve(async (req: Request) => {
     // Get request body
     const body = await req.json()
     console.log('📥 Request body:', body)
-    const { name, grade, education_level, academic_year, teacher_id } = body
+    const { name, grade, education_level, academic_year, teacher_id, section } = body
 
     // Validate required fields
-    if (!name || !grade || !education_level || !academic_year) {
+    if (!name || !grade || !education_level || !academic_year || !section) {
       throw new Error('Todos los campos son requeridos')
     }
 
     // Validate education_level
     if (!['primaria', 'secundaria'].includes(education_level)) {
       throw new Error('Nivel educativo no válido')
+    }
+
+    // Validate section (single uppercase letter A-Z)
+    if (!/^[A-Z]$/.test(section)) {
+      throw new Error('La sección debe ser una sola letra mayúscula (A-Z)')
     }
 
     // Insert new virtual classroom - use teacher_id from request if admin, otherwise use current user's profile
@@ -75,6 +80,7 @@ serve(async (req: Request) => {
         grade,
         education_level,
         academic_year,
+        section,
         teacher_id: finalTeacherId,
         is_active: true
       })

@@ -53,7 +53,8 @@ export default function VirtualClassrooms() {
     grade: '',
     education_level: '' as 'primaria' | 'secundaria' | '',
     academic_year: new Date().getFullYear().toString(),
-    teacher_id: ''
+    teacher_id: '',
+    section: ''
   });
 
   const grades = {
@@ -176,6 +177,7 @@ export default function VirtualClassrooms() {
           education_level: formData.education_level as 'primaria' | 'secundaria',
           academic_year: formData.academic_year,
           teacher_id: formData.teacher_id || profile.id,
+          section: formData.section.toUpperCase()
         }
       });
 
@@ -197,7 +199,8 @@ export default function VirtualClassrooms() {
         grade: '',
         education_level: '',
         academic_year: new Date().getFullYear().toString(),
-        teacher_id: ''
+        teacher_id: '',
+        section: ''
       });
       
       // Add the new classroom to the existing list to avoid refetching
@@ -304,6 +307,27 @@ export default function VirtualClassrooms() {
                       placeholder="2024"
                       required
                     />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="section">Sección</Label>
+                    <Input
+                      id="section"
+                      value={formData.section}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase();
+                        // Solo permitir una letra de A-Z
+                        if (value === '' || /^[A-Z]$/.test(value)) {
+                          setFormData({ ...formData, section: value });
+                        }
+                      }}
+                      placeholder="A"
+                      maxLength={1}
+                      required
+                    />
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Ingresa una letra de A a Z
+                    </p>
                   </div>
 
                   {profile?.role === 'admin' && (
