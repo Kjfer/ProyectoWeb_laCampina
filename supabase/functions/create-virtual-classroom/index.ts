@@ -70,6 +70,25 @@ serve(async (req: Request) => {
       throw new Error('La sección debe ser una sola letra mayúscula (A-Z)')
     }
 
+    // Check if classroom with same combination already exists
+    const { data: existingClassroom, error: checkError } = await supabaseClient
+      .from('virtual_classrooms')
+      .select('id, name')
+      .eq('education_level', education_level)
+      .eq('grade', grade)
+      .eq('section', section)
+      .eq('academic_year', academic_year)
+      .maybeSingle()
+
+    if (checkError) {
+      console.error('Error checking existing classroom:', checkError)
+      throw new Error('Error al verificar aulas existentes')
+    }
+
+    if (existingClassroom) {
+      throw new Error(`Ya existe un aula virtual para ${education_level} ${grade}${section} del año ${academic_year}`)
+    }
+
     // Insert new virtual classroom - use teacher_id from request if admin, otherwise use current user's profile
     const finalTeacherId = teacher_id || profile.id;
     
