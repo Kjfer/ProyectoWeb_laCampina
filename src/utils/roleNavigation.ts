@@ -128,6 +128,12 @@ export const adminNavigationItems: NavItem[] = [
     roles: ['admin']
   },
   {
+    title: 'Importación Masiva',
+    url: '/admin/bulk-import',
+    icon: Users,
+    roles: ['admin']
+  },
+  {
     title: 'Gestión de Usuarios',
     url: '/admin/users',
     icon: UserCog,

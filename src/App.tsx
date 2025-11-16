@@ -23,6 +23,7 @@ import VirtualClassroomDetail from "./pages/VirtualClassroomDetail";
 import VirtualClassroomCourses from "./pages/VirtualClassroomCourses";
 import Calendar from "./pages/Calendar";
 import NotFound from "./pages/NotFound";
+import AdminBulkStudentImport from "./pages/AdminBulkStudentImport";
 
 const queryClient = new QueryClient();
 
@@ -103,6 +104,11 @@ const App = () => (
             <Route path="/calendar" element={
               <ProtectedRoute>
                 <Calendar />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/bulk-import" element={
+              <ProtectedRoute>
+                <AdminBulkStudentImport />
               </ProtectedRoute>
             } />
             <Route path="/admin/*" element={
