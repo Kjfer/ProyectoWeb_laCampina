@@ -19,6 +19,7 @@ interface VirtualClassroom {
   grade: string;
   education_level: 'primaria' | 'secundaria';
   academic_year: string;
+  section: string;
   teacher_id: string;
   is_active: boolean;
   created_at: string;
@@ -395,7 +396,7 @@ export default function VirtualClassrooms() {
                     </Badge>
                   </div>
                   <CardDescription>
-                    {classroom.grade} - {classroom.education_level.charAt(0).toUpperCase() + classroom.education_level.slice(1)}
+                    {classroom.grade} {classroom.section} - {classroom.education_level.charAt(0).toUpperCase() + classroom.education_level.slice(1)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
