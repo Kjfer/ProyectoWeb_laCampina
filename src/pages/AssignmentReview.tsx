@@ -32,8 +32,10 @@ interface Submission {
   id: string;
   student_id: string;
   content: string | null;
-  file_url: string | null;
+  file_path: string | null;
   file_name: string | null;
+  file_size: number | null;
+  mime_type: string | null;
   score: number | null;
   feedback: string | null;
   submitted_at: string;
@@ -93,7 +95,17 @@ const AssignmentReview = () => {
       const { data: submissionsData, error: submissionsError } = await supabase
         .from('assignment_submissions')
         .select(`
-          *,
+          id,
+          student_id,
+          content,
+          file_path,
+          file_name,
+          file_size,
+          mime_type,
+          score,
+          feedback,
+          submitted_at,
+          graded_at,
           student:profiles!assignment_submissions_student_id_fkey (
             id,
             first_name,
@@ -343,7 +355,7 @@ const AssignmentReview = () => {
                   </div>
 
                   {/* File Attachment */}
-                  {selectedSubmission.file_url && (
+                  {selectedSubmission.file_path && selectedSubmission.file_name && (
                     <div>
                       <Label className="text-base font-semibold">Archivo adjunto</Label>
                       <div className="mt-2 flex items-center gap-3 p-3 border rounded-lg">
@@ -352,7 +364,7 @@ const AssignmentReview = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDownloadFile(selectedSubmission.file_url!, selectedSubmission.file_name!)}
+                          onClick={() => handleDownloadFile(selectedSubmission.file_path!, selectedSubmission.file_name!)}
                         >
                           <Download className="w-4 h-4 mr-1" />
                           Descargar
