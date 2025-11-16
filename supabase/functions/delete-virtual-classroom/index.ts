@@ -12,7 +12,7 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  if (req.method !== 'DELETE') {
+  if (req.method !== 'DELETE' && req.method !== 'POST') {
     return new Response(
       JSON.stringify({ success: false, error: 'Método no permitido' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 405 }
