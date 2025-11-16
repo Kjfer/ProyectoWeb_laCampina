@@ -110,7 +110,7 @@ serve(async (req: Request) => {
                 user_id: authData.user.id,
                 email,
                 first_name: studentData.first_name,
-                last_name: studentData.first_name,
+                last_name: `${studentData.paternal_surname} ${studentData.maternal_surname}`.trim(),
                 paternal_surname: studentData.paternal_surname,
                 maternal_surname: studentData.maternal_surname,
                 student_code: studentData.student_code,
