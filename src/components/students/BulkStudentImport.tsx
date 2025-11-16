@@ -73,7 +73,29 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+      
+      // Deshacer celdas combinadas para procesamiento correcto
+      if (firstSheet['!merges']) {
+        firstSheet['!merges'].forEach((merge: any) => {
+          const startCell = XLSX.utils.encode_cell(merge.s);
+          const cellValue = firstSheet[startCell]?.v;
+          
+          // Aplicar el valor de la celda combinada a todas las celdas del rango
+          for (let row = merge.s.r; row <= merge.e.r; row++) {
+            for (let col = merge.s.c; col <= merge.e.c; col++) {
+              const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+              if (!firstSheet[cellAddress]) {
+                firstSheet[cellAddress] = { v: cellValue, t: 's' };
+              }
+            }
+          }
+        });
+      }
+
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { 
+        defval: '',
+        raw: false 
+      });
 
       const students: StudentData[] = jsonData.map((row: any) => ({
         document_type: String(row['TIPO DE DOCUMENTO'] || '').trim(),
