@@ -81,7 +81,6 @@ serve(async (req: Request) => {
             description,
             code,
             academic_year,
-            semester,
             is_active,
             created_at,
             teacher:profiles!courses_teacher_id_fkey (
