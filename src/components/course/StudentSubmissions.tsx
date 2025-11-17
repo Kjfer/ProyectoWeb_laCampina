@@ -74,7 +74,9 @@ export function StudentSubmissions({
           assignment_submissions (
             id,
             content,
-            file_url,
+            file_path,
+            file_name,
+            file_size,
             score,
             feedback,
             submitted_at,
