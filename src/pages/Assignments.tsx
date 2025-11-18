@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FileText, Calendar, Clock, Plus, AlertCircle, Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SubmitAssignmentDialog } from '@/components/assignments/SubmitAssignmentDialog';
 
 interface Assignment {
   id: string;
@@ -36,11 +37,14 @@ interface Assignment {
 const Assignments = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [courseFilter, setCourseFilter] = useState<string>('all');
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
 
   useEffect(() => {
     fetchAssignments();
@@ -128,6 +132,15 @@ const Assignments = () => {
     }
   };
 
+  const getLetterGrade = (score: number | null, maxScore: number): string => {
+    if (!score) return '';
+    const percentage = (score / maxScore) * 100;
+    if (percentage >= 90) return 'AD';
+    if (percentage >= 75) return 'A';
+    if (percentage >= 60) return 'B';
+    return 'C';
+  };
+
   const getAssignmentStatus = (assignment: Assignment) => {
     const now = new Date();
     const dueDate = new Date(assignment.due_date);
@@ -135,9 +148,10 @@ const Assignments = () => {
 
     if (hasSubmission) {
       const submission = assignment.submissions[0];
+      const letterGrade = getLetterGrade(submission.score, assignment.max_score);
       return {
         status: 'submitted',
-        label: submission.score ? `Calificada: ${submission.score}/${assignment.max_score}` : 'Entregada',
+        label: submission.score ? letterGrade : 'Entregada',
         variant: submission.score ? 'default' as const : 'secondary' as const,
         color: submission.score ? 'text-primary' : 'text-secondary'
       };
@@ -297,9 +311,17 @@ const Assignments = () => {
                           <CardTitle className="text-lg font-semibold text-foreground">
                             {assignment.title}
                           </CardTitle>
-                          <Badge variant={status.variant} className="text-xs">
-                            {status.label}
-                          </Badge>
+                          {profile?.role === 'teacher' || profile?.role === 'admin' ? (
+                            assignment.submissions && assignment.submissions.filter(s => s.score).length > 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                Calificados: {assignment.submissions.filter(s => s.score).length}
+                              </Badge>
+                            )
+                          ) : (
+                            <Badge variant={status.variant} className="text-xs">
+                              {status.label}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Badge variant="secondary" className="text-xs">
@@ -364,26 +386,33 @@ const Assignments = () => {
                         >
                           <Link to={`/assignments/${assignment.id}/review`}>
                             Revisar Entregas
-                            {assignment.submissions && assignment.submissions.length > 0 && (
+                            {assignment.submissions && assignment.submissions.filter(s => !s.score).length > 0 && (
                               <Badge variant="secondary" className="ml-2">
-                                {assignment.submissions.length}
+                                {assignment.submissions.filter(s => !s.score).length}
                               </Badge>
                             )}
                           </Link>
                         </Button>
                       ) : (
-                        profile?.role === 'student' && status.status !== 'submitted' && (
-                          <Button 
-                            className="bg-gradient-primary shadow-glow"
-                            onClick={() => {
-                              toast({
-                                title: "Próximamente",
-                                description: "La entrega de tareas estará disponible pronto.",
-                              });
-                            }}
-                          >
-                            Entregar
-                          </Button>
+                        profile?.role === 'student' && (
+                          status.status === 'submitted' ? (
+                            <Button 
+                              className="bg-gradient-primary shadow-glow"
+                              onClick={() => navigate(`/assignments/${assignment.id}/review`)}
+                            >
+                              Ver Detalles
+                            </Button>
+                          ) : (
+                            <Button 
+                              className="bg-gradient-primary shadow-glow"
+                              onClick={() => {
+                                setSelectedAssignment(assignment);
+                                setSubmitDialogOpen(true);
+                              }}
+                            >
+                              Entregar
+                            </Button>
+                          )
                         )
                       )}
                     </div>
@@ -392,6 +421,19 @@ const Assignments = () => {
               );
             })}
           </div>
+        )}
+
+        {selectedAssignment && (
+          <SubmitAssignmentDialog
+            open={submitDialogOpen}
+            onOpenChange={setSubmitDialogOpen}
+            assignment={{
+              id: selectedAssignment.id,
+              title: selectedAssignment.title,
+              course_id: selectedAssignment.course_id,
+            }}
+            onSubmitSuccess={fetchAssignments}
+          />
         )}
       </div>
     </DashboardLayout>

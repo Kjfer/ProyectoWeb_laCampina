@@ -1492,7 +1492,7 @@ export type Database = {
       app_role: "admin" | "teacher" | "student" | "parent"
       education_level: "primaria" | "secundaria"
       event_type: "vacation" | "holiday" | "exam" | "meeting" | "other"
-      user_role: "admin" | "teacher" | "student" | "parent"
+      user_role: "admin" | "teacher" | "student" | "parent" | "tutor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1623,7 +1623,7 @@ export const Constants = {
       app_role: ["admin", "teacher", "student", "parent"],
       education_level: ["primaria", "secundaria"],
       event_type: ["vacation", "holiday", "exam", "meeting", "other"],
-      user_role: ["admin", "teacher", "student", "parent"],
+      user_role: ["admin", "teacher", "student", "parent", "tutor"],
     },
   },
 } as const
