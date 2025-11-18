@@ -9,11 +9,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { FileText, Calendar, Clock, Download, ArrowLeft, User, CheckCircle, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+
+const GRADE_VALUES = {
+  'AD': 20,
+  'A': 17,
+  'B': 14,
+  'C': 11
+} as const;
+
+const getLetterGrade = (score: number | null): string => {
+  if (score === null) return '';
+  if (score >= 18) return 'AD';
+  if (score >= 15) return 'A';
+  if (score >= 11) return 'B';
+  return 'C';
+};
 
 interface Assignment {
   id: string;
@@ -129,18 +145,19 @@ const AssignmentReview = () => {
 
   const handleSelectSubmission = (submission: Submission) => {
     setSelectedSubmission(submission);
-    setScore(submission.score?.toString() || '');
+    setScore(getLetterGrade(submission.score));
     setFeedback(submission.feedback || '');
   };
 
   const handleGradeSubmission = async () => {
-    if (!selectedSubmission || !assignment) return;
+    if (!selectedSubmission) return;
 
-    const numScore = parseFloat(score);
-    if (isNaN(numScore) || numScore < 0 || numScore > assignment.max_score) {
-      toast.error(`La calificación debe estar entre 0 y ${assignment.max_score}`);
+    if (!score) {
+      toast.error('Debes seleccionar una calificación');
       return;
     }
+
+    const numericScore = GRADE_VALUES[score as keyof typeof GRADE_VALUES];
 
     try {
       setGrading(true);
@@ -148,7 +165,7 @@ const AssignmentReview = () => {
       const { error } = await supabase
         .from('assignment_submissions')
         .update({
-          score: numScore,
+          score: numericScore,
           feedback: feedback.trim() || null,
           graded_at: new Date().toISOString()
         })
@@ -305,15 +322,15 @@ const AssignmentReview = () => {
                             <p className="text-xs text-muted-foreground">
                               {format(new Date(submission.submitted_at), "d MMM, HH:mm", { locale: es })}
                             </p>
-                            {submission.score !== null ? (
-                              <Badge variant="default" className="text-xs mt-1">
-                                {submission.score}/{assignment.max_score} pts
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="text-xs mt-1">
-                                Sin calificar
-                              </Badge>
-                            )}
+                        {submission.score !== null ? (
+                          <Badge variant="default" className="text-xs mt-1">
+                            {getLetterGrade(submission.score)}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs mt-1">
+                            Sin calificar
+                          </Badge>
+                        )}
                           </div>
                         </div>
                       </button>
@@ -378,17 +395,18 @@ const AssignmentReview = () => {
                     <Label className="text-base font-semibold">Calificación</Label>
                     
                     <div>
-                      <Label htmlFor="score">Puntuación (0 - {assignment.max_score})</Label>
-                      <Input
-                        id="score"
-                        type="number"
-                        min="0"
-                        max={assignment.max_score}
-                        value={score}
-                        onChange={(e) => setScore(e.target.value)}
-                        placeholder="Ingresa la calificación"
-                        className="mt-1"
-                      />
+                      <Label htmlFor="score">Calificación</Label>
+                      <Select value={score} onValueChange={setScore}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Selecciona una calificación" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AD">AD - Logro Destacado</SelectItem>
+                          <SelectItem value="A">A - Logro Esperado</SelectItem>
+                          <SelectItem value="B">B - En Proceso</SelectItem>
+                          <SelectItem value="C">C - En Inicio</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div>

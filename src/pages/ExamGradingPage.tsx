@@ -7,12 +7,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle, XCircle, Clock, Save, ArrowLeft, User, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+const GRADE_VALUES = {
+  'AD': 20,
+  'A': 17,
+  'B': 14,
+  'C': 11
+} as const;
+
+const getLetterGrade = (score: number | null): string => {
+  if (score === null) return '';
+  if (score >= 18) return 'AD';
+  if (score >= 15) return 'A';
+  if (score >= 11) return 'B';
+  return 'C';
+};
 
 interface Question {
   id: string;
@@ -47,7 +63,7 @@ const ExamGradingPage = () => {
 
   const [submission, setSubmission] = useState<SubmissionData | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [grades, setGrades] = useState<Record<string, { score: number; feedback: string }>>({});
+  const [grades, setGrades] = useState<Record<string, { score: string; feedback: string }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -90,13 +106,14 @@ const ExamGradingPage = () => {
 
       // Initialize grades from existing data
       const answers = submissionData.answers as Record<string, any>;
-      const initialGrades: Record<string, { score: number; feedback: string }> = {};
+      const initialGrades: Record<string, { score: string; feedback: string }> = {};
       
       Object.keys(answers).forEach(questionId => {
         const answer = answers[questionId];
         if (answer.requires_grading) {
+          const numericScore = answer.points_earned !== undefined ? answer.points_earned : 0;
           initialGrades[questionId] = {
-            score: answer.points_earned !== undefined ? answer.points_earned : 0,
+            score: getLetterGrade(numericScore),
             feedback: answer.feedback || ''
           };
         }
@@ -111,31 +128,34 @@ const ExamGradingPage = () => {
     }
   };
 
-  const handleGradeChange = (questionId: string, field: 'score' | 'feedback', value: number | string) => {
+  const handleGradeChange = (questionId: string, field: 'score' | 'feedback', value: string) => {
     setGrades(prev => ({
       ...prev,
       [questionId]: {
-        score: field === 'score' ? (value as number) : (prev[questionId]?.score || 0),
-        feedback: field === 'feedback' ? (value as string) : (prev[questionId]?.feedback || '')
+        ...prev[questionId],
+        [field]: value
       }
     }));
   };
 
   const calculateTotalScore = () => {
-    if (!submission) return 0;
-    
-    const answers = submission.answers as Record<string, any>;
     let total = 0;
-
-    Object.keys(answers).forEach(questionId => {
-      const answer = answers[questionId];
-      if (answer.requires_grading && grades[questionId]) {
-        total += grades[questionId].score || 0;
-      } else {
-        total += answer.points_earned || 0;
+    
+    questions.forEach(question => {
+      const answer = submission?.answers[question.id];
+      
+      if (answer?.requires_grading) {
+        // Use manually entered grade
+        const letterGrade = grades[question.id]?.score;
+        if (letterGrade) {
+          total += GRADE_VALUES[letterGrade as keyof typeof GRADE_VALUES];
+        }
+      } else if (answer?.is_correct !== undefined) {
+        // Use auto-graded score
+        total += answer.is_correct ? question.points : 0;
       }
     });
-
+    
     return total;
   };
 
@@ -153,9 +173,10 @@ const ExamGradingPage = () => {
         const answer = updatedAnswers[questionId];
         
         if (answer.requires_grading && grades[questionId]) {
-          answer.points_earned = grades[questionId].score;
+          const letterGrade = grades[questionId].score;
+          answer.points_earned = letterGrade ? GRADE_VALUES[letterGrade as keyof typeof GRADE_VALUES] : 0;
           answer.feedback = grades[questionId].feedback;
-          totalScore += grades[questionId].score || 0;
+          totalScore += answer.points_earned;
         } else {
           totalScore += answer.points_earned || 0;
         }
@@ -337,58 +358,50 @@ const ExamGradingPage = () => {
                       <span className="text-sm font-medium text-muted-foreground">
                         Calificación automática
                       </span>
-                      <span className="text-lg font-bold">
-                        {answer.points_earned} / {question.points} pts
-                      </span>
+                      <Badge variant={answer.is_correct ? "default" : "destructive"}>
+                        {answer.is_correct ? getLetterGrade(question.points) : 'C'}
+                      </Badge>
                     </div>
                   ) : (
-                    <div className="space-y-4 p-4 bg-accent/5 border border-accent/20 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="w-4 h-4 text-accent" />
-                        <span className="text-sm font-semibold text-accent">Calificación Manual</span>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`score-${question.id}`}>
-                            Puntos obtenidos <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            id={`score-${question.id}`}
-                            type="number"
-                            min="0"
-                            max={question.points}
-                            step="0.5"
-                            value={currentGrade?.score !== undefined ? currentGrade.score : ''}
-                            onChange={(e) => handleGradeChange(question.id, 'score', parseFloat(e.target.value) || 0)}
-                            placeholder={`Máx: ${question.points}`}
-                            className="text-lg font-semibold"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            De 0 a {question.points} puntos
-                          </p>
-                        </div>
-                        
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor={`feedback-${question.id}`}>
-                            Retroalimentación (opcional)
-                          </Label>
-                          <Textarea
-                            id={`feedback-${question.id}`}
-                            value={currentGrade?.feedback || ''}
-                            onChange={(e) => handleGradeChange(question.id, 'feedback', e.target.value)}
-                            placeholder="Comentarios para el estudiante sobre su respuesta..."
-                            rows={3}
-                            className="resize-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                    <div className="space-y-4 pt-4 border-t">
+                      <div>
+                        <Label htmlFor={`score-${question.id}`}>
+                          Calificación
+                        </Label>
+                        <Select 
+                          value={grades[question.id]?.score || ''} 
+                          onValueChange={(value) => handleGradeChange(question.id, 'score', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona una calificación" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="AD">AD - Logro Destacado</SelectItem>
+                            <SelectItem value="A">A - Logro Esperado</SelectItem>
+                            <SelectItem value="B">B - En Proceso</SelectItem>
+                            <SelectItem value="C">C - En Inicio</SelectItem>
+                          </SelectContent>
+                        </Select>
+                       </div>
+
+                       <div>
+                         <Label htmlFor={`feedback-${question.id}`}>
+                           Retroalimentación
+                         </Label>
+                         <Textarea
+                           id={`feedback-${question.id}`}
+                           value={grades[question.id]?.feedback || ''}
+                           onChange={(e) => handleGradeChange(question.id, 'feedback', e.target.value)}
+                           placeholder="Añade comentarios para el estudiante..."
+                           rows={3}
+                         />
+                       </div>
+                     </div>
+                   )}
+                 </CardContent>
+               </Card>
+             );
+           })}
         </div>
 
         {/* Footer Actions */}
