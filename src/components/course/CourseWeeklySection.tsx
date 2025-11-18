@@ -97,9 +97,15 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
   const [editingResource, setEditingResource] = useState<WeeklyResource | null>(null);
 
   const handleResourceClick = (resource: WeeklyResource) => {
-    // Si es una tarea y tiene assignment_id, redirigir a la página de detalles
+    // Si es una tarea y tiene assignment_id
     if (resource.resource_type === 'assignment' && resource.assignment_id) {
-      navigate(`/assignments/${resource.assignment_id}`);
+      // Para profesores, ir a revisar entregas
+      if (canEdit) {
+        navigate(`/assignment-review/${resource.assignment_id}`);
+      } else {
+        // Para estudiantes, ir a la página de detalles
+        navigate(`/assignments/${resource.assignment_id}`);
+      }
     } else {
       // Para otros recursos, abrir el modal
       setSelectedResource(resource);
