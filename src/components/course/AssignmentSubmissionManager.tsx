@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Download, 
   Eye, 
@@ -18,6 +19,21 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+
+const GRADE_VALUES = {
+  'AD': 20,
+  'A': 17,
+  'B': 14,
+  'C': 11
+} as const;
+
+const getLetterGrade = (score: number | null): string => {
+  if (score === null) return '';
+  if (score >= 18) return 'AD';
+  if (score >= 15) return 'A';
+  if (score >= 11) return 'B';
+  return 'C';
+};
 
 interface AssignmentSubmission {
   id: string;
@@ -52,7 +68,7 @@ export function AssignmentSubmissionManager({
   const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [gradingSubmission, setGradingSubmission] = useState<string | null>(null);
-  const [gradeValues, setGradeValues] = useState<{[key: string]: { score: number; feedback: string }}>({});
+  const [gradeValues, setGradeValues] = useState<{[key: string]: { score: string; feedback: string }}>({});
 
   useEffect(() => {
     if (profile?.role === 'teacher' || profile?.role === 'admin') {
@@ -137,18 +153,20 @@ export function AssignmentSubmissionManager({
   };
 
   const handleGradeSubmission = async (submissionId: string) => {
-    const gradeData = gradeValues[submissionId];
-    if (!gradeData || gradeData.score < 0 || gradeData.score > maxScore) {
-      toast.error(`La calificación debe estar entre 0 y ${maxScore}`);
+    const values = gradeValues[submissionId];
+    if (!values || !values.score) {
+      toast.error('Debes seleccionar una calificación');
       return;
     }
+
+    const numericScore = GRADE_VALUES[values.score as keyof typeof GRADE_VALUES];
 
     try {
       const { error } = await supabase
         .from('assignment_submissions')
         .update({
-          score: gradeData.score,
-          feedback: gradeData.feedback.trim() || null,
+          score: numericScore,
+          feedback: values.feedback.trim() || null,
           graded_at: new Date().toISOString()
         })
         .eq('id', submissionId);
@@ -268,7 +286,7 @@ export function AssignmentSubmissionManager({
                       <div className="flex items-center gap-2 mb-2">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <span className="font-medium text-green-800">
-                          Calificación: {submission.score} / {maxScore}
+                          Calificación: {getLetterGrade(submission.score)}
                         </span>
                       </div>
                       {submission.feedback && (
@@ -282,30 +300,33 @@ export function AssignmentSubmissionManager({
                     </div>
                   )}
 
-                  {/* Grading Section */}
-                  {gradingSubmission === submission.id ? (
-                    <div className="border-t pt-4 space-y-3">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`score-${submission.id}`}>
-                            Calificación (0-{maxScore})
-                          </Label>
-                          <Input
-                            id={`score-${submission.id}`}
-                            type="number"
-                            min="0"
-                            max={maxScore}
-                            value={gradeValues[submission.id]?.score || submission.score || ''}
-                            onChange={(e) => setGradeValues(prev => ({
-                              ...prev,
-                              [submission.id]: {
-                                ...prev[submission.id],
-                                score: parseFloat(e.target.value) || 0
-                              }
-                            }))}
-                          />
-                        </div>
-                      </div>
+                   {/* Grading Section */}
+                   {gradingSubmission === submission.id ? (
+                     <div className="border-t pt-4 space-y-3">
+                       <div>
+                         <Label>Calificación</Label>
+                         <Select 
+                           value={gradeValues[submission.id]?.score || ''} 
+                           onValueChange={(value) => setGradeValues({
+                             ...gradeValues,
+                             [submission.id]: {
+                               ...gradeValues[submission.id],
+                               score: value,
+                               feedback: gradeValues[submission.id]?.feedback || ''
+                             }
+                           })}
+                         >
+                           <SelectTrigger>
+                             <SelectValue placeholder="Selecciona una calificación" />
+                           </SelectTrigger>
+                           <SelectContent>
+                             <SelectItem value="AD">AD - Logro Destacado</SelectItem>
+                             <SelectItem value="A">A - Logro Esperado</SelectItem>
+                             <SelectItem value="B">B - En Proceso</SelectItem>
+                             <SelectItem value="C">C - En Inicio</SelectItem>
+                           </SelectContent>
+                         </Select>
+                       </div>
                       
                       <div className="space-y-2">
                         <Label htmlFor={`feedback-${submission.id}`}>
