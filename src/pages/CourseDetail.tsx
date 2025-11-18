@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Users, GraduationCap, Clock, Calendar, ClipboardCheck, Plus, Edit, UserCheck } from 'lucide-react';
+import { ArrowLeft, Users, GraduationCap, Clock, Calendar, ClipboardCheck, Plus, Edit, UserCheck, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import { CourseScheduleManager } from '@/components/course/CourseScheduleManager
 import { ExamForm } from '@/components/course/ExamForm';
 import { ExamsList } from '@/components/course/ExamsList';
 import { CourseEditDialog } from '@/components/course/CourseEditDialog';
+import { CourseAssignmentsReview } from '@/components/course/CourseAssignmentsReview';
 
 interface Course {
   id: string;
@@ -290,13 +291,19 @@ export default function CourseDetail() {
 
         {/* Tabs for Content, Attendance, Students, Exams and Schedule */}
         <Tabs defaultValue="content" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="content">Contenido</TabsTrigger>
             <TabsTrigger value="attendance" className="flex items-center gap-2">
               <ClipboardCheck className="h-4 w-4" />
               Asistencia
             </TabsTrigger>
             <TabsTrigger value="exams">Exámenes</TabsTrigger>
+            {(profile?.role === 'teacher' || profile?.role === 'admin') && (
+              <TabsTrigger value="submissions" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Entregas
+              </TabsTrigger>
+            )}
             <TabsTrigger value="students" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Estudiantes
@@ -351,6 +358,10 @@ export default function CourseDetail() {
               
               <ExamsList courseId={course.id} canEdit={canEdit || false} />
             </div>
+          </TabsContent>
+
+          <TabsContent value="submissions">
+            <CourseAssignmentsReview courseId={course.id} />
           </TabsContent>
 
           <TabsContent value="students">
