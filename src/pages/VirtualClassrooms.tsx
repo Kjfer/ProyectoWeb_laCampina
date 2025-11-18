@@ -39,12 +39,22 @@ interface Teacher {
   first_name: string;
   last_name: string;
   email: string;
+  role: string;
+}
+
+interface Tutor {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
 }
 
 export default function VirtualClassrooms() {
   const { user, profile } = useAuth();
   const [classrooms, setClassrooms] = useState<VirtualClassroom[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [tutors, setTutors] = useState<Tutor[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [lastFetch, setLastFetch] = useState<number>(0);
@@ -71,7 +81,8 @@ export default function VirtualClassrooms() {
     // Paralelizar la carga de datos
     Promise.all([
       fetchClassrooms(),
-      fetchTeachers()
+      fetchTeachers(),
+      fetchTutors()
     ]).catch(error => {
       console.error('Error en carga inicial:', error);
     });
@@ -81,7 +92,7 @@ export default function VirtualClassrooms() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, role')
         .eq('role', 'teacher')
         .eq('is_active', true);
 
@@ -90,6 +101,22 @@ export default function VirtualClassrooms() {
     } catch (error) {
       console.error('Error fetching teachers:', error);
       toast.error('Error al cargar la lista de profesores');
+    }
+  };
+
+  const fetchTutors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, role')
+        .eq('role', 'tutor')
+        .eq('is_active', true);
+
+      if (error) throw error;
+      setTutors(data || []);
+    } catch (error) {
+      console.error('Error fetching tutors:', error);
+      toast.error('Error al cargar la lista de tutores');
     }
   };
 
@@ -502,6 +529,7 @@ export default function VirtualClassrooms() {
         onOpenChange={(open) => !open && setEditingClassroom(null)}
         onSuccess={() => fetchClassrooms(true)}
         teachers={teachers}
+        tutors={tutors}
         isAdmin={profile?.role === 'admin'}
       />
 

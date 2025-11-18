@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Users } from 'lucide-react';
+import { CourseEditDialog } from '@/components/course/CourseEditDialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 interface Course {
   id: string;
@@ -46,13 +49,16 @@ interface CourseFormData {
 
 const SimpleCourseManagement = () => {
   const { profile } = useAuth();
-  const { toast } = useToast();
+  const { toast: toastOld } = useToast();
   
   // States
   const [courses, setCourses] = useState<Course[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [formData, setFormData] = useState<CourseFormData>({
     name: '',
     description: '',
@@ -78,11 +84,7 @@ const SimpleCourseManagement = () => {
 
       if (error) {
         console.error('Error fetching courses:', error);
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los cursos",
-          variant: "destructive",
-        });
+        toast.error("No se pudieron cargar los cursos");
       } else {
         setCourses(data || []);
       }
@@ -121,16 +123,9 @@ const SimpleCourseManagement = () => {
 
       if (error) {
         console.error('Error creating course:', error);
-        toast({
-          title: "Error",
-          description: "No se pudo crear el curso",
-          variant: "destructive",
-        });
+        toast.error("No se pudo crear el curso");
       } else {
-        toast({
-          title: "Éxito",
-          description: "Curso creado exitosamente",
-        });
+        toast.success("Curso creado exitosamente");
         setIsCreateModalOpen(false);
         resetForm();
         fetchCourses();
@@ -148,6 +143,37 @@ const SimpleCourseManagement = () => {
       teacher_id: '',
       academic_year: '2024'
     });
+  };
+
+  const handleEditCourse = (course: Course) => {
+    setSelectedCourse(course);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteCourse = (course: Course) => {
+    setSelectedCourse(course);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteCourse = async () => {
+    if (!selectedCourse) return;
+
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', selectedCourse.id);
+
+      if (error) throw error;
+
+      toast.success('Curso eliminado exitosamente');
+      setIsDeleteDialogOpen(false);
+      setSelectedCourse(null);
+      fetchCourses();
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      toast.error('Error al eliminar el curso');
+    }
   };
 
   if (loading) {
@@ -222,10 +248,18 @@ const SimpleCourseManagement = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEditCourse(course)}
+                        >
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleDeleteCourse(course)}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -335,6 +369,32 @@ const SimpleCourseManagement = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Course Modal */}
+      <CourseEditDialog
+        courseId={selectedCourse?.id || ''}
+        open={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        onSuccess={fetchCourses}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el curso "{selectedCourse?.name}" permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteCourse}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
