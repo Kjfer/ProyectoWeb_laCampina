@@ -17,6 +17,7 @@ interface WeeklyResource {
   is_published: boolean;
   position: number;
   settings: any;
+  assignment_id?: string;
 }
 
 interface WeeklySection {
