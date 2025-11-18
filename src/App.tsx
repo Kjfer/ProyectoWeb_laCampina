@@ -24,6 +24,7 @@ import VirtualClassroomCourses from "./pages/VirtualClassroomCourses";
 import Calendar from "./pages/Calendar";
 import NotFound from "./pages/NotFound";
 import AdminBulkStudentImport from "./pages/AdminBulkStudentImport";
+import AssignmentDetail from "./pages/AssignmentDetail";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,11 @@ const App = () => (
             <Route path="/assignments" element={
               <ProtectedRoute>
                 <Assignments />
+              </ProtectedRoute>
+            } />
+            <Route path="/assignments/:id" element={
+              <ProtectedRoute>
+                <AssignmentDetail />
               </ProtectedRoute>
             } />
             <Route path="/assignments/:assignmentId/review" element={

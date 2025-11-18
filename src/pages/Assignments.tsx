@@ -6,13 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FileText, Calendar, Clock, Plus, AlertCircle, Search } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SubmitAssignmentDialog } from '@/components/assignments/SubmitAssignmentDialog';
 
 interface Assignment {
   id: string;
@@ -37,14 +36,11 @@ interface Assignment {
 const Assignments = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [courseFilter, setCourseFilter] = useState<string>('all');
-  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
 
   useEffect(() => {
     fetchAssignments();
@@ -395,26 +391,14 @@ const Assignments = () => {
                         </Button>
                       ) : (
                         profile?.role === 'student' && (
-                          status.status === 'submitted' ? (
-                            <Button 
-                              className="bg-gradient-primary shadow-glow"
-                              asChild
-                            >
-                              <Link to={`/courses/${assignment.course_id}`}>
-                                Ver Detalles
-                              </Link>
-                            </Button>
-                          ) : status.status !== 'overdue' ? (
-                            <Button 
-                              className="bg-gradient-primary shadow-glow"
-                              onClick={() => {
-                                setSelectedAssignment(assignment);
-                                setSubmitDialogOpen(true);
-                              }}
-                            >
-                              Entregar
-                            </Button>
-                          ) : null
+                          <Button 
+                            className="bg-gradient-primary shadow-glow"
+                            asChild
+                          >
+                            <Link to={`/assignments/${assignment.id}`}>
+                              Ver Detalles
+                            </Link>
+                          </Button>
                         )
                       )}
                     </div>
@@ -423,22 +407,6 @@ const Assignments = () => {
               );
             })}
           </div>
-        )}
-
-        {selectedAssignment && (
-          <SubmitAssignmentDialog
-            open={submitDialogOpen}
-            onOpenChange={setSubmitDialogOpen}
-            assignment={{
-              id: selectedAssignment.id,
-              title: selectedAssignment.title,
-              description: selectedAssignment.description,
-              due_date: selectedAssignment.due_date,
-              max_score: selectedAssignment.max_score,
-              course_id: selectedAssignment.course_id,
-            }}
-            onSubmitSuccess={fetchAssignments}
-          />
         )}
       </div>
     </DashboardLayout>
