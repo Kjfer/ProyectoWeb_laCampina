@@ -373,7 +373,7 @@ export function AssignmentSubmissionManager({
                           setGradeValues(prev => ({
                             ...prev,
                             [submission.id]: {
-                              score: submission.score || 0,
+                              score: submission.score ? getLetterGrade(submission.score) : '',
                               feedback: submission.feedback || ''
                             }
                           }));
