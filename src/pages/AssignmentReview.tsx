@@ -11,10 +11,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { FileText, Calendar, Clock, Download, ArrowLeft, User, CheckCircle, XCircle } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { FileText, Calendar, Clock, Download, ArrowLeft, User, CheckCircle, XCircle, Edit, Trash2, Upload, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { EditAssignmentDialog } from '@/components/assignments/EditAssignmentDialog';
+import { FileUpload } from '@/components/ui/file-upload';
 
 const GRADE_VALUES = {
   'AD': 20,
@@ -75,6 +78,10 @@ const AssignmentReview = () => {
   const [score, setScore] = useState<string>('');
   const [feedback, setFeedback] = useState<string>('');
   const [grading, setGrading] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [feedbackFiles, setFeedbackFiles] = useState<File[]>([]);
 
   useEffect(() => {
     if (profile?.role !== 'teacher' && profile?.role !== 'admin') {
@@ -166,11 +173,39 @@ const AssignmentReview = () => {
     try {
       setGrading(true);
 
+      // Upload feedback files if any
+      let uploadedFiles: string[] = [];
+      if (feedbackFiles.length > 0) {
+        for (const file of feedbackFiles) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+          const filePath = `feedback/${selectedSubmission.id}/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('student-submissions')
+            .upload(filePath, file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('student-submissions')
+            .getPublicUrl(filePath);
+
+          uploadedFiles.push(publicUrl);
+        }
+      }
+
+      // Prepare feedback text with file links
+      let finalFeedback = feedback.trim();
+      if (uploadedFiles.length > 0) {
+        finalFeedback += '\n\nArchivos adjuntos:\n' + uploadedFiles.map((url, i) => `${i + 1}. ${url}`).join('\n');
+      }
+
       const { error } = await supabase
         .from('assignment_submissions')
         .update({
           score: numericScore,
-          feedback: feedback.trim() || null,
+          feedback: finalFeedback || null,
           graded_at: new Date().toISOString()
         })
         .eq('id', selectedSubmission.id);
@@ -182,6 +217,7 @@ const AssignmentReview = () => {
       setSelectedSubmission(null);
       setScore('');
       setFeedback('');
+      setFeedbackFiles([]);
 
     } catch (error) {
       console.error('Error grading submission:', error);
@@ -189,6 +225,34 @@ const AssignmentReview = () => {
     } finally {
       setGrading(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!assignmentId) return;
+
+    try {
+      setDeleting(true);
+
+      const { error } = await supabase
+        .from('assignments')
+        .delete()
+        .eq('id', assignmentId);
+
+      if (error) throw error;
+
+      toast.success('Tarea eliminada exitosamente');
+      navigate('/assignments');
+    } catch (error) {
+      console.error('Error deleting assignment:', error);
+      toast.error('Error al eliminar la tarea');
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const removeFeedbackFile = (index: number) => {
+    setFeedbackFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleDownloadFile = (fileUrl: string, fileName: string) => {
@@ -251,6 +315,22 @@ const AssignmentReview = () => {
               <Badge variant="secondary">{assignment.course.code}</Badge>
               <span className="text-sm text-muted-foreground">{assignment.course.name}</span>
             </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(true)}
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Editar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteDialogOpen(true)}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Eliminar
+            </Button>
           </div>
         </div>
 
@@ -425,6 +505,36 @@ const AssignmentReview = () => {
                       />
                     </div>
 
+                    {/* File Upload for Feedback */}
+                    <div>
+                      <Label>Archivos adjuntos (opcional)</Label>
+                      <div className="mt-2 space-y-2">
+                        <FileUpload
+                          onFileSelect={(files) => setFeedbackFiles(prev => [...prev, ...files])}
+                          accept="*/*"
+                          multiple
+                          maxSize={10 * 1024 * 1024}
+                        />
+                        {feedbackFiles.length > 0 && (
+                          <div className="space-y-2">
+                            {feedbackFiles.map((file, index) => (
+                              <div key={index} className="flex items-center gap-2 p-2 border rounded-lg bg-muted/50">
+                                <FileText className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-sm flex-1 truncate">{file.name}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeFeedbackFile(index)}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     {selectedSubmission.graded_at && (
                       <p className="text-xs text-muted-foreground">
                         Última calificación: {format(new Date(selectedSubmission.graded_at), "d 'de' MMMM, yyyy HH:mm", { locale: es })}
@@ -457,6 +567,42 @@ const AssignmentReview = () => {
           </div>
         </div>
       </div>
+
+      {/* Edit Assignment Dialog */}
+      {assignment && (
+        <EditAssignmentDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          assignment={assignment}
+          onEditSuccess={() => {
+            fetchAssignmentData();
+            setEditDialogOpen(false);
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Esto eliminará permanentemente la tarea
+              y todas las entregas de los estudiantes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
