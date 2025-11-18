@@ -21,8 +21,21 @@ import {
   CheckCircle2, 
   ArrowLeft,
   Loader2,
-  Download
+  Download,
+  Edit,
+  Trash2
 } from 'lucide-react';
+import { EditAssignmentDialog } from '@/components/assignments/EditAssignmentDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Assignment {
   id: string;
@@ -59,6 +72,9 @@ const AssignmentDetail = () => {
   const [content, setContent] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchAssignmentDetails();
@@ -189,6 +205,38 @@ const AssignmentDetail = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!assignment) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      const { error } = await supabase
+        .from('assignments')
+        .delete()
+        .eq('id', assignment.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Tarea eliminada",
+        description: "La tarea ha sido eliminada correctamente",
+      });
+
+      navigate('/assignments');
+    } catch (error: any) {
+      console.error('Error deleting assignment:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo eliminar la tarea",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   const getLetterGrade = (score: number | null, maxScore: number): string => {
     if (!score) return '';
     const percentage = (score / maxScore) * 100;
@@ -200,6 +248,7 @@ const AssignmentDetail = () => {
 
   const isOverdue = assignment ? isAfter(new Date(), new Date(assignment.due_date)) : false;
   const canSubmit = !submission && !isOverdue;
+  const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin';
 
   if (loading) {
     return (
@@ -254,6 +303,28 @@ const AssignmentDetail = () => {
               </Link>
             </p>
           </div>
+          
+          {/* Teacher/Admin Actions */}
+          {isTeacherOrAdmin && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditDialogOpen(true)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Editar
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Eliminar
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Assignment Details */}
@@ -467,6 +538,52 @@ const AssignmentDetail = () => {
           </Card>
         )}
       </div>
+
+      {/* Edit Dialog */}
+      {assignment && (
+        <EditAssignmentDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          assignment={{
+            id: assignment.id,
+            title: assignment.title,
+            description: assignment.description,
+            due_date: assignment.due_date,
+            max_score: assignment.max_score,
+          }}
+          onEditSuccess={fetchAssignmentDetails}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente esta tarea
+              y todas las entregas asociadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                'Eliminar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
