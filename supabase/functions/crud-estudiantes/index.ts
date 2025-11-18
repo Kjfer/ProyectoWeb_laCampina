@@ -92,65 +92,108 @@ serve(async (req: Request) => {
             const email = `${studentData.student_code}@estudiante.edu.pe`;
             const password = studentData.document_number || 'Temporal123';
 
-            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-              email,
-              password,
-              email_confirm: true,
-            });
-
-            if (authError) {
-              console.error(`❌ Auth error for ${studentData.student_code}:`, authError);
-              results.errors.push({ student_code: studentData.student_code, error: authError.message });
-              continue;
-            }
-
-            const { error: profileError } = await supabase
+            // Verificar si el perfil ya existe por student_code o email
+            const { data: existingProfile } = await supabase
               .from('profiles')
-              .insert({
-                user_id: authData.user.id,
-                email,
-                first_name: studentData.first_name,
-                last_name: `${studentData.paternal_surname} ${studentData.maternal_surname}`.trim(),
-                paternal_surname: studentData.paternal_surname,
-                maternal_surname: studentData.maternal_surname,
-                student_code: studentData.student_code,
-                document_type: studentData.document_type,
-                document_number: studentData.document_number,
-                gender: studentData.gender,
-                birth_date: studentData.birth_date,
-                role: 'student',
-                is_active: true,
-              });
-
-            if (profileError) {
-              console.error(`❌ Profile error for ${studentData.student_code}:`, profileError);
-              results.errors.push({ student_code: studentData.student_code, error: profileError.message });
-              continue;
-            }
-
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('user_id', authData.user.id)
+              .select('id, user_id')
+              .or(`student_code.eq.${studentData.student_code},email.eq.${email}`)
               .single();
 
-            if (profileData && courseIds.length > 0) {
-              const enrollments = courseIds.map(courseId => ({
-                student_id: profileData.id,
-                course_id: courseId,
-              }));
+            let profileId: string;
 
-              const { error: enrollError } = await supabase
-                .from('course_enrollments')
-                .insert(enrollments);
+            if (existingProfile) {
+              console.log(`ℹ️ Estudiante ya existe: ${studentData.student_code}, actualizando...`);
+              profileId = existingProfile.id;
+              
+              // Actualizar información del estudiante
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({
+                  first_name: studentData.first_name,
+                  last_name: `${studentData.paternal_surname} ${studentData.maternal_surname}`.trim(),
+                  paternal_surname: studentData.paternal_surname,
+                  maternal_surname: studentData.maternal_surname,
+                  document_type: studentData.document_type,
+                  document_number: studentData.document_number,
+                  gender: studentData.gender,
+                  birth_date: studentData.birth_date,
+                })
+                .eq('id', profileId);
 
-              if (enrollError) {
-                console.error(`⚠️ Enrollment error for ${studentData.student_code}:`, enrollError);
+              if (updateError) {
+                console.error(`⚠️ Error actualizando perfil para ${studentData.student_code}:`, updateError);
+              }
+            } else {
+              // Crear nuevo usuario
+              const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+                email,
+                password,
+                email_confirm: true,
+              });
+
+              if (authError) {
+                console.error(`❌ Auth error for ${studentData.student_code}:`, authError);
+                results.errors.push({ student_code: studentData.student_code, error: authError.message });
+                continue;
+              }
+
+              // Crear perfil
+              const { data: newProfile, error: profileError } = await supabase
+                .from('profiles')
+                .insert({
+                  user_id: authData.user.id,
+                  email,
+                  first_name: studentData.first_name,
+                  last_name: `${studentData.paternal_surname} ${studentData.maternal_surname}`.trim(),
+                  paternal_surname: studentData.paternal_surname,
+                  maternal_surname: studentData.maternal_surname,
+                  student_code: studentData.student_code,
+                  document_type: studentData.document_type,
+                  document_number: studentData.document_number,
+                  gender: studentData.gender,
+                  birth_date: studentData.birth_date,
+                  role: 'student',
+                  is_active: true,
+                })
+                .select('id')
+                .single();
+
+              if (profileError) {
+                console.error(`❌ Profile error for ${studentData.student_code}:`, profileError);
+                results.errors.push({ student_code: studentData.student_code, error: profileError.message });
+                continue;
+              }
+
+              profileId = newProfile.id;
+            }
+
+            // Inscribir en cursos (evitando duplicados)
+            if (courseIds.length > 0) {
+              for (const courseId of courseIds) {
+                const { data: existingEnrollment } = await supabase
+                  .from('course_enrollments')
+                  .select('id')
+                  .eq('student_id', profileId)
+                  .eq('course_id', courseId)
+                  .single();
+
+                if (!existingEnrollment) {
+                  const { error: enrollError } = await supabase
+                    .from('course_enrollments')
+                    .insert({
+                      student_id: profileId,
+                      course_id: courseId,
+                    });
+
+                  if (enrollError) {
+                    console.error(`⚠️ Enrollment error for ${studentData.student_code} in course ${courseId}:`, enrollError);
+                  }
+                }
               }
             }
 
             results.success.push(studentData.student_code);
-            console.log(`✅ Estudiante creado: ${studentData.student_code}`);
+            console.log(`✅ Estudiante procesado: ${studentData.student_code}`);
           } catch (error) {
             console.error(`❌ Error processing ${studentData.student_code}:`, error);
             results.errors.push({ student_code: studentData.student_code, error: String(error) });
