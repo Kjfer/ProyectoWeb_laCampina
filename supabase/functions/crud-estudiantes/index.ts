@@ -91,21 +91,23 @@ serve(async (req: Request) => {
           try {
             const email = `${studentData.student_code}@estudiante.edu.pe`;
             const password = studentData.document_number || 'Temporal123';
+            
+            console.log(`📝 Procesando: ${studentData.student_code} - ${studentData.first_name}`);
 
-            // Verificar si el perfil ya existe por student_code o email
+            // Paso 1: Verificar si existe el perfil
             const { data: existingProfile } = await supabase
               .from('profiles')
-              .select('id, user_id')
-              .or(`student_code.eq.${studentData.student_code},email.eq.${email}`)
+              .select('id, user_id, email')
+              .eq('student_code', studentData.student_code)
               .single();
 
             let profileId: string;
 
             if (existingProfile) {
-              console.log(`ℹ️ Estudiante ya existe: ${studentData.student_code}, actualizando...`);
+              console.log(`✏️ Estudiante existe, actualizando: ${studentData.student_code}`);
               profileId = existingProfile.id;
               
-              // Actualizar información del estudiante
+              // Actualizar perfil con todos los datos del Excel
               const { error: updateError } = await supabase
                 .from('profiles')
                 .update({
@@ -117,54 +119,148 @@ serve(async (req: Request) => {
                   document_number: studentData.document_number,
                   gender: studentData.gender,
                   birth_date: studentData.birth_date,
+                  student_code: studentData.student_code,
+                  is_active: true,
                 })
                 .eq('id', profileId);
 
               if (updateError) {
-                console.error(`⚠️ Error actualizando perfil para ${studentData.student_code}:`, updateError);
+                console.error(`❌ Error actualizando: ${studentData.student_code}`, updateError);
+                results.errors.push({ 
+                  student_code: studentData.student_code, 
+                  error: `Error al actualizar: ${updateError.message}` 
+                });
+                continue;
               }
+              
+              console.log(`✅ Perfil actualizado: ${studentData.student_code}`);
             } else {
-              // Crear nuevo usuario
+              // Paso 2: Crear nuevo usuario en auth
+              console.log(`🆕 Creando nuevo usuario: ${email}`);
+              
               const { data: authData, error: authError } = await supabase.auth.admin.createUser({
                 email,
                 password,
                 email_confirm: true,
+                user_metadata: {
+                  first_name: studentData.first_name,
+                  last_name: `${studentData.paternal_surname} ${studentData.maternal_surname}`.trim(),
+                }
               });
 
               if (authError) {
-                console.error(`❌ Auth error for ${studentData.student_code}:`, authError);
-                results.errors.push({ student_code: studentData.student_code, error: authError.message });
-                continue;
+                // Si el usuario ya existe en auth, buscar su profile
+                if (authError.message.includes('already') || authError.message.includes('exists')) {
+                  console.log(`ℹ️ Usuario auth existe, buscando profile por email: ${email}`);
+                  
+                  const { data: profileByEmail } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('email', email)
+                    .single();
+                  
+                  if (profileByEmail) {
+                    profileId = profileByEmail.id;
+                    
+                    // Actualizar el profile con los datos del Excel
+                    const { error: updateError } = await supabase
+                      .from('profiles')
+                      .update({
+                        first_name: studentData.first_name,
+                        last_name: `${studentData.paternal_surname} ${studentData.maternal_surname}`.trim(),
+                        paternal_surname: studentData.paternal_surname,
+                        maternal_surname: studentData.maternal_surname,
+                        document_type: studentData.document_type,
+                        document_number: studentData.document_number,
+                        gender: studentData.gender,
+                        birth_date: studentData.birth_date,
+                        student_code: studentData.student_code,
+                        is_active: true,
+                      })
+                      .eq('id', profileId);
+                    
+                    if (updateError) {
+                      console.error(`❌ Error actualizando profile existente: ${studentData.student_code}`, updateError);
+                      results.errors.push({ 
+                        student_code: studentData.student_code, 
+                        error: `Error al actualizar: ${updateError.message}` 
+                      });
+                      continue;
+                    }
+                    
+                    console.log(`✅ Profile existente actualizado: ${studentData.student_code}`);
+                  } else {
+                    console.error(`❌ No se encontró profile para email: ${email}`);
+                    results.errors.push({ 
+                      student_code: studentData.student_code, 
+                      error: 'Usuario auth existe pero no tiene profile' 
+                    });
+                    continue;
+                  }
+                } else {
+                  console.error(`❌ Error creando usuario auth: ${studentData.student_code}`, authError);
+                  results.errors.push({ 
+                    student_code: studentData.student_code, 
+                    error: `Error de autenticación: ${authError.message}` 
+                  });
+                  continue;
+                }
+              } else {
+                // Usuario creado exitosamente
+                console.log(`✅ Usuario auth creado: ${email}, user_id: ${authData.user.id}`);
+                
+                // Paso 3: Esperar un momento para que el trigger cree el profile básico
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Buscar el profile creado por el trigger
+                const { data: triggeredProfile } = await supabase
+                  .from('profiles')
+                  .select('id')
+                  .eq('user_id', authData.user.id)
+                  .single();
+                
+                if (triggeredProfile) {
+                  profileId = triggeredProfile.id;
+                  console.log(`📋 Profile del trigger encontrado: ${profileId}`);
+                  
+                  // Actualizar con todos los datos del Excel
+                  const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({
+                      first_name: studentData.first_name,
+                      last_name: `${studentData.paternal_surname} ${studentData.maternal_surname}`.trim(),
+                      paternal_surname: studentData.paternal_surname,
+                      maternal_surname: studentData.maternal_surname,
+                      document_type: studentData.document_type,
+                      document_number: studentData.document_number,
+                      gender: studentData.gender,
+                      birth_date: studentData.birth_date,
+                      student_code: studentData.student_code,
+                      email: email,
+                      role: 'student',
+                      is_active: true,
+                    })
+                    .eq('id', profileId);
+                  
+                  if (updateError) {
+                    console.error(`❌ Error actualizando profile del trigger: ${studentData.student_code}`, updateError);
+                    results.errors.push({ 
+                      student_code: studentData.student_code, 
+                      error: `Error al actualizar profile: ${updateError.message}` 
+                    });
+                    continue;
+                  }
+                  
+                  console.log(`✅ Profile actualizado con datos del Excel: ${studentData.student_code}`);
+                } else {
+                  console.error(`❌ No se encontró el profile creado por trigger para: ${studentData.student_code}`);
+                  results.errors.push({ 
+                    student_code: studentData.student_code, 
+                    error: 'Profile no creado por trigger' 
+                  });
+                  continue;
+                }
               }
-
-              // Crear perfil
-              const { data: newProfile, error: profileError } = await supabase
-                .from('profiles')
-                .insert({
-                  user_id: authData.user.id,
-                  email,
-                  first_name: studentData.first_name,
-                  last_name: `${studentData.paternal_surname} ${studentData.maternal_surname}`.trim(),
-                  paternal_surname: studentData.paternal_surname,
-                  maternal_surname: studentData.maternal_surname,
-                  student_code: studentData.student_code,
-                  document_type: studentData.document_type,
-                  document_number: studentData.document_number,
-                  gender: studentData.gender,
-                  birth_date: studentData.birth_date,
-                  role: 'student',
-                  is_active: true,
-                })
-                .select('id')
-                .single();
-
-              if (profileError) {
-                console.error(`❌ Profile error for ${studentData.student_code}:`, profileError);
-                results.errors.push({ student_code: studentData.student_code, error: profileError.message });
-                continue;
-              }
-
-              profileId = newProfile.id;
             }
 
             // Inscribir en cursos (evitando duplicados)
