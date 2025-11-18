@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BulkStudentImport } from '@/components/students/BulkStudentImport';
 import { Loader2, School, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 interface VirtualClassroom {
   id: string;
@@ -33,18 +34,20 @@ const AdminBulkStudentImport = () => {
 
   if (profile?.role !== 'admin') {
     return (
-      <div className="p-6">
-        <Card className="bg-gradient-card shadow-card border-0">
-          <CardContent className="p-8 text-center">
-            <div className="text-destructive text-lg font-semibold mb-2">
-              Acceso Denegado
-            </div>
-            <p className="text-muted-foreground">
-              Solo los administradores pueden acceder a esta sección.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout>
+        <div className="p-6">
+          <Card className="bg-gradient-card shadow-card border-0">
+            <CardContent className="p-8 text-center">
+              <div className="text-destructive text-lg font-semibold mb-2">
+                Acceso Denegado
+              </div>
+              <p className="text-muted-foreground">
+                Solo los administradores pueden acceder a esta sección.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
     );
   }
 
@@ -124,14 +127,17 @@ const AdminBulkStudentImport = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <DashboardLayout>
+      <div className="container mx-auto p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">Importación Masiva de Estudiantes</h1>
         <p className="text-muted-foreground">
@@ -214,7 +220,8 @@ const AdminBulkStudentImport = () => {
           />
         </div>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 
