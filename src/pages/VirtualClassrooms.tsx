@@ -156,10 +156,27 @@ export default function VirtualClassrooms() {
 
       if (error) {
         console.error('❌ Error calling Edge Function:', error);
+        // Check if it's an authentication error
+        if (error.message?.includes('UNAUTHORIZED') || error.message?.includes('Sesión expirada')) {
+          toast.error('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+          // Redirect to auth page
+          setTimeout(() => {
+            window.location.href = '/auth';
+          }, 2000);
+          return;
+        }
         throw new Error(`Error en Edge Function: ${error.message}`);
       }
 
       if (!data || !data.success) {
+        // Check if the error is an auth error
+        if (data?.code === 'UNAUTHORIZED' || data?.error?.includes('Sesión expirada')) {
+          toast.error('Su sesión ha expirado. Por favor, inicie sesión nuevamente.');
+          setTimeout(() => {
+            window.location.href = '/auth';
+          }, 2000);
+          return;
+        }
         throw new Error(data?.error || 'Error en la respuesta del servidor');
       }
 

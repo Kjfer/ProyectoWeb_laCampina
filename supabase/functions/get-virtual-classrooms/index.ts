@@ -31,7 +31,18 @@ serve(async (req: Request) => {
     // Get the current user
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     if (userError || !user) {
-      throw new Error('No autorizado')
+      console.error('Error de autenticación:', userError?.message || 'Usuario no encontrado')
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Sesión expirada o no válida. Por favor, inicie sesión nuevamente.',
+          code: 'UNAUTHORIZED'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+          status: 401 
+        }
+      )
     }
 
     // Get user profile to check role
