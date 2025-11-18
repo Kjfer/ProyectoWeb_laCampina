@@ -29,6 +29,15 @@ interface Teacher {
   first_name: string;
   last_name: string;
   email: string;
+  role: string;
+}
+
+interface Tutor {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
 }
 
 interface EditClassroomDialogProps {
@@ -37,6 +46,7 @@ interface EditClassroomDialogProps {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   teachers: Teacher[];
+  tutors: Tutor[];
   isAdmin: boolean;
 }
 
@@ -51,6 +61,7 @@ export function EditClassroomDialog({
   onOpenChange, 
   onSuccess, 
   teachers,
+  tutors,
   isAdmin 
 }: EditClassroomDialogProps) {
   const [formData, setFormData] = useState({
@@ -59,6 +70,7 @@ export function EditClassroomDialog({
     education_level: '' as 'primaria' | 'secundaria' | '',
     academic_year: '',
     teacher_id: '',
+    tutor_id: '',
     section: '',
     is_active: true
   });
@@ -72,6 +84,7 @@ export function EditClassroomDialog({
         education_level: classroom.education_level,
         academic_year: classroom.academic_year,
         teacher_id: classroom.teacher_id,
+        tutor_id: '', // TODO: Agregar campo tutor_id en virtual_classrooms
         section: classroom.section,
         is_active: classroom.is_active
       });
@@ -222,6 +235,28 @@ export function EditClassroomDialog({
                   {teachers.map((teacher) => (
                     <SelectItem key={teacher.id} value={teacher.id}>
                       {teacher.first_name} {teacher.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {isAdmin && (
+            <div>
+              <Label htmlFor="edit-tutor">Tutor (Opcional)</Label>
+              <Select 
+                value={formData.tutor_id} 
+                onValueChange={(value) => setFormData({ ...formData, tutor_id: value })}
+              >
+                <SelectTrigger id="edit-tutor">
+                  <SelectValue placeholder="Seleccionar tutor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin tutor</SelectItem>
+                  {tutors.map((tutor) => (
+                    <SelectItem key={tutor.id} value={tutor.id}>
+                      {tutor.first_name} {tutor.last_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
