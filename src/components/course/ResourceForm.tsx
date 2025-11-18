@@ -87,6 +87,37 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
         deadlineISO = new Date(formData.assignment_deadline).toISOString();
       }
 
+      let assignmentId = null;
+
+      // Si es una tarea, crear el registro en la tabla assignments
+      if (formData.resource_type === 'assignment') {
+        // Obtener el course_id de la sección
+        const { data: sectionData, error: sectionError } = await supabase
+          .from('course_weekly_sections')
+          .select('course_id')
+          .eq('id', sectionId)
+          .single();
+
+        if (sectionError) throw sectionError;
+
+        // Crear el assignment
+        const { data: assignmentData, error: assignmentError } = await supabase
+          .from('assignments')
+          .insert({
+            course_id: sectionData.course_id,
+            title: formData.title.trim(),
+            description: formData.description.trim() || null,
+            due_date: deadlineISO,
+            max_score: formData.max_score,
+            is_published: formData.is_published
+          })
+          .select()
+          .single();
+
+        if (assignmentError) throw assignmentError;
+        assignmentId = assignmentData.id;
+      }
+
       const insertData = {
         section_id: sectionId,
         title: formData.title.trim(),
@@ -98,7 +129,8 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
         position: 0,
         assignment_deadline: deadlineISO,
         max_score: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.max_score : null,
-        allows_student_submissions: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.allows_student_submissions : false
+        allows_student_submissions: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.allows_student_submissions : false,
+        assignment_id: assignmentId
       };
 
       console.log('📤 Intentando crear recurso:', insertData);

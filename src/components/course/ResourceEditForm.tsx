@@ -21,6 +21,7 @@ interface WeeklyResource {
   assignment_deadline?: string;
   max_score?: number;
   allows_student_submissions?: boolean;
+  assignment_id?: string;
 }
 
 interface ResourceEditFormProps {
@@ -97,6 +98,22 @@ export function ResourceEditForm({ resource, sectionId, onClose, onSuccess }: Re
       let deadlineISO = null;
       if (formData.assignment_deadline) {
         deadlineISO = new Date(formData.assignment_deadline).toISOString();
+      }
+
+      // Si es una tarea y tiene assignment_id, actualizar el assignment también
+      if (formData.resource_type === 'assignment' && resource.assignment_id) {
+        const { error: assignmentError } = await supabase
+          .from('assignments')
+          .update({
+            title: formData.title.trim(),
+            description: formData.description.trim() || null,
+            due_date: deadlineISO,
+            max_score: formData.max_score,
+            is_published: formData.is_published
+          })
+          .eq('id', resource.assignment_id);
+
+        if (assignmentError) throw assignmentError;
       }
 
       const updateData = {

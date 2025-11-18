@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +30,7 @@ interface WeeklyResource {
   assignment_deadline?: string;
   max_score?: number;
   settings?: any;
+  assignment_id?: string;
 }
 
 interface WeeklySection {
@@ -86,6 +88,7 @@ const getResourceTypeLabel = (type: string) => {
 };
 
 export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSection }: CourseWeeklySectionProps) {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showResourceForm, setShowResourceForm] = useState(false);
   const [selectedResource, setSelectedResource] = useState<WeeklyResource | null>(null);
@@ -94,7 +97,13 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
   const [editingResource, setEditingResource] = useState<WeeklyResource | null>(null);
 
   const handleResourceClick = (resource: WeeklyResource) => {
-    setSelectedResource(resource);
+    // Si es una tarea y tiene assignment_id, redirigir a la página de detalles
+    if (resource.resource_type === 'assignment' && resource.assignment_id) {
+      navigate(`/assignments/${resource.assignment_id}`);
+    } else {
+      // Para otros recursos, abrir el modal
+      setSelectedResource(resource);
+    }
   };
 
   const handleToggleSectionPublish = async (e: React.MouseEvent) => {

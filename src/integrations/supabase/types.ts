@@ -564,6 +564,7 @@ export type Database = {
         Row: {
           allows_student_submissions: boolean | null
           assignment_deadline: string | null
+          assignment_id: string | null
           created_at: string | null
           description: string | null
           file_path: string | null
@@ -583,6 +584,7 @@ export type Database = {
         Insert: {
           allows_student_submissions?: boolean | null
           assignment_deadline?: string | null
+          assignment_id?: string | null
           created_at?: string | null
           description?: string | null
           file_path?: string | null
@@ -602,6 +604,7 @@ export type Database = {
         Update: {
           allows_student_submissions?: boolean | null
           assignment_deadline?: string | null
+          assignment_id?: string | null
           created_at?: string | null
           description?: string | null
           file_path?: string | null
@@ -619,6 +622,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "course_weekly_resources_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "course_weekly_resources_section_id_fkey"
             columns: ["section_id"]
