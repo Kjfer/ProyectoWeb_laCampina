@@ -398,11 +398,13 @@ const Assignments = () => {
                           status.status === 'submitted' ? (
                             <Button 
                               className="bg-gradient-primary shadow-glow"
-                              onClick={() => navigate(`/assignments/${assignment.id}/review`)}
+                              asChild
                             >
-                              Ver Detalles
+                              <Link to={`/courses/${assignment.course_id}`}>
+                                Ver Detalles
+                              </Link>
                             </Button>
-                          ) : (
+                          ) : status.status !== 'overdue' ? (
                             <Button 
                               className="bg-gradient-primary shadow-glow"
                               onClick={() => {
@@ -412,7 +414,7 @@ const Assignments = () => {
                             >
                               Entregar
                             </Button>
-                          )
+                          ) : null
                         )
                       )}
                     </div>
@@ -430,6 +432,9 @@ const Assignments = () => {
             assignment={{
               id: selectedAssignment.id,
               title: selectedAssignment.title,
+              description: selectedAssignment.description,
+              due_date: selectedAssignment.due_date,
+              max_score: selectedAssignment.max_score,
               course_id: selectedAssignment.course_id,
             }}
             onSubmitSuccess={fetchAssignments}

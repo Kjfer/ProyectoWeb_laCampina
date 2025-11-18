@@ -5,7 +5,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Calendar, Clock, Target } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface SubmitAssignmentDialogProps {
   open: boolean;
@@ -13,6 +15,9 @@ interface SubmitAssignmentDialogProps {
   assignment: {
     id: string;
     title: string;
+    description: string;
+    due_date: string;
+    max_score: number;
     course_id: string;
   };
   onSubmitSuccess: () => void;
@@ -117,6 +122,31 @@ export const SubmitAssignmentDialog = ({
             {assignment.title}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Assignment Details */}
+        <div className="space-y-3 py-4 px-1 border-b border-border">
+          <p className="text-sm text-muted-foreground">
+            {assignment.description || 'Sin descripción'}
+          </p>
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Calendar className="w-4 h-4" />
+              <span>
+                {format(new Date(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Clock className="w-4 h-4" />
+              <span>
+                {format(new Date(assignment.due_date), "HH:mm")}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Target className="w-4 h-4" />
+              <span>{assignment.max_score} pts</span>
+            </div>
+          </div>
+        </div>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
