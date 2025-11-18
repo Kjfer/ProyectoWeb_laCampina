@@ -246,14 +246,13 @@ export function EditClassroomDialog({
             <div>
               <Label htmlFor="edit-tutor">Tutor (Opcional)</Label>
               <Select 
-                value={formData.tutor_id} 
+                value={formData.tutor_id || undefined} 
                 onValueChange={(value) => setFormData({ ...formData, tutor_id: value })}
               >
                 <SelectTrigger id="edit-tutor">
-                  <SelectValue placeholder="Seleccionar tutor" />
+                  <SelectValue placeholder="Seleccionar tutor (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin tutor</SelectItem>
                   {tutors.map((tutor) => (
                     <SelectItem key={tutor.id} value={tutor.id}>
                       {tutor.first_name} {tutor.last_name}
