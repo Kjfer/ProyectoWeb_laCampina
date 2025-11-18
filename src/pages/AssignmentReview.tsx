@@ -132,6 +132,8 @@ const AssignmentReview = () => {
         .eq('assignment_id', assignmentId)
         .order('submitted_at', { ascending: false });
 
+      console.log('Assignment submissions data:', submissionsData);
+
       if (submissionsError) throw submissionsError;
       setSubmissions(submissionsData || []);
 
@@ -145,6 +147,8 @@ const AssignmentReview = () => {
 
   const handleSelectSubmission = (submission: Submission) => {
     setSelectedSubmission(submission);
+    console.log('Selected submission:', submission);
+    console.log('Submission content:', submission.content);
     setScore(getLetterGrade(submission.score));
     setFeedback(submission.feedback || '');
   };
