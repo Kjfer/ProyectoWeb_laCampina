@@ -168,6 +168,14 @@ const AssignmentReview = () => {
       return;
     }
 
+    // Validate file sizes
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const oversizedFiles = feedbackFiles.filter(file => file.size > maxSize);
+    if (oversizedFiles.length > 0) {
+      toast.error('Algunos archivos superan los 5MB. Para archivos grandes, te recomendamos subirlos a Google Drive y compartir el enlace en los comentarios.');
+      return;
+    }
+
     const numericScore = GRADE_VALUES[score as keyof typeof GRADE_VALUES];
 
     try {
@@ -185,7 +193,10 @@ const AssignmentReview = () => {
             .from('student-submissions')
             .upload(filePath, file);
 
-          if (uploadError) throw uploadError;
+          if (uploadError) {
+            console.error('Error uploading file:', uploadError);
+            throw new Error(`Error al subir el archivo ${file.name}`);
+          }
 
           const { data: { publicUrl } } = supabase.storage
             .from('student-submissions')
@@ -221,7 +232,7 @@ const AssignmentReview = () => {
 
     } catch (error) {
       console.error('Error grading submission:', error);
-      toast.error('Error al guardar la calificación');
+      toast.error(error instanceof Error ? error.message : 'Error al guardar la calificación');
     } finally {
       setGrading(false);
     }
@@ -508,12 +519,15 @@ const AssignmentReview = () => {
                     {/* File Upload for Feedback */}
                     <div>
                       <Label>Archivos adjuntos (opcional)</Label>
+                      <p className="text-xs text-muted-foreground mt-1 mb-2">
+                        Máximo 5MB por archivo. Para archivos grandes, sube a Google Drive y comparte el enlace en los comentarios.
+                      </p>
                       <div className="mt-2 space-y-2">
                         <FileUpload
                           onFileSelect={(files) => setFeedbackFiles(prev => [...prev, ...files])}
                           accept="*/*"
                           multiple
-                          maxSize={10 * 1024 * 1024}
+                          maxSize={5 * 1024 * 1024}
                         />
                         {feedbackFiles.length > 0 && (
                           <div className="space-y-2">
