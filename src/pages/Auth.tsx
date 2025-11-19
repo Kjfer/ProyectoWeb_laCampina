@@ -25,7 +25,8 @@ const Auth = () => {
     confirmPassword: '',
     first_name: '',
     last_name: '',
-    role: 'student'
+    role: 'student',
+    document_number: ''
   });
 
   // Redirect if already authenticated
@@ -72,11 +73,18 @@ const Auth = () => {
       return;
     }
 
+    if (!signupData.document_number.trim()) {
+      setError('El DNI es obligatorio');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error } = await signUp(signupData.email, signupData.password, {
         first_name: signupData.first_name,
         last_name: signupData.last_name,
-        role: signupData.role
+        role: signupData.role,
+        document_number: signupData.document_number
       });
 
       if (error) {
@@ -190,6 +198,17 @@ const Auth = () => {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="document-number">DNI</Label>
+                  <Input
+                    id="document-number"
+                    type="text"
+                    placeholder="12345678"
+                    value={signupData.document_number}
+                    onChange={(e) => setSignupData(prev => ({ ...prev, document_number: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="role">Tipo de usuario</Label>
                   <Select value={signupData.role} onValueChange={(value) => setSignupData(prev => ({ ...prev, role: value }))}>
                     <SelectTrigger>
@@ -199,6 +218,7 @@ const Auth = () => {
                       <SelectItem value="student">Estudiante</SelectItem>
                       <SelectItem value="teacher">Docente</SelectItem>
                       <SelectItem value="parent">Padre de Familia</SelectItem>
+                      <SelectItem value="tutor">Tutor</SelectItem>
                       <SelectItem value="admin">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
