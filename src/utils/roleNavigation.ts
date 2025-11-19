@@ -15,7 +15,7 @@ import {
   Settings
 } from 'lucide-react';
 
-export type UserRole = 'admin' | 'teacher' | 'student' | 'parent';
+export type UserRole = 'admin' | 'teacher' | 'student' | 'parent' | 'tutor';
 
 export interface NavItem {
   title: string;
@@ -30,7 +30,7 @@ export const navigationItems: NavItem[] = [
     title: 'Dashboard',
     url: '/',
     icon: Home,
-    roles: ['admin', 'teacher', 'student', 'parent']
+    roles: ['admin', 'teacher', 'student', 'parent', 'tutor']
   },
   
   // Aulas Virtuales
@@ -70,7 +70,7 @@ export const navigationItems: NavItem[] = [
     title: 'Calendario',
     url: '/calendar',
     icon: Calendar,
-    roles: ['admin', 'teacher', 'student', 'parent']
+    roles: ['admin', 'teacher', 'student', 'parent', 'tutor']
   },
   
   // Biblioteca
@@ -86,7 +86,7 @@ export const navigationItems: NavItem[] = [
     title: 'Mensajes',
     url: '/messages',
     icon: MessageSquare,
-    roles: ['admin', 'teacher', 'student', 'parent']
+    roles: ['admin', 'teacher', 'student', 'parent', 'tutor']
   },
   
   // Compañeros (solo estudiantes)
@@ -110,7 +110,7 @@ export const navigationItems: NavItem[] = [
     title: 'Soporte',
     url: '/support',
     icon: HelpCircle,
-    roles: ['admin', 'teacher', 'student', 'parent']
+    roles: ['admin', 'teacher', 'student', 'parent', 'tutor']
   }
 ];
 

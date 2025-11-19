@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface RoleBasedRouteProps {
   children: React.ReactNode;
-  allowedRoles: Array<'admin' | 'teacher' | 'student' | 'parent'>;
+  allowedRoles: Array<'admin' | 'teacher' | 'student' | 'parent' | 'tutor'>;
   redirectTo?: string;
 }
 

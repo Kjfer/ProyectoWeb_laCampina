@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles?: Array<'admin' | 'teacher' | 'student' | 'parent'>;
+  allowedRoles?: Array<'admin' | 'teacher' | 'student' | 'parent' | 'tutor'>;
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
