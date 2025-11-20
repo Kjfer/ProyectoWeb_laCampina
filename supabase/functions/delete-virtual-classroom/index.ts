@@ -45,20 +45,22 @@ serve(async (req: Request) => {
       throw new Error('Error al obtener el perfil del usuario')
     }
 
-    // Get classroom ID from URL or body
+    // Get classroom ID and force flag from URL or body
     const url = new URL(req.url)
-    const id = url.searchParams.get('id') || (await req.json()).id
+    const requestBody = await req.json()
+    const id = url.searchParams.get('id') || requestBody.id
+    const force = requestBody.force || false
 
     if (!id) {
       throw new Error('El ID del aula virtual es requerido')
     }
 
-    console.log('📥 Deleting classroom with ID:', id)
+    console.log('📥 Deleting classroom with ID:', id, 'Force:', force)
 
     // Get existing classroom to check permissions
     const { data: existingClassroom, error: fetchError } = await supabaseClient
       .from('virtual_classrooms')
-      .select('teacher_id, name')
+      .select('teacher_id, name, is_active')
       .eq('id', id)
       .single()
 
@@ -95,8 +97,8 @@ serve(async (req: Request) => {
       }
     }
 
-    // If there are enrolled students, only deactivate instead of delete
-    if (enrollmentCount > 0) {
+    // If there are enrolled students and not forcing deletion, only deactivate
+    if (enrollmentCount > 0 && !force) {
       const { data: deactivated, error: deactivateError } = await supabaseClient
         .from('virtual_classrooms')
         .update({ is_active: false })
@@ -124,8 +126,15 @@ serve(async (req: Request) => {
       )
     }
 
-    // No students enrolled, safe to delete
-    // First, delete associated courses
+    // Check if forcing deletion on an active classroom with students
+    if (enrollmentCount > 0 && force && existingClassroom.is_active) {
+      throw new Error('No se puede forzar la eliminación de un aula activa. Primero desactívala.')
+    }
+
+    // Safe to delete (no students or forced deletion)
+    console.log(`🗑️ Eliminando aula ${force ? '(FORZADO)' : ''}: ${existingClassroom.name}`)
+    
+    // First, delete associated courses (this will cascade delete enrollments, assignments, etc.)
     if (courses && courses.length > 0) {
       const { error: deleteCoursesError } = await supabaseClient
         .from('courses')
@@ -151,12 +160,16 @@ serve(async (req: Request) => {
       throw deleteError
     }
 
-    console.log('✅ Aula virtual eliminada exitosamente:', existingClassroom.name)
+    const message = force 
+      ? `Aula virtual "${existingClassroom.name}" y todos sus datos eliminados permanentemente`
+      : 'Aula virtual eliminada exitosamente'
+    
+    console.log('✅', message)
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Aula virtual eliminada exitosamente'
+        message
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
