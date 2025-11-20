@@ -211,11 +211,11 @@ const AssignmentDetail = () => {
             .getPublicUrl(newFilePath);
 
           uploadedFiles.push({
-            fileUrl: publicUrl,
-            filePath: newFilePath,
-            fileName: file.name,
-            fileSize: file.size,
-            mimeType: file.type,
+            file_url: publicUrl,
+            file_path: newFilePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
           });
         }
       }
