@@ -112,7 +112,8 @@ export function EditClassroomDialog({
           academic_year: formData.academic_year,
           section: formData.section,
           is_active: formData.is_active,
-          ...(isAdmin && { teacher_id: formData.teacher_id })
+          ...(isAdmin && { teacher_id: formData.teacher_id }),
+          ...(isAdmin && { tutor_id: formData.tutor_id || null })
         }
       });
 

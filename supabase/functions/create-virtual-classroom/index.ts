@@ -53,7 +53,7 @@ serve(async (req: Request) => {
     // Get request body
     const body = await req.json()
     console.log('📥 Request body:', body)
-    const { name, grade, education_level, academic_year, teacher_id, section } = body
+    const { name, grade, education_level, academic_year, teacher_id, tutor_id, section } = body
 
     // Validate required fields
     if (!name || !grade || !education_level || !academic_year || !section) {
@@ -101,6 +101,7 @@ serve(async (req: Request) => {
         academic_year,
         section,
         teacher_id: finalTeacherId,
+        tutor_id: tutor_id || null,
         is_active: true
       })
       .select(`
@@ -110,9 +111,16 @@ serve(async (req: Request) => {
         education_level,
         academic_year,
         teacher_id,
+        tutor_id,
         is_active,
         created_at,
         teacher:profiles!teacher_id(
+          id,
+          first_name,
+          last_name,
+          email
+        ),
+        tutor:profiles!tutor_id(
           id,
           first_name,
           last_name,
