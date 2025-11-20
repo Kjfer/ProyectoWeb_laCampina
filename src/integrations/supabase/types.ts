@@ -110,6 +110,7 @@ export type Database = {
           id: string
           mime_type: string | null
           score: number | null
+          student_files: Json | null
           student_id: string | null
           submitted_at: string | null
         }
@@ -125,6 +126,7 @@ export type Database = {
           id?: string
           mime_type?: string | null
           score?: number | null
+          student_files?: Json | null
           student_id?: string | null
           submitted_at?: string | null
         }
@@ -140,6 +142,7 @@ export type Database = {
           id?: string
           mime_type?: string | null
           score?: number | null
+          student_files?: Json | null
           student_id?: string | null
           submitted_at?: string | null
         }

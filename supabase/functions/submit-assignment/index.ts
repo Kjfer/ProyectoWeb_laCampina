@@ -88,9 +88,17 @@ serve(async (req) => {
       }
     );
 
-    // If multiple files, we'll store the first one in the old fields for backwards compatibility
-    // and all files in a JSON field if needed
+    // Store first file in legacy fields for backwards compatibility
     const firstFile = files && files.length > 0 ? files[0] : null;
+    
+    // Store all files in student_files JSON array
+    const studentFiles = files && files.length > 0 ? files.map((file: any) => ({
+      file_path: file.filePath,
+      file_name: file.fileName,
+      file_size: file.fileSize,
+      mime_type: file.mimeType,
+      file_url: file.fileUrl
+    })) : [];
 
     const { error: submissionError } = await userSupabase
       .from('assignment_submissions')
@@ -102,7 +110,8 @@ serve(async (req) => {
         file_name: firstFile?.fileName,
         file_size: firstFile?.fileSize,
         mime_type: firstFile?.mimeType,
-        file_url: firstFile?.fileUrl
+        file_url: firstFile?.fileUrl,
+        student_files: studentFiles
       });
 
     if (submissionError) {

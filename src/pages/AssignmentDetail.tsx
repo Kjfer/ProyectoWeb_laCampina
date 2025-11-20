@@ -65,6 +65,13 @@ interface Submission {
   submitted_at: string;
   score: number | null;
   feedback: string | null;
+  student_files?: Array<{
+    file_path: string;
+    file_name: string;
+    file_size: number;
+    mime_type: string;
+    file_url: string;
+  }>;
 }
 
 const AssignmentDetail = () => {
@@ -131,7 +138,10 @@ const AssignmentDetail = () => {
         throw submissionError;
       }
 
-      setSubmission(submissionData);
+      setSubmission(submissionData ? {
+        ...submissionData,
+        student_files: Array.isArray(submissionData.student_files) ? submissionData.student_files as any : []
+      } : null);
     } catch (error) {
       console.error('Error fetching assignment details:', error);
       toast({
@@ -525,7 +535,48 @@ const AssignmentDetail = () => {
                 </div>
               )}
 
-              {submission.file_url && submission.file_name && (
+              {/* Mostrar múltiples archivos adjuntos del estudiante */}
+              {submission.student_files && submission.student_files.length > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Archivos adjuntos ({submission.student_files.length})
+                  </p>
+                  <div className="space-y-2">
+                    {submission.student_files.map((file, index) => (
+                      <div key={index} className="p-3 rounded-lg bg-muted/50 border border-border">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {file.file_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {(file.file_size / 1024).toFixed(2)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            asChild
+                            className="flex-shrink-0"
+                          >
+                            <a href={file.file_url} target="_blank" rel="noopener noreferrer">
+                              <Download className="w-4 h-4 mr-2" />
+                              Ver
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Fallback para entregas antiguas con un solo archivo */}
+              {(!submission.student_files || submission.student_files.length === 0) && 
+               submission.file_url && submission.file_name && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Archivo adjunto</p>
                   <Button
