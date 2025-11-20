@@ -35,6 +35,7 @@ interface WeeklyResource {
   assignment_deadline?: string;
   max_score?: number;
   assignment_id?: string;
+  section_id?: string;
   settings?: any;
 }
 
@@ -91,6 +92,69 @@ const formatFileSize = (bytes?: number) => {
 export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetailModalProps) {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
+
+  const handleAssignmentNavigation = async () => {
+    try {
+      let assignmentId = resource.assignment_id;
+      
+      // Si no existe assignment_id, crear el assignment
+      if (!assignmentId && resource.resource_type === 'assignment') {
+        setIsCreatingAssignment(true);
+        
+        // Obtener el course_id de la sección
+        const { data: sectionData, error: sectionError } = await supabase
+          .from('course_weekly_sections')
+          .select('course_id')
+          .eq('id', resource.section_id)
+          .single();
+
+        if (sectionError) throw sectionError;
+
+        // Crear el assignment
+        const { data: newAssignment, error: assignmentError } = await supabase
+          .from('assignments')
+          .insert({
+            title: resource.title,
+            description: resource.description,
+            due_date: resource.assignment_deadline,
+            max_score: resource.max_score || 100,
+            course_id: sectionData.course_id,
+            is_published: resource.is_published
+          })
+          .select()
+          .single();
+
+        if (assignmentError) throw assignmentError;
+
+        // Actualizar el resource con el assignment_id
+        const { error: updateError } = await supabase
+          .from('course_weekly_resources')
+          .update({ assignment_id: newAssignment.id })
+          .eq('id', resource.id);
+
+        if (updateError) throw updateError;
+
+        assignmentId = newAssignment.id;
+        toast.success('Tarea configurada correctamente');
+      }
+
+      onClose();
+      
+      if (assignmentId) {
+        if (profile?.role === 'student') {
+          navigate(`/assignments/${assignmentId}`);
+        } else if (profile?.role === 'teacher' || profile?.role === 'admin') {
+          navigate(`/assignments/${assignmentId}/review`);
+        }
+      }
+    } catch (error) {
+      console.error('Error al navegar a la tarea:', error);
+      toast.error('Error al abrir la tarea');
+    } finally {
+      setIsCreatingAssignment(false);
+    }
+  };
 
   const handleDownload = async () => {
     try {
@@ -263,18 +327,11 @@ export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetai
               <Button 
                 variant="secondary"
                 className="flex-1"
-                onClick={() => {
-                  onClose();
-                  const assignmentId = resource.assignment_id || resource.id;
-                  if (profile?.role === 'student') {
-                    navigate(`/assignments/${assignmentId}`);
-                  } else if (profile?.role === 'teacher' || profile?.role === 'admin') {
-                    navigate(`/assignments/${assignmentId}/review`);
-                  }
-                }}
+                onClick={handleAssignmentNavigation}
+                disabled={isCreatingAssignment}
               >
                 <ClipboardList className="h-4 w-4 mr-2" />
-                {profile?.role === 'student' ? 'Ver/Enviar Tarea' : 'Ver Entregas'}
+                {isCreatingAssignment ? 'Cargando...' : (profile?.role === 'student' ? 'Ver/Enviar Tarea' : 'Ver Entregas')}
               </Button>
             )}
           </div>
