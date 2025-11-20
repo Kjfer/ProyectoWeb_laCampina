@@ -53,11 +53,16 @@ serve(async (req: Request) => {
     // Get request body
     const body = await req.json()
     console.log('📥 Request body:', body)
-    const { name, grade, education_level, academic_year, teacher_id, tutor_id, section } = body
+    const { name, grade, education_level, academic_year, teacher_id, tutor_id, section, start_date, end_date } = body
 
     // Validate required fields
-    if (!name || !grade || !education_level || !academic_year || !section) {
-      throw new Error('Todos los campos son requeridos')
+    if (!name || !grade || !education_level || !academic_year || !section || !start_date || !end_date) {
+      throw new Error('Todos los campos son requeridos, incluyendo fechas de inicio y fin')
+    }
+
+    // Validate dates
+    if (new Date(end_date) <= new Date(start_date)) {
+      throw new Error('La fecha de fin debe ser posterior a la fecha de inicio')
     }
 
     // Validate education_level
@@ -177,6 +182,8 @@ serve(async (req: Request) => {
         classroom_id: newClassroom.id,
         teacher_id: finalTeacherId,
         academic_year: academic_year,
+        start_date: start_date,
+        end_date: end_date,
         is_active: true
       };
     });
@@ -193,6 +200,38 @@ serve(async (req: Request) => {
 
     console.log(`✅ Created ${createdCourses?.length || 0} standard courses for classroom ${newClassroom.id}`);
 
+    // Generate weekly sections for each course automatically
+    let successfulWeekGenerations = 0;
+    if (createdCourses && createdCourses.length > 0) {
+      console.log(`📅 Generating weekly sections for ${createdCourses.length} courses...`);
+      
+      for (const course of createdCourses) {
+        try {
+          const { data: weekData, error: weekError } = await supabaseClient.functions.invoke(
+            'generate-course-weeks',
+            {
+              body: {
+                courseId: course.id,
+                startDate: start_date,
+                endDate: end_date
+              }
+            }
+          );
+
+          if (weekError) {
+            console.error(`❌ Error generating weeks for course ${course.id}:`, weekError);
+          } else {
+            successfulWeekGenerations++;
+            console.log(`✅ Generated weeks for course ${course.id}:`, weekData);
+          }
+        } catch (weekGenError) {
+          console.error(`❌ Exception generating weeks for course ${course.id}:`, weekGenError);
+        }
+      }
+      
+      console.log(`✅ Successfully generated weeks for ${successfulWeekGenerations}/${createdCourses.length} courses`);
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -201,7 +240,7 @@ serve(async (req: Request) => {
           courses_count: createdCourses?.length || 0,
           students_count: 0
         },
-        message: `Aula virtual creada exitosamente con ${createdCourses?.length || 0} cursos`
+        message: `Aula virtual creada exitosamente con ${createdCourses?.length || 0} cursos y ${successfulWeekGenerations} cursos con semanas generadas automáticamente`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

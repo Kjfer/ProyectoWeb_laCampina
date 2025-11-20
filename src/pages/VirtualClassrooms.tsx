@@ -1,19 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Users, BookOpen, Calendar, RefreshCw, Pencil, Trash2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { toast } from 'sonner';
-import { ClassroomCoursesList } from '@/components/virtual-classrooms/ClassroomCoursesList';
-import { EditClassroomDialog } from '@/components/virtual-classrooms/EditClassroomDialog';
-import { DeleteClassroomDialog } from '@/components/virtual-classrooms/DeleteClassroomDialog';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BookOpen, GraduationCap, Users, Plus, Loader2, Trash2, Edit, CalendarIcon, Check, ChevronsUpDown, RefreshCw, Pencil } from "lucide-react";
+import { toast } from "sonner";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/useAuth";
+import { EditClassroomDialog } from "@/components/virtual-classrooms/EditClassroomDialog";
+import { DeleteClassroomDialog } from "@/components/virtual-classrooms/DeleteClassroomDialog";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { ClassroomCoursesList } from "@/components/virtual-classrooms/ClassroomCoursesList";
 
 interface VirtualClassroom {
   id: string;
@@ -58,6 +65,7 @@ interface Tutor {
 
 export default function VirtualClassrooms() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [classrooms, setClassrooms] = useState<VirtualClassroom[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [tutors, setTutors] = useState<Tutor[]>([]);
@@ -76,13 +84,21 @@ export default function VirtualClassrooms() {
     academic_year: new Date().getFullYear().toString(),
     teacher_id: '',
     tutor_id: '',
-    section: ''
+    section: '',
+    start_date: undefined as Date | undefined,
+    end_date: undefined as Date | undefined
   });
+  const [teacherSearch, setTeacherSearch] = useState("");
+  const [tutorSearch, setTutorSearch] = useState("");
+  const [teacherOpen, setTeacherOpen] = useState(false);
+  const [tutorOpen, setTutorOpen] = useState(false);
 
   const grades = {
     primaria: ['1ro', '2do', '3ro', '4to', '5to', '6to'],
     secundaria: ['1ro', '2do', '3ro', '4to', '5to']
   };
+
+  const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
     // Paralelizar la carga de datos
@@ -197,7 +213,7 @@ export default function VirtualClassrooms() {
       setClassrooms(data.data || []);
       setLastFetch(now);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error general cargando aulas virtuales:', error);
       toast.error(`Error al cargar las aulas virtuales: ${error.message}`);
       setClassrooms([]); // Set empty array on error
@@ -208,6 +224,17 @@ export default function VirtualClassrooms() {
 
   const handleCreateClassroom = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate dates
+    if (!formData.start_date || !formData.end_date) {
+      toast.error('Por favor selecciona las fechas de inicio y fin');
+      return;
+    }
+
+    if (formData.end_date <= formData.start_date) {
+      toast.error('La fecha de fin debe ser posterior a la fecha de inicio');
+      return;
+    }
     
     if (!profile || !formData.education_level) {
       toast.error('No se pudo identificar el usuario o falta el nivel educativo');
@@ -234,7 +261,9 @@ export default function VirtualClassrooms() {
           academic_year: formData.academic_year,
           teacher_id: formData.teacher_id || profile.id,
           tutor_id: formData.tutor_id && formData.tutor_id !== "none" ? formData.tutor_id : null,
-          section: formData.section.toUpperCase()
+          section: formData.section.toUpperCase(),
+          start_date: format(formData.start_date, 'yyyy-MM-dd'),
+          end_date: format(formData.end_date, 'yyyy-MM-dd')
         }
       });
 
@@ -258,13 +287,17 @@ export default function VirtualClassrooms() {
         academic_year: new Date().getFullYear().toString(),
         teacher_id: '',
         tutor_id: '',
-        section: ''
+        section: '',
+        start_date: undefined,
+        end_date: undefined
       });
+      setTeacherSearch("");
+      setTutorSearch("");
       
       // Add the new classroom to the existing list to avoid refetching
       setClassrooms(prev => [data.data, ...prev]);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error creando aula virtual:', error);
       toast.error(`Error al crear el aula virtual: ${error.message}`);
     }
@@ -300,138 +333,294 @@ export default function VirtualClassrooms() {
                     Crear Aula Virtual
                   </Button>
                 </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Crear Nueva Aula Virtual</DialogTitle>
                   <DialogDescription>
-                    Complete los datos para crear una nueva aula virtual
+                    Complete los datos para crear una nueva aula virtual con generación automática de semanas
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleCreateClassroom} className="space-y-4">
-                  <div>
-                    <Label htmlFor="name">Nombre del Aula</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Ej: Aula 1ro A"
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="education_level">Nivel Educativo</Label>
-                      <Select 
-                        value={formData.education_level} 
-                        onValueChange={(value: 'primaria' | 'secundaria') => 
-                          setFormData({ ...formData, education_level: value, grade: '' })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar nivel" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="primaria">Primaria</SelectItem>
-                          <SelectItem value="secundaria">Secundaria</SelectItem>
-                        </SelectContent>
-                      </Select>
-                  </div>
-
-                  {formData.education_level && (
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium">Información Básica</h3>
+                    
                     <div>
-                      <Label htmlFor="grade">Grado</Label>
-                      <Select 
-                        value={formData.grade} 
-                        onValueChange={(value) => setFormData({ ...formData, grade: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar grado" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {grades[formData.education_level].map((grade) => (
-                            <SelectItem key={grade} value={grade}>{grade}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="name">Nombre del Aula *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Ej: Aula 1ro A"
+                        required
+                      />
                     </div>
-                  )}
-
-                  <div>
-                    <Label htmlFor="academic_year">Año Académico</Label>
-                    <Input
-                      id="academic_year"
-                      value={formData.academic_year}
-                      onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
-                      placeholder="2024"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="section">Sección</Label>
-                    <Input
-                      id="section"
-                      value={formData.section}
-                      onChange={(e) => {
-                        const value = e.target.value.toUpperCase();
-                        // Solo permitir una letra de A-Z
-                        if (value === '' || /^[A-Z]$/.test(value)) {
-                          setFormData({ ...formData, section: value });
-                        }
-                      }}
-                      placeholder="A"
-                      maxLength={1}
-                      required
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Ingresa una letra de A a Z
-                    </p>
-                  </div>
-
-                  {profile?.role === 'admin' && (
-                    <>
-                      <div>
-                        <Label htmlFor="teacher">Profesor Asignado</Label>
+                    
+                    <div>
+                      <Label htmlFor="education_level">Nivel Educativo *</Label>
                         <Select 
-                          value={formData.teacher_id} 
-                          onValueChange={(value) => setFormData({ ...formData, teacher_id: value })}
+                          value={formData.education_level} 
+                          onValueChange={(value: 'primaria' | 'secundaria') => 
+                            setFormData({ ...formData, education_level: value, grade: '' })
+                          }
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar profesor" />
+                            <SelectValue placeholder="Seleccionar nivel" />
                           </SelectTrigger>
                           <SelectContent>
-                            {teachers.map((teacher) => (
-                              <SelectItem key={teacher.id} value={teacher.id}>
-                                {teacher.first_name} {teacher.last_name} - {teacher.email}
-                              </SelectItem>
+                            <SelectItem value="primaria">Primaria</SelectItem>
+                            <SelectItem value="secundaria">Secundaria</SelectItem>
+                          </SelectContent>
+                        </Select>
+                    </div>
+
+                    {formData.education_level && (
+                      <div>
+                        <Label htmlFor="grade">Grado *</Label>
+                        <Select 
+                          value={formData.grade} 
+                          onValueChange={(value) => setFormData({ ...formData, grade: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar grado" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {grades[formData.education_level].map((grade) => (
+                              <SelectItem key={grade} value={grade}>{grade}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                    )}
+
+                    <div>
+                      <Label htmlFor="section">Sección *</Label>
+                      <Input
+                        id="section"
+                        value={formData.section}
+                        onChange={(e) => {
+                          const value = e.target.value.toUpperCase();
+                          // Solo permitir una letra de A-Z
+                          if (value === '' || /^[A-Z]$/.test(value)) {
+                            setFormData({ ...formData, section: value });
+                          }
+                        }}
+                        placeholder="A"
+                        maxLength={1}
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Ingresa una letra de A a Z
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="academic_year">Año Académico *</Label>
+                      <Input
+                        id="academic_year"
+                        value={formData.academic_year}
+                        onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
+                        placeholder="2024"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {isAdmin && (
+                    <div className="space-y-4 border-t pt-4">
+                      <h3 className="text-sm font-medium">Responsables</h3>
+                      
+                      <div>
+                        <Label htmlFor="teacher">Profesor *</Label>
+                        <Popover open={teacherOpen} onOpenChange={setTeacherOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={teacherOpen}
+                              className="w-full justify-between"
+                            >
+                              {formData.teacher_id
+                                ? teachers.find((teacher) => teacher.id === formData.teacher_id)
+                                    ? `${teachers.find((teacher) => teacher.id === formData.teacher_id)?.first_name} ${teachers.find((teacher) => teacher.id === formData.teacher_id)?.last_name}`
+                                    : "Seleccionar profesor"
+                                : "Seleccionar profesor"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0">
+                            <Command>
+                              <CommandInput 
+                                placeholder="Buscar profesor..." 
+                                value={teacherSearch}
+                                onValueChange={setTeacherSearch}
+                              />
+                              <CommandList>
+                                <CommandEmpty>No se encontraron profesores.</CommandEmpty>
+                                <CommandGroup>
+                                  {teachers.map((teacher) => (
+                                    <CommandItem
+                                      key={teacher.id}
+                                      value={`${teacher.first_name} ${teacher.last_name} ${teacher.email}`}
+                                      onSelect={() => {
+                                        setFormData({ ...formData, teacher_id: teacher.id });
+                                        setTeacherOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          formData.teacher_id === teacher.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="flex flex-col">
+                                        <span>{teacher.first_name} {teacher.last_name}</span>
+                                        <span className="text-xs text-muted-foreground">{teacher.email}</span>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
 
                       <div>
                         <Label htmlFor="tutor">Tutor (Opcional)</Label>
-                        <Select 
-                          value={formData.tutor_id || "none"} 
-                          onValueChange={(value) => setFormData({ ...formData, tutor_id: value === "none" ? "" : value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sin tutor asignado" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sin tutor</SelectItem>
-                            {tutors.map((tutor) => (
-                              <SelectItem key={tutor.id} value={tutor.id}>
-                                {tutor.first_name} {tutor.last_name} - {tutor.email}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover open={tutorOpen} onOpenChange={setTutorOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={tutorOpen}
+                              className="w-full justify-between"
+                            >
+                              {formData.tutor_id
+                                ? tutors.find((tutor) => tutor.id === formData.tutor_id)
+                                    ? `${tutors.find((tutor) => tutor.id === formData.tutor_id)?.first_name} ${tutors.find((tutor) => tutor.id === formData.tutor_id)?.last_name}`
+                                    : "Sin tutor asignado"
+                                : "Sin tutor asignado"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0">
+                            <Command>
+                              <CommandInput 
+                                placeholder="Buscar tutor..." 
+                                value={tutorSearch}
+                                onValueChange={setTutorSearch}
+                              />
+                              <CommandList>
+                                <CommandEmpty>No se encontraron tutores.</CommandEmpty>
+                                <CommandGroup>
+                                  <CommandItem
+                                    value="none"
+                                    onSelect={() => {
+                                      setFormData({ ...formData, tutor_id: "" });
+                                      setTutorOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        !formData.tutor_id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    Sin tutor
+                                  </CommandItem>
+                                  {tutors.map((tutor) => (
+                                    <CommandItem
+                                      key={tutor.id}
+                                      value={`${tutor.first_name} ${tutor.last_name} ${tutor.email}`}
+                                      onSelect={() => {
+                                        setFormData({ ...formData, tutor_id: tutor.id });
+                                        setTutorOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          formData.tutor_id === tutor.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="flex flex-col">
+                                        <span>{tutor.first_name} {tutor.last_name}</span>
+                                        <span className="text-xs text-muted-foreground">{tutor.email}</span>
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
-                    </>
+                    </div>
                   )}
 
-                  <div className="flex justify-end space-x-2">
+                  <div className="space-y-4 border-t pt-4">
+                    <h3 className="text-sm font-medium">Calendario Académico</h3>
+                    
+                    <div>
+                      <Label htmlFor="start_date">Fecha de Inicio *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !formData.start_date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.start_date ? format(formData.start_date, "PPP") : "Seleccionar fecha"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={formData.start_date}
+                            onSelect={(date) => setFormData({ ...formData, start_date: date })}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="end_date">Fecha de Fin *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !formData.end_date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.end_date ? format(formData.end_date, "PPP") : "Seleccionar fecha"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={formData.end_date}
+                            onSelect={(date) => setFormData({ ...formData, end_date: date })}
+                            disabled={(date) => formData.start_date ? date < formData.start_date : false}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Las semanas se generarán automáticamente para todos los cursos
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-2 border-t pt-4">
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -439,7 +628,12 @@ export default function VirtualClassrooms() {
                     >
                       Cancelar
                     </Button>
-                    <Button type="submit">Crear Aula</Button>
+                    <Button 
+                      type="submit"
+                      disabled={!formData.name || !formData.education_level || !formData.grade || !formData.section || !formData.start_date || !formData.end_date}
+                    >
+                      Crear Aula Virtual
+                    </Button>
                   </div>
                 </form>
               </DialogContent>
@@ -464,135 +658,131 @@ export default function VirtualClassrooms() {
                 </CardContent>
               </Card>
             ))
+          ) : classrooms.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <p className="text-muted-foreground">No hay aulas virtuales disponibles</p>
+            </div>
           ) : (
             classrooms.map((classroom) => (
-              <Card key={classroom.id} className="hover:shadow-md transition-shadow">
+              <Card key={classroom.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{classroom.name}</CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={classroom.is_active ? "default" : "secondary"}>
-                        {classroom.is_active ? "Activo" : "Inactivo"}
-                      </Badge>
-                      {(profile?.role === 'admin' || profile?.role === 'teacher') && (
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingClassroom(classroom);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeletingClassroom(classroom);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <GraduationCap className="h-5 w-5" />
+                        {classroom.name}
+                      </CardTitle>
+                      <CardDescription>
+                        {classroom.education_level === 'primaria' ? 'Primaria' : 'Secundaria'} - {classroom.grade}{classroom.section}
+                      </CardDescription>
                     </div>
+                    <Badge variant={classroom.is_active ? "default" : "secondary"}>
+                      {classroom.is_active ? "Activo" : "Inactivo"}
+                    </Badge>
                   </div>
-                  <CardDescription>
-                    {classroom.grade} {classroom.section} - {classroom.education_level.charAt(0).toUpperCase() + classroom.education_level.slice(1)}
-                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    Año {classroom.academic_year}
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Año Académico:</span>
+                    <span className="font-medium">{classroom.academic_year}</span>
                   </div>
                   
-                  <div className="flex items-center justify-between">
+                  {classroom.teacher && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Profesor:</span>
+                      <span className="font-medium">{classroom.teacher.first_name} {classroom.teacher.last_name}</span>
+                    </div>
+                  )}
+                  
+                  {classroom.tutor && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Tutor:</span>
+                      <span className="font-medium">{classroom.tutor.first_name} {classroom.tutor.last_name}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-4 pt-2 border-t">
                     <div className="flex items-center gap-2 text-sm">
-                      <BookOpen className="h-4 w-4" />
-                      {classroom.courses_count} cursos
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                      <span>{classroom.courses_count || 0} cursos</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4" />
-                      {classroom.students_count} estudiantes
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span>{classroom.students_count || 0} estudiantes</span>
                     </div>
                   </div>
-
-                  {classroom.teacher && (
-                    <div className="text-sm text-muted-foreground">
-                      Profesor: {classroom.teacher.first_name} {classroom.teacher.last_name}
-                    </div>
-                  )}
-
-                  {classroom.tutor && (
-                    <div className="text-sm text-muted-foreground">
-                      Tutor: {classroom.tutor.first_name} {classroom.tutor.last_name}
-                    </div>
-                  )}
-
+                </CardContent>
+                <CardFooter className="flex gap-2">
                   {profile?.role === 'student' ? (
                     <Button 
                       variant="outline" 
-                      className="w-full"
-                      onClick={() => window.location.href = `/virtual-classrooms/${classroom.id}/courses`}
+                      className="flex-1"
+                      onClick={() => navigate(`/virtual-classrooms/${classroom.id}/courses`)}
                     >
                       Ver Cursos
                     </Button>
                   ) : (
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => window.location.href = `/virtual-classrooms/${classroom.id}`}
-                    >
-                      Ver Detalles
-                    </Button>
+                    <>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => navigate(`/virtual-classrooms/${classroom.id}`)}
+                      >
+                        Ver Detalles
+                      </Button>
+                      {(profile?.role === 'admin' || profile?.role === 'teacher') && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingClassroom(classroom)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingClassroom(classroom)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </>
                   )}
-                </CardContent>
+                </CardFooter>
               </Card>
             ))
           )}
         </div>
-
-        {!loading && classrooms.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No hay aulas virtuales</h3>
-              <p className="text-muted-foreground text-center mb-4">
-                Comienza creando tu primera aula virtual para organizar tus cursos
-              </p>
-              {(profile?.role === 'admin' || profile?.role === 'teacher') && (
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Crear Primera Aula
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
       </div>
 
-      <EditClassroomDialog
-        classroom={editingClassroom}
-        open={!!editingClassroom}
-        onOpenChange={(open) => !open && setEditingClassroom(null)}
-        onSuccess={() => fetchClassrooms(true)}
-        teachers={teachers}
-        tutors={tutors}
-        isAdmin={profile?.role === 'admin'}
-      />
+      {editingClassroom && (
+        <EditClassroomDialog
+          classroom={editingClassroom}
+          teachers={teachers}
+          tutors={tutors}
+          open={!!editingClassroom}
+          onOpenChange={(open) => !open && setEditingClassroom(null)}
+          onSuccess={() => {
+            setEditingClassroom(null);
+            fetchClassrooms(true);
+          }}
+          isAdmin={isAdmin}
+        />
+      )}
 
-      <DeleteClassroomDialog
-        classroom={deletingClassroom}
-        open={!!deletingClassroom}
-        onOpenChange={(open) => !open && setDeletingClassroom(null)}
-        onSuccess={() => fetchClassrooms(true)}
-      />
+      {deletingClassroom && (
+        <DeleteClassroomDialog
+          classroom={deletingClassroom}
+          open={!!deletingClassroom}
+          onOpenChange={(open) => !open && setDeletingClassroom(null)}
+          onSuccess={() => {
+            setDeletingClassroom(null);
+            fetchClassrooms(true);
+          }}
+        />
+      )}
     </DashboardLayout>
-  )
-};
+  );
+}
