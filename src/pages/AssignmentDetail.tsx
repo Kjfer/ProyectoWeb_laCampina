@@ -89,6 +89,7 @@ const AssignmentDetail = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isEditingSubmission, setIsEditingSubmission] = useState(false);
 
   useEffect(() => {
     fetchAssignmentDetails();
@@ -210,27 +211,47 @@ const AssignmentDetail = () => {
         }
       }
 
-      // Call the edge function to create submission
-      const { error } = await supabase.functions.invoke('submit-assignment', {
-        body: {
-          assignmentTitle: assignment?.title,
-          courseId: assignment?.course_id,
-          content: content.trim(),
-          files: uploadedFiles,
-        },
-      });
+      if (isEditingSubmission && submission) {
+        // Update existing submission
+        const { error } = await supabase
+          .from('assignment_submissions')
+          .update({
+            content: content.trim(),
+            student_files: uploadedFiles.length > 0 ? uploadedFiles : submission.student_files,
+            submitted_at: new Date().toISOString(),
+          })
+          .eq('id', submission.id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: "¡Tarea entregada!",
-        description: "Tu tarea ha sido enviada correctamente",
-      });
+        toast({
+          title: "¡Entrega actualizada!",
+          description: "Tu tarea ha sido actualizada correctamente",
+        });
+      } else {
+        // Call the edge function to create new submission
+        const { error } = await supabase.functions.invoke('submit-assignment', {
+          body: {
+            assignmentTitle: assignment?.title,
+            courseId: assignment?.course_id,
+            content: content.trim(),
+            files: uploadedFiles,
+          },
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "¡Tarea entregada!",
+          description: "Tu tarea ha sido enviada correctamente",
+        });
+      }
 
       // Refresh to show submission
       fetchAssignmentDetails();
       setContent('');
       setSelectedFiles([]);
+      setIsEditingSubmission(false);
     } catch (error: any) {
       console.error('Error submitting assignment:', error);
       toast({
@@ -241,6 +262,19 @@ const AssignmentDetail = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleEditSubmission = () => {
+    if (!submission) return;
+    setContent(submission.content || '');
+    setSelectedFiles([]);
+    setIsEditingSubmission(true);
+  };
+
+  const handleCancelEdit = () => {
+    setContent('');
+    setSelectedFiles([]);
+    setIsEditingSubmission(false);
   };
 
   const handleDelete = async () => {
@@ -322,8 +356,9 @@ const AssignmentDetail = () => {
   };
 
   const isOverdue = assignment ? isAfter(new Date(), new Date(assignment.due_date)) : false;
-  const canSubmit = !submission && !isOverdue;
+  const canSubmit = (!submission && !isOverdue) || isEditingSubmission;
   const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin';
+  const canEditSubmission = submission && submission.score === null && !isOverdue;
 
   if (loading) {
     return (
@@ -510,13 +545,25 @@ const AssignmentDetail = () => {
         </Card>
 
         {/* Submission Status */}
-        {submission && (
+        {submission && !isEditingSubmission && (
           <Card className="bg-gradient-card shadow-card border-0">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-green-500" />
-                Tu Entrega
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  Tu Entrega
+                </CardTitle>
+                {canEditSubmission && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEditSubmission}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Editar Entrega
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -635,7 +682,9 @@ const AssignmentDetail = () => {
         {canSubmit && (
           <Card className="bg-gradient-card shadow-card border-0">
             <CardHeader>
-              <CardTitle>Entregar Tarea</CardTitle>
+              <CardTitle>
+                {isEditingSubmission ? 'Editar Entrega' : 'Entregar Tarea'}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -700,18 +749,18 @@ const AssignmentDetail = () => {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Enviando...
+                      {isEditingSubmission ? 'Actualizando...' : 'Enviando...'}
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Entregar Tarea
+                      {isEditingSubmission ? 'Actualizar Entrega' : 'Entregar Tarea'}
                     </>
                   )}
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => navigate('/assignments')}
+                  onClick={isEditingSubmission ? handleCancelEdit : () => navigate('/assignments')}
                 >
                   Cancelar
                 </Button>
