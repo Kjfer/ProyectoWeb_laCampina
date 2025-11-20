@@ -62,6 +62,7 @@ interface Submission {
   content: string;
   file_url: string | null;
   file_name: string | null;
+  file_path: string | null;
   submitted_at: string;
   score: number | null;
   feedback: string | null;
@@ -392,6 +393,43 @@ const AssignmentDetail = () => {
     }
   };
 
+  const handleDownloadStudentFile = async (filePath: string, fileName: string) => {
+    setIsDownloading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('download-file', {
+        body: {
+          bucket: 'student-submissions',
+          filePath: filePath,
+          fileName: fileName
+        }
+      });
+
+      if (error) throw error;
+
+      // Download the file using the signed URL
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = data.fileName || fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Descarga iniciada",
+        description: "El archivo se está descargando",
+      });
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el archivo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const getLetterGrade = (score: number | null, maxScore: number): string => {
     if (!score) return '';
     const percentage = (score / maxScore) * 100;
@@ -652,13 +690,12 @@ const AssignmentDetail = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            asChild
+                            onClick={() => handleDownloadStudentFile(file.file_path, file.file_name)}
+                            disabled={isDownloading}
                             className="flex-shrink-0"
                           >
-                            <a href={file.file_url} target="_blank" rel="noopener noreferrer">
-                              <Download className="w-4 h-4 mr-2" />
-                              Ver
-                            </a>
+                            <Download className="w-4 h-4 mr-2" />
+                            {isDownloading ? 'Descargando...' : 'Descargar'}
                           </Button>
                         </div>
                       </div>
@@ -669,19 +706,26 @@ const AssignmentDetail = () => {
               
               {/* Fallback para entregas antiguas con un solo archivo */}
               {(!submission.student_files || submission.student_files.length === 0) && 
-               submission.file_url && submission.file_name && (
+               submission.file_url && submission.file_name && submission.file_path && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Archivo adjunto</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                  >
-                    <a href={submission.file_url} target="_blank" rel="noopener noreferrer">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {submission.file_name}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadStudentFile(submission.file_path!, submission.file_name!)}
+                      disabled={isDownloading}
+                    >
                       <Download className="w-4 h-4 mr-2" />
-                      {submission.file_name}
-                    </a>
-                  </Button>
+                      {isDownloading ? 'Descargando...' : 'Descargar'}
+                    </Button>
+                  </div>
                 </div>
               )}
 
