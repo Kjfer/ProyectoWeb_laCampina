@@ -9,6 +9,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 
+interface DaySchedule {
+  day: string;
+  start_time: string;
+  end_time: string;
+  enabled: boolean;
+}
+
 interface CourseScheduleManagerProps {
   courseId: string;
   canEdit: boolean;
@@ -29,9 +36,14 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
   
   // Solo los administradores pueden editar el horario
   const canEdit = profile?.role === 'admin';
-  const [scheduleDays, setScheduleDays] = useState<string[]>([]);
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  const [daySchedules, setDaySchedules] = useState<DaySchedule[]>(
+    WEEKDAYS.map(day => ({
+      day: day.value,
+      start_time: '',
+      end_time: '',
+      enabled: false,
+    }))
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -44,16 +56,26 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
       setLoading(true);
       const { data, error } = await supabase
         .from('courses')
-        .select('schedule_days, start_time, end_time')
+        .select('schedule')
         .eq('id', courseId)
         .single();
 
       if (error) throw error;
 
-      if (data) {
-        setScheduleDays(data.schedule_days || []);
-        setStartTime(data.start_time || '');
-        setEndTime(data.end_time || '');
+      if (data?.schedule && Array.isArray(data.schedule)) {
+        // Map the schedule from DB to our DaySchedule format
+        const scheduleMap = new Map(
+          data.schedule.map((s: any) => [s.day, { start_time: s.start_time, end_time: s.end_time }])
+        );
+        
+        setDaySchedules(
+          WEEKDAYS.map(day => ({
+            day: day.value,
+            start_time: scheduleMap.get(day.value)?.start_time || '',
+            end_time: scheduleMap.get(day.value)?.end_time || '',
+            enabled: scheduleMap.has(day.value),
+          }))
+        );
       }
     } catch (error) {
       console.error('Error fetching schedule:', error);
@@ -64,10 +86,18 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
   };
 
   const handleDayToggle = (day: string) => {
-    setScheduleDays(prev =>
-      prev.includes(day)
-        ? prev.filter(d => d !== day)
-        : [...prev, day]
+    setDaySchedules(prev =>
+      prev.map(d =>
+        d.day === day ? { ...d, enabled: !d.enabled } : d
+      )
+    );
+  };
+
+  const handleTimeChange = (day: string, field: 'start_time' | 'end_time', value: string) => {
+    setDaySchedules(prev =>
+      prev.map(d =>
+        d.day === day ? { ...d, [field]: value } : d
+      )
     );
   };
 
@@ -75,22 +105,41 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
     try {
       setSaving(true);
 
-      if (scheduleDays.length === 0) {
-        toast.error('Debe seleccionar al menos un día');
+      // Get only enabled days
+      const enabledSchedules = daySchedules.filter(d => d.enabled);
+
+      if (enabledSchedules.length === 0) {
+        toast.error('Debe habilitar al menos un día');
         return;
       }
 
-      if (!startTime || !endTime) {
-        toast.error('Debe especificar hora de inicio y fin');
-        return;
+      // Validate that all enabled days have start and end times
+      for (const schedule of enabledSchedules) {
+        if (!schedule.start_time || !schedule.end_time) {
+          const dayLabel = WEEKDAYS.find(w => w.value === schedule.day)?.label;
+          toast.error(`Debe especificar horario completo para ${dayLabel}`);
+          return;
+        }
+        
+        // Validate that end time is after start time
+        if (schedule.end_time <= schedule.start_time) {
+          const dayLabel = WEEKDAYS.find(w => w.value === schedule.day)?.label;
+          toast.error(`La hora de fin debe ser posterior a la hora de inicio para ${dayLabel}`);
+          return;
+        }
       }
+
+      // Build the schedule array in the format expected by the DB
+      const scheduleArray = enabledSchedules.map(s => ({
+        day: s.day,
+        start_time: s.start_time,
+        end_time: s.end_time,
+      }));
 
       const { error } = await supabase
         .from('courses')
         .update({
-          schedule_days: scheduleDays,
-          start_time: startTime,
-          end_time: endTime,
+          schedule: scheduleArray,
         })
         .eq('id', courseId);
 
@@ -122,49 +171,65 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         <div className="space-y-3">
-          <Label>Días de clase</Label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {WEEKDAYS.map(day => (
-              <div key={day.value} className="flex items-center space-x-2">
-                <Checkbox
-                  id={day.value}
-                  checked={scheduleDays.includes(day.value)}
-                  onCheckedChange={() => handleDayToggle(day.value)}
-                  disabled={!canEdit}
-                />
-                <label
-                  htmlFor={day.value}
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+          <Label>Horario por día</Label>
+          <div className="space-y-2">
+            {WEEKDAYS.map((day) => {
+              const schedule = daySchedules.find(d => d.day === day.value);
+              if (!schedule) return null;
+              
+              return (
+                <div
+                  key={day.value}
+                  className="border rounded-lg p-4 space-y-3 bg-card"
                 >
-                  {day.label}
-                </label>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="start-time">Hora de inicio</Label>
-            <Input
-              id="start-time"
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              disabled={!canEdit}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="end-time">Hora de fin</Label>
-            <Input
-              id="end-time"
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-              disabled={!canEdit}
-            />
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`checkbox-${day.value}`}
+                      checked={schedule.enabled}
+                      onCheckedChange={() => handleDayToggle(day.value)}
+                      disabled={!canEdit}
+                    />
+                    <label
+                      htmlFor={`checkbox-${day.value}`}
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      {day.label}
+                    </label>
+                  </div>
+                  
+                  {schedule.enabled && (
+                    <div className="grid grid-cols-2 gap-3 ml-6">
+                      <div className="space-y-1">
+                        <Label htmlFor={`start-${day.value}`} className="text-xs text-muted-foreground">
+                          Hora de inicio
+                        </Label>
+                        <Input
+                          id={`start-${day.value}`}
+                          type="time"
+                          value={schedule.start_time}
+                          onChange={(e) => handleTimeChange(day.value, 'start_time', e.target.value)}
+                          disabled={!canEdit}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor={`end-${day.value}`} className="text-xs text-muted-foreground">
+                          Hora de fin
+                        </Label>
+                        <Input
+                          id={`end-${day.value}`}
+                          type="time"
+                          value={schedule.end_time}
+                          onChange={(e) => handleTimeChange(day.value, 'end_time', e.target.value)}
+                          disabled={!canEdit}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 

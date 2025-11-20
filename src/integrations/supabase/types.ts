@@ -696,13 +696,11 @@ export type Database = {
           created_at: string | null
           description: string | null
           end_date: string | null
-          end_time: string | null
           id: string
           is_active: boolean | null
           name: string
-          schedule_days: string[] | null
+          schedule: Json | null
           start_date: string | null
-          start_time: string | null
           teacher_id: string
           updated_at: string | null
         }
@@ -713,13 +711,11 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           end_date?: string | null
-          end_time?: string | null
           id?: string
           is_active?: boolean | null
           name: string
-          schedule_days?: string[] | null
+          schedule?: Json | null
           start_date?: string | null
-          start_time?: string | null
           teacher_id: string
           updated_at?: string | null
         }
@@ -730,13 +726,11 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           end_date?: string | null
-          end_time?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
-          schedule_days?: string[] | null
+          schedule?: Json | null
           start_date?: string | null
-          start_time?: string | null
           teacher_id?: string
           updated_at?: string | null
         }

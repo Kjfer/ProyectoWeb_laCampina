@@ -35,11 +35,11 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
   const [attendance, setAttendance] = useState<Record<string, AttendanceRecord>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [courseSchedule, setCourseSchedule] = useState<{
-    schedule_days: string[];
+  const [courseSchedule, setCourseSchedule] = useState<Array<{
+    day: string;
     start_time: string;
     end_time: string;
-  } | null>(null);
+  }> | null>(null);
   const [isWithinSchedule, setIsWithinSchedule] = useState(false);
 
   useEffect(() => {
@@ -63,19 +63,25 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
     try {
       const { data, error } = await supabase
         .from('courses')
-        .select('schedule_days, start_time, end_time')
+        .select('schedule')
         .eq('id', courseId)
         .single();
 
       if (error) throw error;
-      setCourseSchedule(data);
+      
+      // Parse schedule from Json type to our expected format
+      if (data?.schedule && Array.isArray(data.schedule)) {
+        setCourseSchedule(data.schedule as Array<{ day: string; start_time: string; end_time: string; }>);
+      } else {
+        setCourseSchedule(null);
+      }
     } catch (error) {
       console.error('Error fetching course schedule:', error);
     }
   };
 
   const checkSchedule = () => {
-    if (!courseSchedule) return;
+    if (!courseSchedule || courseSchedule.length === 0) return;
 
     const now = new Date();
     const currentDay = now.toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase();
@@ -92,11 +98,18 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
     };
 
     const englishDay = dayMap[currentDay];
-    const isDayMatch = courseSchedule.schedule_days?.includes(englishDay);
-    const isTimeMatch = courseSchedule.start_time && courseSchedule.end_time &&
-      currentTime >= courseSchedule.start_time && currentTime <= courseSchedule.end_time;
+    
+    // Find the schedule for the current day
+    const todaySchedule = courseSchedule.find(s => s.day === englishDay);
+    
+    if (!todaySchedule) {
+      setIsWithinSchedule(false);
+      return;
+    }
 
-    setIsWithinSchedule(isDayMatch && isTimeMatch);
+    // Check if current time is within the schedule
+    const isTimeMatch = currentTime >= todaySchedule.start_time && currentTime <= todaySchedule.end_time;
+    setIsWithinSchedule(isTimeMatch);
   };
 
   const fetchStudents = async () => {
@@ -257,7 +270,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {!isWithinSchedule && courseSchedule && (
+        {!isWithinSchedule && courseSchedule && courseSchedule.length > 0 && (
           <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
               <Clock className="h-5 w-5" />
@@ -265,7 +278,9 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
                 <p className="font-medium">Fuera del horario de clase</p>
                 <p className="text-sm text-yellow-700 dark:text-yellow-300">
                   El registro de asistencia está disponible durante el horario del curso:
-                  {courseSchedule.schedule_days?.map(day => {
+                </p>
+                <ul className="mt-2 text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+                  {courseSchedule.map(schedule => {
                     const dayNames: Record<string, string> = {
                       'monday': 'Lunes',
                       'tuesday': 'Martes',
@@ -275,9 +290,13 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
                       'saturday': 'Sábado',
                       'sunday': 'Domingo'
                     };
-                    return dayNames[day];
-                  }).join(', ')} de {courseSchedule.start_time} a {courseSchedule.end_time}
-                </p>
+                    return (
+                      <li key={schedule.day}>
+                        • {dayNames[schedule.day]}: {schedule.start_time} - {schedule.end_time}
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             </div>
           </div>

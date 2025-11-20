@@ -95,7 +95,8 @@ serve(async (req: Request) => {
       teacher_id, 
       classroom_id,
       start_date,
-      end_date
+      end_date,
+      schedule
     } = body
 
     // Validar campos requeridos
@@ -219,6 +220,7 @@ serve(async (req: Request) => {
       classroom_id: classroom_id,
       start_date: courseStartDate,
       end_date: courseEndDate,
+      schedule: schedule || null,
       is_active: true
     }
 
