@@ -184,6 +184,7 @@ serve(async (req: Request) => {
         academic_year: academic_year,
         start_date: start_date,
         end_date: end_date,
+        schedule: null, // No default schedule - teachers will configure individually
         is_active: true
       };
     });

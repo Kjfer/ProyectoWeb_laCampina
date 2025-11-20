@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { X, Plus, UserCheck } from 'lucide-react';
+import { X, UserCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface Teacher {
@@ -35,10 +35,7 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
     academic_year: '',
     teacher_id: '',
     start_date: '',
-    end_date: '',
-    schedule_days: [] as string[],
-    start_time: '',
-    end_time: ''
+    end_date: ''
   });
 
   useEffect(() => {
@@ -66,10 +63,7 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
         academic_year: data.academic_year || '',
         teacher_id: data.teacher_id || '',
         start_date: data.start_date || '',
-        end_date: data.end_date || '',
-        schedule_days: data.schedule_days || [],
-        start_time: data.start_time || '',
-        end_time: data.end_time || ''
+        end_date: data.end_date || ''
       });
     } catch (error) {
       console.error('Error fetching course:', error);
@@ -171,10 +165,7 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
           academic_year: formData.academic_year,
           teacher_id: formData.teacher_id,
           start_date: formData.start_date || null,
-          end_date: formData.end_date || null,
-          schedule_days: formData.schedule_days,
-          start_time: formData.start_time || null,
-          end_time: formData.end_time || null
+          end_date: formData.end_date || null
         })
         .eq('id', courseId);
 
@@ -189,25 +180,6 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
     } finally {
       setLoading(false);
     }
-  };
-
-  const daysOfWeek = [
-    { value: 'monday', label: 'Lunes' },
-    { value: 'tuesday', label: 'Martes' },
-    { value: 'wednesday', label: 'Miércoles' },
-    { value: 'thursday', label: 'Jueves' },
-    { value: 'friday', label: 'Viernes' },
-    { value: 'saturday', label: 'Sábado' },
-    { value: 'sunday', label: 'Domingo' }
-  ];
-
-  const toggleDay = (day: string) => {
-    setFormData(prev => ({
-      ...prev,
-      schedule_days: prev.schedule_days.includes(day)
-        ? prev.schedule_days.filter(d => d !== day)
-        : [...prev.schedule_days, day]
-    }));
   };
 
   return (
@@ -347,43 +319,11 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
             )}
           </div>
 
-          {/* Schedule */}
-          <div className="space-y-3">
-            <Label>Días de Clase</Label>
-            <div className="flex flex-wrap gap-2">
-              {daysOfWeek.map((day) => (
-                <Badge
-                  key={day.value}
-                  variant={formData.schedule_days.includes(day.value) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => toggleDay(day.value)}
-                >
-                  {day.label}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start_time">Hora de Inicio</Label>
-              <Input
-                id="start_time"
-                type="time"
-                value={formData.start_time}
-                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="end_time">Hora de Fin</Label>
-              <Input
-                id="end_time"
-                type="time"
-                value={formData.end_time}
-                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-              />
-            </div>
+          {/* Note about schedule management */}
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              <strong>Nota:</strong> El horario del curso (días y horas) se gestiona desde la sección "Horario del Curso" en la página del curso.
+            </p>
           </div>
 
           {/* Actions */}
