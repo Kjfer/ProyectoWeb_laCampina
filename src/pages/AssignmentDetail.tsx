@@ -49,6 +49,9 @@ interface Assignment {
     name: string;
     code: string;
   };
+  teacher_file_path?: string;
+  teacher_file_name?: string;
+  teacher_file_size?: number;
 }
 
 interface Submission {
@@ -75,6 +78,7 @@ const AssignmentDetail = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     fetchAssignmentDetails();
@@ -99,7 +103,20 @@ const AssignmentDetail = () => {
         .single();
 
       if (assignmentError) throw assignmentError;
-      setAssignment(assignmentData);
+
+      // Fetch teacher's file if this assignment is linked to a course_weekly_resource
+      const { data: resourceData } = await supabase
+        .from('course_weekly_resources')
+        .select('file_path, file_size, title')
+        .eq('assignment_id', id)
+        .maybeSingle();
+
+      setAssignment({
+        ...assignmentData,
+        teacher_file_path: resourceData?.file_path,
+        teacher_file_name: resourceData?.title,
+        teacher_file_size: resourceData?.file_size
+      });
 
       // Fetch student's submission if exists
       const { data: submissionData, error: submissionError } = await supabase
@@ -234,6 +251,45 @@ const AssignmentDetail = () => {
     } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
+    }
+  };
+
+  const handleDownloadTeacherFile = async () => {
+    if (!assignment?.teacher_file_path) return;
+
+    setIsDownloading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('download-file', {
+        body: {
+          bucket: 'course-documents',
+          filePath: assignment.teacher_file_path,
+          fileName: assignment.teacher_file_name || 'archivo'
+        }
+      });
+
+      if (error) throw error;
+
+      // Download the file using the signed URL
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = data.fileName || assignment.teacher_file_name || 'archivo';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Descarga iniciada",
+        description: "El archivo se está descargando",
+      });
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el archivo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -376,6 +432,43 @@ const AssignmentDetail = () => {
                 </div>
               </div>
             </div>
+
+            {/* Archivo adjunto del profesor */}
+            {assignment.teacher_file_path && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Archivo de instrucciones del profesor</h3>
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {assignment.teacher_file_name || 'Archivo adjunto'}
+                          </p>
+                          {assignment.teacher_file_size && (
+                            <p className="text-xs text-muted-foreground">
+                              {(assignment.teacher_file_size / 1024).toFixed(2)} KB
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDownloadTeacherFile}
+                        disabled={isDownloading}
+                        className="flex-shrink-0"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        {isDownloading ? 'Descargando...' : 'Descargar'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             {isOverdue && !submission && (
               <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
