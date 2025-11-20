@@ -1507,6 +1507,10 @@ export type Database = {
         Args: { _classroom_id: string; _user_id: string }
         Returns: boolean
       }
+      is_tutor_of_classroom_simple: {
+        Args: { _classroom_id: string }
+        Returns: boolean
+      }
       is_tutor_of_student: {
         Args: { _student_profile_id: string; _tutor_user_id: string }
         Returns: boolean
