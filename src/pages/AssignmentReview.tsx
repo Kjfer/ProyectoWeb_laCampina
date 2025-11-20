@@ -500,25 +500,32 @@ const AssignmentReview = () => {
                     <div>
                       <Label className="text-base font-semibold">Archivos adjuntos del estudiante</Label>
                       <div className="mt-2 space-y-2">
-                        {selectedSubmission.student_files.map((file, index) => (
-                          <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-                            <FileText className="w-5 h-5 text-muted-foreground" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{file.file_name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {file.file_size ? (file.file_size / 1024).toFixed(2) : '0.00'} KB
-                              </p>
+                        {selectedSubmission.student_files.map((file: any, index: number) => {
+                          // Normalizar datos - soportar tanto camelCase como snake_case
+                          const filePath = file.file_path || file.filePath;
+                          const fileName = file.file_name || file.fileName;
+                          const fileSize = file.file_size || file.fileSize;
+                          
+                          return (
+                            <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
+                              <FileText className="w-5 h-5 text-muted-foreground" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{fileName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {fileSize ? (fileSize / 1024).toFixed(2) : '0.00'} KB
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadFile(filePath, fileName)}
+                              >
+                                <Download className="w-4 h-4 mr-1" />
+                                Descargar
+                              </Button>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDownloadFile(file.file_path, file.file_name)}
-                            >
-                              <Download className="w-4 h-4 mr-1" />
-                              Descargar
-                            </Button>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
