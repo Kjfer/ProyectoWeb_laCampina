@@ -529,6 +529,12 @@ export default function VirtualClassrooms() {
                     </div>
                   )}
 
+                  {classroom.tutor && (
+                    <div className="text-sm text-muted-foreground">
+                      Tutor: {classroom.tutor.first_name} {classroom.tutor.last_name}
+                    </div>
+                  )}
+
                   {profile?.role === 'student' ? (
                     <Button 
                       variant="outline" 
