@@ -211,6 +211,11 @@ const ExamTaking = () => {
         };
       });
 
+      // Convertir puntaje numérico a letra
+      const finalLetterGrade = totalScore >= 18 ? 'AD' : 
+                                totalScore >= 15 ? 'A' : 
+                                totalScore >= 12 ? 'B' : 'C';
+
       // Submit to database
       const { error } = await supabase
         .from('quiz_submissions')
@@ -218,7 +223,7 @@ const ExamTaking = () => {
           quiz_id: exam.quiz_id,
           student_id: profile.id,
           answers: answersData,
-          score: totalScore,
+          score: finalLetterGrade,  // Guardar como letra
           attempt_number: 1
         });
 

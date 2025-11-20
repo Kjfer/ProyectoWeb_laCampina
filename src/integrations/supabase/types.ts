@@ -109,7 +109,7 @@ export type Database = {
           graded_at: string | null
           id: string
           mime_type: string | null
-          score: number | null
+          score: string | null
           student_files: Json | null
           student_id: string | null
           submitted_at: string | null
@@ -125,7 +125,7 @@ export type Database = {
           graded_at?: string | null
           id?: string
           mime_type?: string | null
-          score?: number | null
+          score?: string | null
           student_files?: Json | null
           student_id?: string | null
           submitted_at?: string | null
@@ -141,7 +141,7 @@ export type Database = {
           graded_at?: string | null
           id?: string
           mime_type?: string | null
-          score?: number | null
+          score?: string | null
           student_files?: Json | null
           student_id?: string | null
           submitted_at?: string | null
@@ -1076,7 +1076,7 @@ export type Database = {
           attempt_number: number | null
           id: string
           quiz_id: string
-          score: number | null
+          score: string | null
           student_id: string
           submitted_at: string | null
         }
@@ -1085,7 +1085,7 @@ export type Database = {
           attempt_number?: number | null
           id?: string
           quiz_id: string
-          score?: number | null
+          score?: string | null
           student_id: string
           submitted_at?: string | null
         }
@@ -1094,7 +1094,7 @@ export type Database = {
           attempt_number?: number | null
           id?: string
           quiz_id?: string
-          score?: number | null
+          score?: string | null
           student_id?: string
           submitted_at?: string | null
         }

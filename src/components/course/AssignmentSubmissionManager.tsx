@@ -20,20 +20,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
-const GRADE_VALUES = {
-  'AD': 20,
-  'A': 17,
-  'B': 14,
-  'C': 11
-} as const;
-
-const getLetterGrade = (score: number | null): string => {
-  if (score === null) return '';
-  if (score >= 18) return 'AD';
-  if (score >= 15) return 'A';
-  if (score >= 12) return 'B';
-  return 'C';
-};
+// Las calificaciones ahora se almacenan como letras en la base de datos
+const VALID_GRADES = ['AD', 'A', 'B', 'C'] as const;
+type Grade = typeof VALID_GRADES[number];
 
 interface AssignmentSubmission {
   id: string;
@@ -41,7 +30,7 @@ interface AssignmentSubmission {
   file_path?: string;
   file_name?: string;
   file_size?: number;
-  score?: number;
+  score?: string;  // Ahora es texto (AD, A, B, C)
   feedback?: string;
   submitted_at: string;
   graded_at?: string;
@@ -159,13 +148,11 @@ export function AssignmentSubmissionManager({
       return;
     }
 
-    const numericScore = GRADE_VALUES[values.score as keyof typeof GRADE_VALUES];
-
     try {
       const { error } = await supabase
         .from('assignment_submissions')
         .update({
-          score: numericScore,
+          score: values.score,  // Guardar directamente la letra
           feedback: values.feedback.trim() || null,
           graded_at: new Date().toISOString()
         })
@@ -286,7 +273,7 @@ export function AssignmentSubmissionManager({
                       <div className="flex items-center gap-2 mb-2">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <span className="font-medium text-green-800">
-                          Calificación: {getLetterGrade(submission.score)}
+                          Calificación: {submission.score}
                         </span>
                       </div>
                       {submission.feedback && (
@@ -373,7 +360,7 @@ export function AssignmentSubmissionManager({
                           setGradeValues(prev => ({
                             ...prev,
                             [submission.id]: {
-                              score: submission.score ? getLetterGrade(submission.score) : '',
+                              score: submission.score || '',  // Score ya es letra
                               feedback: submission.feedback || ''
                             }
                           }));

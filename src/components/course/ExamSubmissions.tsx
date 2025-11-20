@@ -25,7 +25,7 @@ interface ExamSubmissionsProps {
 interface Submission {
   id: string;
   student_id: string;
-  score: number;
+  score: string;  // Ahora es texto (AD, A, B, C)
   submitted_at: string;
   answers: Record<string, any>;
   student: {
@@ -215,7 +215,7 @@ export function ExamSubmissions({ examId, courseId }: ExamSubmissionsProps) {
                     <TableCell>
                       {submission ? (
                         <span className="font-medium">
-                          {submission.score.toFixed(1)} pts
+                          {submission.score}
                           {submission.hasUngradedQuestions && (
                             <span className="text-xs text-muted-foreground ml-1">(parcial)</span>
                           )}

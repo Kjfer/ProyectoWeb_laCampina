@@ -36,7 +36,7 @@ interface Exam {
     code: string;
   };
   submission?: {
-    score: number;
+    score: string;  // Ahora es texto (AD, A, B, C)
     answers: any;
     submitted_at: string;
   } | null;
@@ -349,7 +349,7 @@ const Exams = () => {
                               <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-center">
                                 <CheckCircle className="w-5 h-5 text-primary mx-auto mb-1" />
                                 <p className="text-sm font-medium text-primary">
-                                  Completado - {exam.submission.score.toFixed(1)} / {exam.max_score} pts
+                                  Completado - Nota: {exam.submission.score}
                                 </p>
                               </div>
                               {(() => {

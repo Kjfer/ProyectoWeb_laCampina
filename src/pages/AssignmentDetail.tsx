@@ -64,7 +64,7 @@ interface Submission {
   file_name: string | null;
   file_path: string | null;
   submitted_at: string;
-  score: number | null;
+  score: string | null;  // Ahora es texto (AD, A, B, C)
   feedback: string | null;
   student_files?: Array<{
     file_path: string;
@@ -737,13 +737,8 @@ const AssignmentDetail = () => {
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-foreground">Calificación</p>
                     <Badge variant="default" className="text-lg px-4 py-1">
-                      {getLetterGrade(submission.score, assignment.max_score)}
+                      {submission.score}
                     </Badge>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      {submission.score} / {assignment.max_score} puntos
-                    </p>
                   </div>
 
                   {submission.feedback && (

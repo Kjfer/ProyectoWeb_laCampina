@@ -15,20 +15,9 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-const GRADE_VALUES = {
-  'AD': 20,
-  'A': 17,
-  'B': 14,
-  'C': 11
-} as const;
-
-const getLetterGrade = (score: number | null): string => {
-  if (score === null) return '';
-  if (score >= 18) return 'AD';
-  if (score >= 15) return 'A';
-  if (score >= 11) return 'B';
-  return 'C';
-};
+// Las calificaciones ahora se almacenan como letras en la base de datos
+const VALID_GRADES = ['AD', 'A', 'B', 'C'] as const;
+type Grade = typeof VALID_GRADES[number];
 
 interface Question {
   id: string;
@@ -45,7 +34,7 @@ interface SubmissionData {
   student_id: string;
   quiz_id: string;
   answers: Record<string, any>;
-  score: number;
+  score: string;  // Ahora es texto (AD, A, B, C)
   submitted_at: string;
   student: {
     first_name: string;
@@ -111,9 +100,9 @@ const ExamGradingPage = () => {
       Object.keys(answers).forEach(questionId => {
         const answer = answers[questionId];
         if (answer.requires_grading) {
-          const numericScore = answer.points_earned !== undefined ? answer.points_earned : 0;
+          // Para preguntas que requieren calificación manual, usar el score guardado
           initialGrades[questionId] = {
-            score: getLetterGrade(numericScore),
+            score: answer.points_earned !== undefined ? String(answer.points_earned) : '',
             feedback: answer.feedback || ''
           };
         }
@@ -145,10 +134,10 @@ const ExamGradingPage = () => {
       const answer = submission?.answers[question.id];
       
       if (answer?.requires_grading) {
-        // Use manually entered grade
-        const letterGrade = grades[question.id]?.score;
-        if (letterGrade) {
-          total += GRADE_VALUES[letterGrade as keyof typeof GRADE_VALUES];
+        // Use manually entered score (now a number)
+        const enteredScore = grades[question.id]?.score;
+        if (enteredScore) {
+          total += Number(enteredScore);
         }
       } else if (answer?.is_correct !== undefined) {
         // Use auto-graded score
@@ -173,8 +162,8 @@ const ExamGradingPage = () => {
         const answer = updatedAnswers[questionId];
         
         if (answer.requires_grading && grades[questionId]) {
-          const letterGrade = grades[questionId].score;
-          answer.points_earned = letterGrade ? GRADE_VALUES[letterGrade as keyof typeof GRADE_VALUES] : 0;
+          const enteredScore = Number(grades[questionId].score) || 0;
+          answer.points_earned = enteredScore;
           answer.feedback = grades[questionId].feedback;
           totalScore += answer.points_earned;
         } else {
@@ -188,12 +177,17 @@ const ExamGradingPage = () => {
         totalScore
       });
 
+      // Convertir puntaje numérico total a letra
+      const finalLetterGrade = totalScore >= 18 ? 'AD' : 
+                                totalScore >= 15 ? 'A' : 
+                                totalScore >= 12 ? 'B' : 'C';
+
       // Update submission
       const { error } = await supabase
         .from('quiz_submissions')
         .update({
           answers: updatedAnswers,
-          score: totalScore
+          score: finalLetterGrade  // Guardar como letra
         })
         .eq('id', submissionId);
 
@@ -359,7 +353,7 @@ const ExamGradingPage = () => {
                         Calificación automática
                       </span>
                       <Badge variant={answer.is_correct ? "default" : "destructive"}>
-                        {answer.is_correct ? getLetterGrade(question.points) : 'C'}
+                        {answer.is_correct ? `${question.points} pts` : '0 pts'}
                       </Badge>
                     </div>
                   ) : (

@@ -19,20 +19,9 @@ import { toast } from 'sonner';
 import { EditAssignmentDialog } from '@/components/assignments/EditAssignmentDialog';
 import { FileUpload } from '@/components/ui/file-upload';
 
-const GRADE_VALUES = {
-  'AD': 20,
-  'A': 17,
-  'B': 14,
-  'C': 11
-} as const;
-
-const getLetterGrade = (score: number | null): string => {
-  if (score === null) return '';
-  if (score >= 18) return 'AD';
-  if (score >= 15) return 'A';
-  if (score >= 12) return 'B';
-  return 'C';
-};
+// Las calificaciones ahora se almacenan como letras en la base de datos
+const VALID_GRADES = ['AD', 'A', 'B', 'C'] as const;
+type Grade = typeof VALID_GRADES[number];
 
 interface Assignment {
   id: string;
@@ -63,7 +52,7 @@ interface Submission {
   file_size: number | null;
   mime_type: string | null;
   student_files: any;
-  score: number | null;
+  score: string | null;  // Ahora es texto (AD, A, B, C)
   feedback: string | null;
   submitted_at: string;
   graded_at: string | null;
@@ -165,7 +154,7 @@ const AssignmentReview = () => {
     setSelectedSubmission(submission);
     console.log('Selected submission:', submission);
     console.log('Submission content:', submission.content);
-    setScore(getLetterGrade(submission.score));
+    setScore(submission.score || '');  // Score ya es una letra
     setFeedback(submission.feedback || '');
   };
 
@@ -184,8 +173,6 @@ const AssignmentReview = () => {
       toast.error('Algunos archivos superan los 5MB. Para archivos grandes, te recomendamos subirlos a Google Drive y compartir el enlace en los comentarios.');
       return;
     }
-
-    const numericScore = GRADE_VALUES[score as keyof typeof GRADE_VALUES];
 
     try {
       setGrading(true);
@@ -224,7 +211,7 @@ const AssignmentReview = () => {
       const { error } = await supabase
         .from('assignment_submissions')
         .update({
-          score: numericScore,
+          score: score,  // Guardar directamente la letra
           feedback: finalFeedback || null,
           graded_at: new Date().toISOString()
         })
@@ -448,7 +435,7 @@ const AssignmentReview = () => {
                             </p>
                         {submission.score !== null ? (
                           <Badge variant="default" className="text-xs mt-1">
-                            {getLetterGrade(submission.score)}
+                            {submission.score}
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="text-xs mt-1">
