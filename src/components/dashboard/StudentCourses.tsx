@@ -14,9 +14,11 @@ interface Course {
   id: string;
   name: string;
   code: string;
-  schedule_days?: string[];
-  start_time?: string;
-  end_time?: string;
+  schedule?: Array<{
+    day: string;
+    start_time: string;
+    end_time: string;
+  }>;
   teacher?: {
     first_name: string;
     last_name: string;
@@ -49,9 +51,7 @@ export function StudentCourses() {
             id,
             name,
             code,
-            schedule_days,
-            start_time,
-            end_time,
+            schedule,
             profiles!courses_teacher_id_fkey (
               first_name,
               last_name
@@ -94,9 +94,7 @@ export function StudentCourses() {
             id: course.id,
             name: course.name,
             code: course.code,
-            schedule_days: course.schedule_days,
-            start_time: course.start_time,
-            end_time: course.end_time,
+            schedule: course.schedule,
             teacher: course.profiles,
             pending_assignments: assignmentsCount || 0,
             upcoming_exams: examsCount || 0,
@@ -113,26 +111,25 @@ export function StudentCourses() {
   };
 
   const formatSchedule = (course: Course) => {
-    if (!course.schedule_days || course.schedule_days.length === 0) {
+    if (!course.schedule || course.schedule.length === 0) {
       return "Horario no definido";
     }
 
     const daysMap: { [key: string]: string } = {
-      'monday': 'L',
-      'tuesday': 'M',
-      'wednesday': 'X',
-      'thursday': 'J',
-      'friday': 'V',
-      'saturday': 'S',
-      'sunday': 'D'
+      'Lunes': 'L',
+      'Martes': 'M',
+      'Miércoles': 'X',
+      'Jueves': 'J',
+      'Viernes': 'V',
+      'Sábado': 'S',
+      'Domingo': 'D'
     };
 
-    const days = course.schedule_days.map(day => daysMap[day] || day).join(', ');
-    const time = course.start_time && course.end_time 
-      ? `${course.start_time.slice(0, 5)} - ${course.end_time.slice(0, 5)}`
-      : '';
+    const scheduleSummary = course.schedule
+      .map(s => `${daysMap[s.day] || s.day.charAt(0)} ${s.start_time.slice(0, 5)}-${s.end_time.slice(0, 5)}`)
+      .join(', ');
 
-    return `${days} ${time}`;
+    return scheduleSummary;
   };
 
   if (loading) {
