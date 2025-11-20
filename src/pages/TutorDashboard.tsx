@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Users, GraduationCap, Calendar, AlertCircle, Eye, Search, BookOpen, Target } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { useTutorDashboard } from '@/hooks/queries/useTutorData';
 import { StudentDetailDialog } from '@/components/tutor/StudentDetailDialog';
 import { StatCard } from '@/components/tutor/StatCard';
 import { AttendanceBarChart } from '@/components/tutor/AttendanceBarChart';
@@ -17,220 +17,18 @@ import { GradeDistributionChart } from '@/components/tutor/GradeDistributionChar
 import { StudentsAtRiskTable } from '@/components/tutor/StudentsAtRiskTable';
 import { CoursePerformanceTable } from '@/components/tutor/CoursePerformanceTable';
 
-interface VirtualClassroom {
-  id: string;
-  name: string;
-  grade: string;
-  section: string;
-  education_level: string;
-  academic_year: string;
-}
-
-interface Student {
-  id: string;
-  first_name: string;
-  last_name: string;
-  paternal_surname: string;
-  maternal_surname: string;
-  student_code: string;
-  email: string;
-  phone?: string;
-  document_number?: string;
-  birth_date?: string;
-}
-
-interface AttendanceRecord {
-  student_id: string;
-  present: number;
-  absent: number;
-  late: number;
-  justified: number;
-  total: number;
-  attendance_rate: number;
-}
-
-interface GradeRecord {
-  student_id: string;
-  ad_count: number;
-  a_count: number;
-  b_count: number;
-  c_count: number;
-  total_graded: number;
-  average_score: number;
-}
-
-interface CourseData {
-  id: string;
-  name: string;
-  code: string;
-}
-
 export default function TutorDashboard() {
   const { profile } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [classroom, setClassroom] = useState<VirtualClassroom | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
-  const [gradeData, setGradeData] = useState<GradeRecord[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [courses, setCourses] = useState<CourseData[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    if (profile?.role === 'tutor') {
-      fetchTutorData();
-    }
-  }, [profile]);
+  const { data: tutorData, isLoading: loading, error } = useTutorDashboard(profile?.id);
 
-  const fetchTutorData = async () => {
-    try {
-      setLoading(true);
-
-      // Fetch assigned classroom
-      const { data: classroomData, error: classroomError } = await supabase
-        .from('virtual_classrooms')
-        .select('*')
-        .eq('tutor_id', profile?.id)
-        .single();
-
-      if (classroomError) {
-        if (classroomError.code === 'PGRST116') {
-          toast.error('No tienes un aula virtual asignada');
-          setLoading(false);
-          return;
-        }
-        throw classroomError;
-      }
-
-      setClassroom(classroomData);
-
-      // Fetch courses in classroom
-      const { data: coursesData, error: coursesError } = await supabase
-        .from('courses')
-        .select('id, name, code')
-        .eq('classroom_id', classroomData.id);
-
-      if (coursesError) throw coursesError;
-
-      setCourses(coursesData || []);
-      const courseIds = coursesData.map(c => c.id);
-
-      if (courseIds.length > 0) {
-        // Fetch students
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('course_enrollments')
-          .select('student_id, profiles!inner(*)')
-          .in('course_id', courseIds);
-
-        if (studentsError) throw studentsError;
-
-        // Remove duplicates
-        const uniqueStudents = Array.from(
-          new Map(studentsData.map(item => [item.student_id, item.profiles])).values()
-        ) as Student[];
-
-        setStudents(uniqueStudents);
-
-        // Fetch attendance data
-        const studentIds = uniqueStudents.map(s => s.id);
-        const { data: attendanceRaw, error: attendanceError } = await supabase
-          .from('attendance')
-          .select('student_id, status')
-          .in('student_id', studentIds)
-          .in('course_id', courseIds);
-
-        if (attendanceError) throw attendanceError;
-
-        // Process attendance data
-        const attendanceMap = new Map<string, AttendanceRecord>();
-        studentIds.forEach(studentId => {
-          attendanceMap.set(studentId, {
-            student_id: studentId,
-            present: 0,
-            absent: 0,
-            late: 0,
-            justified: 0,
-            total: 0,
-            attendance_rate: 0
-          });
-        });
-
-        attendanceRaw?.forEach(record => {
-          const current = attendanceMap.get(record.student_id)!;
-          current.total++;
-          if (record.status === 'present') current.present++;
-          else if (record.status === 'absent') current.absent++;
-          else if (record.status === 'late') current.late++;
-          else if (record.status === 'justified') current.justified++;
-        });
-
-        attendanceMap.forEach((record, studentId) => {
-          if (record.total > 0) {
-            record.attendance_rate = (record.present / record.total) * 100;
-          }
-        });
-
-        setAttendanceData(Array.from(attendanceMap.values()));
-
-        // Fetch grades data
-        const { data: submissionsData, error: submissionsError } = await supabase
-          .from('assignment_submissions')
-          .select('student_id, score, assignment_id, assignments!inner(course_id)')
-          .in('student_id', studentIds)
-          .not('score', 'is', null);
-
-        if (submissionsError) throw submissionsError;
-
-        // Filter by course IDs
-        const filteredSubmissions = submissionsData.filter(sub => 
-          courseIds.includes((sub.assignments as any).course_id)
-        );
-
-        // Process grades data
-        const gradeMap = new Map<string, GradeRecord>();
-        studentIds.forEach(studentId => {
-          gradeMap.set(studentId, {
-            student_id: studentId,
-            ad_count: 0,
-            a_count: 0,
-            b_count: 0,
-            c_count: 0,
-            total_graded: 0,
-            average_score: 0
-          });
-        });
-
-        let totalScore = 0;
-        filteredSubmissions.forEach(sub => {
-          const current = gradeMap.get(sub.student_id)!;
-          current.total_graded++;
-          const score = Number(sub.score);
-          totalScore += score;
-
-          if (score >= 18) current.ad_count++;
-          else if (score >= 14) current.a_count++;
-          else if (score >= 11) current.b_count++;
-          else current.c_count++;
-        });
-
-        gradeMap.forEach((record) => {
-          if (record.total_graded > 0) {
-            const studentSubmissions = filteredSubmissions.filter(s => s.student_id === record.student_id);
-            const sum = studentSubmissions.reduce((acc, s) => acc + Number(s.score), 0);
-            record.average_score = sum / record.total_graded;
-          }
-        });
-
-        setGradeData(Array.from(gradeMap.values()));
-      }
-
-    } catch (error) {
-      console.error('Error fetching tutor data:', error);
-      toast.error('Error al cargar los datos del dashboard');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const classroom = tutorData?.classroom || null;
+  const students = tutorData?.students || [];
+  const courses = tutorData?.courses || [];
+  const attendanceData = tutorData?.attendanceData || [];
+  const gradeData = tutorData?.gradeData || [];
 
   const getGradeLetter = (score: number): string => {
     if (score >= 18) return 'AD';

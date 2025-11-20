@@ -1,116 +1,17 @@
-import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { BookOpen, Clock, User, AlertCircle, FileText, ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-
-interface Course {
-  id: string;
-  name: string;
-  code: string;
-  schedule?: Array<{
-    day: string;
-    start_time: string;
-    end_time: string;
-  }>;
-  teacher?: {
-    first_name: string;
-    last_name: string;
-  };
-  pending_assignments?: number;
-  upcoming_exams?: number;
-}
+import { useStudentCourses } from "@/hooks/queries/useCourseData";
 
 export function StudentCourses() {
   const { profile } = useAuth();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: courses = [], isLoading: loading } = useStudentCourses(profile?.id);
 
-  useEffect(() => {
-    if (profile?.id) {
-      fetchCourses();
-    }
-  }, [profile]);
-
-  const fetchCourses = async () => {
-    try {
-      setLoading(true);
-
-      // Get enrolled courses
-      const { data: enrollments, error: enrollError } = await supabase
-        .from('course_enrollments')
-        .select(`
-          course_id,
-          courses (
-            id,
-            name,
-            code,
-            schedule,
-            profiles!courses_teacher_id_fkey (
-              first_name,
-              last_name
-            )
-          )
-        `)
-        .eq('student_id', profile!.id);
-
-      if (enrollError) throw enrollError;
-
-      // Get pending assignments and upcoming exams for each course
-      const coursesWithData = await Promise.all(
-        (enrollments || []).map(async (enrollment: any) => {
-          const course = enrollment.courses;
-          if (!course) return null;
-
-          // Count pending assignments (due in future, not submitted)
-          const { count: assignmentsCount } = await supabase
-            .from('assignments')
-            .select('*', { count: 'exact', head: true })
-            .eq('course_id', course.id)
-            .eq('is_published', true)
-            .gt('due_date', new Date().toISOString())
-            .not('id', 'in', 
-              supabase
-                .from('assignment_submissions')
-                .select('assignment_id')
-                .eq('student_id', profile!.id)
-            );
-
-          // Count upcoming exams (start time in future)
-          const { count: examsCount } = await supabase
-            .from('exams')
-            .select('*', { count: 'exact', head: true })
-            .eq('course_id', course.id)
-            .eq('is_published', true)
-            .gt('start_time', new Date().toISOString());
-
-          return {
-            id: course.id,
-            name: course.name,
-            code: course.code,
-            schedule: course.schedule,
-            teacher: course.profiles,
-            pending_assignments: assignmentsCount || 0,
-            upcoming_exams: examsCount || 0,
-          };
-        })
-      );
-
-      setCourses(coursesWithData.filter(Boolean) as Course[]);
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatSchedule = (course: Course) => {
+  const formatSchedule = (course: typeof courses[0]) => {
     if (!course.schedule || course.schedule.length === 0) {
       return "Horario no definido";
     }

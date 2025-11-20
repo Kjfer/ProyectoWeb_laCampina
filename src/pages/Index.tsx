@@ -1,120 +1,16 @@
-import { useState, useEffect } from "react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { StudentCourses } from "@/components/dashboard/StudentCourses";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Notifications } from "@/components/Notifications";
 import { BookOpen, FileText, GraduationCap, TrendingUp } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { useStudentDashboardStats } from "@/hooks/queries/useDashboardData";
 import heroImage from "@/assets/hero-education.jpg";
-
-interface DashboardStats {
-  coursesCount: number;
-  pendingAssignments: number;
-  upcomingExams: number;
-  attendanceRate: number;
-}
 
 const Index = () => {
   const { profile } = useAuth();
-  const [stats, setStats] = useState<DashboardStats>({
-    coursesCount: 0,
-    pendingAssignments: 0,
-    upcomingExams: 0,
-    attendanceRate: 0,
-  });
-  const [loadingStats, setLoadingStats] = useState(true);
-
-  useEffect(() => {
-    if (profile?.id) {
-      fetchDashboardStats();
-    }
-  }, [profile]);
-
-  const fetchDashboardStats = async () => {
-    try {
-      setLoadingStats(true);
-
-      // Get courses count
-      const { count: coursesCount } = await supabase
-        .from('course_enrollments')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_id', profile!.id);
-
-      // Get pending assignments
-      const { data: enrollments } = await supabase
-        .from('course_enrollments')
-        .select('course_id')
-        .eq('student_id', profile!.id);
-
-      const courseIds = enrollments?.map(e => e.course_id) || [];
-
-      let pendingAssignments = 0;
-      if (courseIds.length > 0) {
-        // Get all assignments in enrolled courses
-        const { data: assignments } = await supabase
-          .from('assignments')
-          .select('id')
-          .in('course_id', courseIds)
-          .eq('is_published', true)
-          .gt('due_date', new Date().toISOString());
-
-        const assignmentIds = assignments?.map(a => a.id) || [];
-
-        if (assignmentIds.length > 0) {
-          // Get submitted assignments
-          const { data: submissions } = await supabase
-            .from('assignment_submissions')
-            .select('assignment_id')
-            .eq('student_id', profile!.id)
-            .in('assignment_id', assignmentIds);
-
-          const submittedIds = new Set(submissions?.map(s => s.assignment_id) || []);
-          pendingAssignments = assignmentIds.filter(id => !submittedIds.has(id)).length;
-        }
-      }
-
-      // Get upcoming exams
-      let upcomingExams = 0;
-      if (courseIds.length > 0) {
-        const { count: examsCount } = await supabase
-          .from('exams')
-          .select('*', { count: 'exact', head: true })
-          .in('course_id', courseIds)
-          .eq('is_published', true)
-          .gt('start_time', new Date().toISOString());
-
-        upcomingExams = examsCount || 0;
-      }
-
-      // Get attendance rate
-      const { data: attendance } = await supabase
-        .from('attendance')
-        .select('status')
-        .eq('student_id', profile!.id);
-
-      let attendanceRate = 0;
-      if (attendance && attendance.length > 0) {
-        const presentCount = attendance.filter(a => 
-          a.status === 'present' || a.status === 'late'
-        ).length;
-        attendanceRate = Math.round((presentCount / attendance.length) * 100);
-      }
-
-      setStats({
-        coursesCount: coursesCount || 0,
-        pendingAssignments,
-        upcomingExams,
-        attendanceRate,
-      });
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-    } finally {
-      setLoadingStats(false);
-    }
-  };
+  const { data: stats, isLoading: loadingStats } = useStudentDashboardStats(profile?.id);
 
   const getWelcomeMessage = () => {
     const name = profile ? profile.first_name : 'Usuario';
@@ -180,28 +76,28 @@ const Index = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatsCard
                 title="Mis Cursos"
-                value={loadingStats ? "..." : stats.coursesCount.toString()}
+                value={loadingStats ? "..." : (stats?.coursesCount || 0).toString()}
                 icon={BookOpen}
                 description="Cursos inscritos"
                 color="primary"
               />
               <StatsCard
                 title="Tareas Pendientes"
-                value={loadingStats ? "..." : stats.pendingAssignments.toString()}
+                value={loadingStats ? "..." : (stats?.pendingAssignments || 0).toString()}
                 icon={FileText}
                 description="Por entregar próximamente"
                 color="accent"
               />
               <StatsCard
                 title="Exámenes Próximos"
-                value={loadingStats ? "..." : stats.upcomingExams.toString()}
+                value={loadingStats ? "..." : (stats?.upcomingExams || 0).toString()}
                 icon={TrendingUp}
                 description="Próximos a rendir"
                 color="secondary"
               />
               <StatsCard
                 title="Asistencia"
-                value={loadingStats ? "..." : `${stats.attendanceRate}%`}
+                value={loadingStats ? "..." : `${stats?.attendanceRate || 0}%`}
                 icon={GraduationCap}
                 description="Tasa de asistencia"
                 color="primary"

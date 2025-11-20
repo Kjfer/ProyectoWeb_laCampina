@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Users, GraduationCap, Clock, Calendar, ClipboardCheck, Plus, Edit, UserCheck, FileText } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { useCourseDetail } from '@/hooks/queries/useCourseData';
 import { WeeklyContentManager } from '@/components/course/WeeklyContentManager';
 import { AttendanceManager } from '@/components/course/AttendanceManager';
 import { AttendanceRecords } from '@/components/course/AttendanceRecords';
@@ -19,52 +19,29 @@ import { ExamsList } from '@/components/course/ExamsList';
 import { CourseEditDialog } from '@/components/course/CourseEditDialog';
 import { CourseAssignmentsReview } from '@/components/course/CourseAssignmentsReview';
 
-interface Course {
-  id: string;
-  name: string;
-  code: string;
-  description: string;
-  academic_year: string;
-  is_active: boolean;
-  created_at: string;
-  teacher?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-  classroom?: {
-    name: string;
-    grade: string;
-    education_level: string;
-  };
-}
-
-interface Teacher {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-}
-
-interface Student {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  enrolled_at: string;
-}
-
 export default function CourseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const [course, setCourse] = useState<Course | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isExamFormOpen, setIsExamFormOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [additionalTeachers, setAdditionalTeachers] = useState<Teacher[]>([]);
+
+  const { data: courseData, isLoading: loading, refetch } = useCourseDetail(id);
+
+  const course = courseData ? {
+    id: courseData.id,
+    name: courseData.name,
+    code: courseData.code,
+    description: courseData.description,
+    academic_year: courseData.academic_year,
+    is_active: courseData.is_active,
+    created_at: courseData.created_at,
+    teacher: courseData.teacher,
+    classroom: courseData.classroom,
+  } : null;
+
+  const students = courseData?.students || [];
+  const additionalTeachers = courseData?.additionalTeachers || [];
 
   // Check if user can edit this course
   const canEdit = profile && course && (
@@ -72,104 +49,6 @@ export default function CourseDetail() {
     (profile.role === 'teacher' && course.teacher && profile.id === course.teacher.id) ||
     (profile.role === 'teacher' && additionalTeachers.some(t => t.id === profile.id))
   );
-
-  useEffect(() => {
-    if (id) {
-      fetchCourse();
-      fetchStudents();
-      fetchAdditionalTeachers();
-    }
-  }, [id]);
-
-  const fetchCourse = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('courses')
-        .select(`
-          *,
-          teacher:profiles!courses_teacher_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email
-          ),
-          classroom:virtual_classrooms!courses_classroom_id_fkey(
-            name,
-            grade,
-            education_level
-          )
-        `)
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      setCourse(data);
-    } catch (error) {
-      console.error('Error fetching course:', error);
-      toast.error('Error al cargar el curso');
-      navigate('/courses');
-    }
-  };
-
-  const fetchStudents = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('course_enrollments')
-        .select(`
-          enrolled_at,
-          student:profiles!course_enrollments_student_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email
-          )
-        `)
-        .eq('course_id', id);
-
-      if (error) throw error;
-      
-      const enrolledStudents = data
-        ?.map(enrollment => {
-          if (!enrollment.student) {
-            console.warn('Enrollment without student data:', enrollment);
-            return null;
-          }
-          return {
-            ...enrollment.student,
-            enrolled_at: enrollment.enrolled_at
-          };
-        })
-        .filter((student): student is Student => student !== null) || [];
-      
-      setStudents(enrolledStudents);
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      toast.error('Error al cargar los estudiantes');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAdditionalTeachers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('course_teachers')
-        .select(`
-          teacher:profiles!course_teachers_teacher_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email
-          )
-        `)
-        .eq('course_id', id);
-
-      if (error) throw error;
-      setAdditionalTeachers(data?.map(item => item.teacher).filter(Boolean) || []);
-    } catch (error) {
-      console.error('Error fetching additional teachers:', error);
-    }
-  };
 
   if (loading) {
     return (
@@ -423,8 +302,7 @@ export default function CourseDetail() {
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           onSuccess={() => {
-            fetchCourse();
-            fetchAdditionalTeachers();
+            refetch();
           }}
         />
       </div>

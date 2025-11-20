@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { format, isAfter } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useAssignmentDetail } from '@/hooks/queries/useAssignmentData';
 import { 
   FileText, 
   Calendar, 
@@ -37,52 +38,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-interface Assignment {
-  id: string;
-  title: string;
-  description: string;
-  due_date: string;
-  max_score: number;
-  course_id: string;
-  course: {
-    id: string;
-    name: string;
-    code: string;
-  };
-  teacher_files?: Array<{
-    file_path: string;
-    file_name: string;
-    file_size: number;
-    mime_type: string;
-  }>;
-}
-
-interface Submission {
-  id: string;
-  content: string;
-  file_url: string | null;
-  file_name: string | null;
-  file_path: string | null;
-  submitted_at: string;
-  score: number | null;
-  feedback: string | null;
-  student_files?: Array<{
-    file_path: string;
-    file_name: string;
-    file_size: number;
-    mime_type: string;
-    file_url: string;
-  }>;
-}
-
 const AssignmentDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [assignment, setAssignment] = useState<Assignment | null>(null);
-  const [submission, setSubmission] = useState<Submission | null>(null);
-  const [loading, setLoading] = useState(true);
   const [content, setContent] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [existingFiles, setExistingFiles] = useState<Array<{
@@ -100,69 +60,12 @@ const AssignmentDetail = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isEditingSubmission, setIsEditingSubmission] = useState(false);
 
-  useEffect(() => {
-    fetchAssignmentDetails();
-  }, [id]);
+  const { data: assignmentData, isLoading: loading, refetch: refetchAssignment } = useAssignmentDetail(id, profile?.id);
 
-  const fetchAssignmentDetails = async () => {
-    if (!id || !profile) return;
+  const assignment = assignmentData?.assignment || null;
+  const submission = assignmentData?.submission || null;
 
-    try {
-      // Fetch assignment details
-      const { data: assignmentData, error: assignmentError } = await supabase
-        .from('assignments')
-        .select(`
-          *,
-          course:courses (
-            id,
-            name,
-            code
-          )
-        `)
-        .eq('id', id)
-        .single();
-
-      if (assignmentError) throw assignmentError;
-
-      // Fetch teacher's files if this assignment is linked to a course_weekly_resource
-      const { data: resourceData } = await supabase
-        .from('course_weekly_resources')
-        .select('teacher_files')
-        .eq('assignment_id', id)
-        .maybeSingle();
-
-      setAssignment({
-        ...assignmentData,
-        teacher_files: Array.isArray(resourceData?.teacher_files) ? resourceData.teacher_files as any : []
-      });
-
-      // Fetch student's submission if exists
-      const { data: submissionData, error: submissionError } = await supabase
-        .from('assignment_submissions')
-        .select('*')
-        .eq('assignment_id', id)
-        .eq('student_id', profile.id)
-        .maybeSingle();
-
-      if (submissionError && submissionError.code !== 'PGRST116') {
-        throw submissionError;
-      }
-
-      setSubmission(submissionData ? {
-        ...submissionData,
-        student_files: Array.isArray(submissionData.student_files) ? submissionData.student_files as any : []
-      } : null);
-    } catch (error) {
-      console.error('Error fetching assignment details:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los detalles de la tarea",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchAssignmentDetails = refetchAssignment;
 
   const handleSubmit = async () => {
     if (!content.trim() && selectedFiles.length === 0) {
