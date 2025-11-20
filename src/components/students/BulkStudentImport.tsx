@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,24 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
   const [isProcessing, setIsProcessing] = useState(false);
   const [studentsToImport, setStudentsToImport] = useState<StudentData[]>([]);
   const [importStatus, setImportStatus] = useState<'idle' | 'preview' | 'importing' | 'completed'>('idle');
+  const [importLogs, setImportLogs] = useState<string[]>([]);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to latest log
+  useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [importLogs]);
+
+  const addLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setImportLogs(prev => [...prev, `[${timestamp}] ${message}`]);
+  };
+
+  const clearLogs = () => {
+    setImportLogs([]);
+  };
 
   const downloadTemplate = () => {
     const template = [
@@ -148,8 +166,12 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
 
   const handleImport = async () => {
     setImportStatus('importing');
+    clearLogs();
     
     try {
+      addLog(`🚀 Iniciando importación de ${studentsToImport.length} estudiantes`);
+      addLog(`📚 Aula Virtual: ${classroom.name} - ${classroom.grade}${classroom.section}`);
+      
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
         .select('id')
@@ -158,6 +180,8 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
       if (courseError) throw courseError;
 
       const courseIds = courseData?.map(c => c.id) || [];
+      addLog(`📖 Cursos encontrados: ${courseIds.length}`);
+      addLog(`⏳ Procesando estudiantes en el servidor...`);
 
       const { data, error } = await supabase.functions.invoke('crud-estudiantes', {
         body: {
@@ -176,6 +200,15 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
         existing: 0,
         errors: 0
       };
+
+      addLog(`✅ Procesamiento completado`);
+      addLog(`📊 Resultados:`);
+      addLog(`   • ${summary.new} estudiantes nuevos creados`);
+      addLog(`   • ${summary.existing} estudiantes existentes asociados`);
+      if (summary.errors > 0) {
+        addLog(`   ⚠️ ${summary.errors} errores encontrados`);
+      }
+      addLog(`🎉 Importación finalizada exitosamente`);
 
       let description = '';
       if (summary.new > 0 && summary.existing > 0) {
@@ -196,10 +229,13 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
       });
 
       setImportStatus('completed');
-      setStudentsToImport([]);
-      onImportComplete();
+      setTimeout(() => {
+        setStudentsToImport([]);
+        onImportComplete();
+      }, 3000);
     } catch (error) {
       console.error('Error importing students:', error);
+      addLog(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
       toast({
         title: "Error",
         description: "No se pudieron importar los estudiantes",
@@ -304,20 +340,59 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
         )}
 
         {importStatus === 'importing' && (
-          <div className="flex flex-col items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-            <p className="text-sm text-muted-foreground">Importando estudiantes...</p>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400 shrink-0" />
+              <div>
+                <p className="font-medium text-blue-900 dark:text-blue-100">Procesando importación...</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300">Por favor espera mientras se procesan los estudiantes</p>
+              </div>
+            </div>
+            
+            <div className="bg-slate-950 text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
+              <div className="space-y-1">
+                {importLogs.map((log, idx) => (
+                  <div key={idx} className="whitespace-pre-wrap break-words">
+                    {log}
+                  </div>
+                ))}
+                {importLogs.length === 0 && (
+                  <div className="text-slate-500 italic">Esperando logs del servidor...</div>
+                )}
+                <div ref={logsEndRef} />
+              </div>
+            </div>
           </div>
         )}
 
         {importStatus === 'completed' && (
-          <div className="flex flex-col items-center justify-center py-8">
-            <CheckCircle2 className="h-8 w-8 text-green-600 mb-2" />
-            <p className="text-sm font-medium">Importación completada exitosamente</p>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+              <div>
+                <p className="font-medium text-green-900 dark:text-green-100">Importación completada exitosamente</p>
+                <p className="text-sm text-green-700 dark:text-green-300">Todos los estudiantes han sido procesados</p>
+              </div>
+            </div>
+            
+            <div className="bg-slate-950 text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
+              <div className="space-y-1">
+                {importLogs.map((log, idx) => (
+                  <div key={idx} className="whitespace-pre-wrap break-words">
+                    {log}
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
+              </div>
+            </div>
+            
             <Button
               variant="outline"
-              onClick={() => setImportStatus('idle')}
-              className="mt-4"
+              onClick={() => {
+                setImportStatus('idle');
+                clearLogs();
+              }}
+              className="w-full"
             >
               Importar más estudiantes
             </Button>
