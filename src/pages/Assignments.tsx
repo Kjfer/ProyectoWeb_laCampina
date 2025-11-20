@@ -28,7 +28,7 @@ interface Assignment {
   };
   submissions?: {
     id: string;
-    score: number;
+    score: string;  // Ahora es texto (AD, A, B, C)
     submitted_at: string;
   }[];
 }
@@ -128,15 +128,6 @@ const Assignments = () => {
     }
   };
 
-  const getLetterGrade = (score: number | null, maxScore: number): string => {
-    if (!score) return '';
-    const percentage = (score / maxScore) * 100;
-    if (percentage >= 90) return 'AD';
-    if (percentage >= 75) return 'A';
-    if (percentage >= 60) return 'B';
-    return 'C';
-  };
-
   const getAssignmentStatus = (assignment: Assignment) => {
     const now = new Date();
     const dueDate = new Date(assignment.due_date);
@@ -144,10 +135,10 @@ const Assignments = () => {
 
     if (hasSubmission) {
       const submission = assignment.submissions[0];
-      const letterGrade = getLetterGrade(submission.score, assignment.max_score);
+      // Score ya es letra directamente (AD, A, B, C)
       return {
         status: 'submitted',
-        label: submission.score ? letterGrade : 'Entregada',
+        label: submission.score || 'Entregada',
         variant: submission.score ? 'default' as const : 'secondary' as const,
         color: submission.score ? 'text-primary' : 'text-secondary'
       };
