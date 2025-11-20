@@ -22,7 +22,7 @@ import { es } from 'date-fns/locale';
 interface Submission {
   id: string;
   student_id: string;
-  score: number;
+  score: string;  // Ahora es texto (AD, A, B, C)
   submitted_at: string;
   answers: Record<string, any>;
   student: {
@@ -332,7 +332,7 @@ const ExamSubmissionsPage = () => {
                           {submission ? (
                             <div className="flex items-center gap-2">
                               <span className="font-medium">
-                                {submission.score.toFixed(1)} / {examMaxScore} pts
+                                {submission.score}
                               </span>
                               {submission.hasUngradedQuestions && (
                                 <Badge variant="secondary" className="text-xs">
