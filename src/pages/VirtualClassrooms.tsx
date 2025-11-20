@@ -763,7 +763,9 @@ export default function VirtualClassrooms() {
           teachers={teachers}
           tutors={tutors}
           open={!!editingClassroom}
-          onOpenChange={(open) => !open && setEditingClassroom(null)}
+          onOpenChange={(open) => {
+            if (!open) setEditingClassroom(null);
+          }}
           onSuccess={() => {
             setEditingClassroom(null);
             fetchClassrooms(true);
@@ -776,7 +778,9 @@ export default function VirtualClassrooms() {
         <DeleteClassroomDialog
           classroom={deletingClassroom}
           open={!!deletingClassroom}
-          onOpenChange={(open) => !open && setDeletingClassroom(null)}
+          onOpenChange={(open) => {
+            if (!open) setDeletingClassroom(null);
+          }}
           onSuccess={() => {
             setDeletingClassroom(null);
             fetchClassrooms(true);
