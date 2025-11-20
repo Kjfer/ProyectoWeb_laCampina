@@ -292,7 +292,14 @@ const AssignmentDetail = () => {
   };
 
   const handleEditSubmission = () => {
-    if (!submission) return;
+    if (!submission || isOverdue) {
+      toast({
+        title: "No se puede editar",
+        description: "No puedes editar una entrega después de la fecha límite",
+        variant: "destructive",
+      });
+      return;
+    }
     setContent(submission.content || '');
     setSelectedFiles([]);
     setExistingFiles(submission.student_files || []);
@@ -395,7 +402,7 @@ const AssignmentDetail = () => {
   };
 
   const isOverdue = assignment ? isAfter(new Date(), new Date(assignment.due_date)) : false;
-  const canSubmit = (!submission && !isOverdue) || isEditingSubmission;
+  const canSubmit = (!submission && !isOverdue) || (isEditingSubmission && !isOverdue);
   const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin';
   const canEditSubmission = submission && submission.score === null && !isOverdue;
 
@@ -545,7 +552,7 @@ const AssignmentDetail = () => {
                                 {file.file_name}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {(file.file_size / 1024).toFixed(2)} KB
+                                {file.file_size ? (file.file_size / 1024).toFixed(2) : '0.00'} KB
                               </p>
                             </div>
                           </div>
@@ -638,7 +645,7 @@ const AssignmentDetail = () => {
                                 {file.file_name}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {(file.file_size / 1024).toFixed(2)} KB
+                                {file.file_size ? (file.file_size / 1024).toFixed(2) : '0.00'} KB
                               </p>
                             </div>
                           </div>
@@ -767,7 +774,7 @@ const AssignmentDetail = () => {
                                 {file.file_name}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {(file.file_size / 1024).toFixed(2)} KB
+                                {file.file_size ? (file.file_size / 1024).toFixed(2) : '0.00'} KB
                               </p>
                             </div>
                           </div>
