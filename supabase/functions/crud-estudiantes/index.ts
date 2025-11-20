@@ -94,12 +94,38 @@ serve(async (req: Request) => {
             
             console.log(`📝 Procesando: ${studentData.student_code} - ${studentData.first_name}`);
 
-            // Paso 1: Verificar si existe el perfil
-            const { data: existingProfile } = await supabase
-              .from('profiles')
-              .select('id, user_id, email')
-              .eq('student_code', studentData.student_code)
-              .single();
+            // Paso 1: Verificar si existe el perfil (primero por DNI, luego por código)
+            let existingProfile = null;
+            
+            // Buscar por DNI primero
+            if (studentData.document_number) {
+              const { data: profileByDNI } = await supabase
+                .from('profiles')
+                .select('id, user_id, email, student_code')
+                .eq('document_number', studentData.document_number)
+                .eq('role', 'student')
+                .single();
+              
+              if (profileByDNI) {
+                existingProfile = profileByDNI;
+                console.log(`🔍 Estudiante encontrado por DNI: ${studentData.document_number}`);
+              }
+            }
+            
+            // Si no se encontró por DNI, buscar por student_code
+            if (!existingProfile && studentData.student_code) {
+              const { data: profileByCode } = await supabase
+                .from('profiles')
+                .select('id, user_id, email, student_code')
+                .eq('student_code', studentData.student_code)
+                .eq('role', 'student')
+                .single();
+              
+              if (profileByCode) {
+                existingProfile = profileByCode;
+                console.log(`🔍 Estudiante encontrado por código: ${studentData.student_code}`);
+              }
+            }
 
             let profileId: string;
 
@@ -264,8 +290,12 @@ serve(async (req: Request) => {
             }
 
             // Inscribir en cursos (evitando duplicados)
+            let enrollmentCount = 0;
             if (courseIds.length > 0) {
+              console.log(`📚 Inscribiendo en ${courseIds.length} cursos...`);
+              
               for (const courseId of courseIds) {
+                // Verificar si ya está inscrito
                 const { data: existingEnrollment } = await supabase
                   .from('course_enrollments')
                   .select('id')
@@ -282,25 +312,48 @@ serve(async (req: Request) => {
                     });
 
                   if (enrollError) {
-                    console.error(`⚠️ Enrollment error for ${studentData.student_code} in course ${courseId}:`, enrollError);
+                    console.error(`⚠️ Error inscribiendo en curso ${courseId}:`, enrollError);
+                  } else {
+                    enrollmentCount++;
+                    console.log(`✅ Inscrito en curso ${courseId}`);
                   }
+                } else {
+                  console.log(`ℹ️ Ya inscrito en curso ${courseId}`);
                 }
               }
             }
 
-            results.success.push(studentData.student_code);
-            console.log(`✅ Estudiante procesado: ${studentData.student_code}`);
+            const message = existingProfile 
+              ? `Actualizado y asociado (${enrollmentCount} cursos nuevos)` 
+              : `Creado y asociado (${enrollmentCount} cursos)`;
+            
+            results.success.push({
+              student_code: studentData.student_code,
+              message: message
+            });
+            
+            console.log(`✅ ${studentData.student_code}: ${message}`);
           } catch (error) {
             console.error(`❌ Error processing ${studentData.student_code}:`, error);
             results.errors.push({ student_code: studentData.student_code, error: String(error) });
           }
         }
 
+        const successStudents = results.success.length;
+        const existingStudents = results.success.filter(s => s.message.includes('Actualizado')).length;
+        const newStudents = results.success.filter(s => s.message.includes('Creado')).length;
+        
         return new Response(
           JSON.stringify({
             success: true,
-            message: `Importados ${results.success.length} estudiantes, ${results.errors.length} errores`,
-            results
+            message: `Procesados: ${successStudents} estudiantes (${newStudents} nuevos, ${existingStudents} existentes), ${results.errors.length} errores`,
+            results,
+            summary: {
+              total: students.length,
+              new: newStudents,
+              existing: existingStudents,
+              errors: results.errors.length
+            }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );

@@ -169,9 +169,30 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
 
       if (error) throw error;
 
+      // Mostrar información detallada de la importación
+      const summary = data?.summary || {
+        total: studentsToImport.length,
+        new: 0,
+        existing: 0,
+        errors: 0
+      };
+
+      let description = '';
+      if (summary.new > 0 && summary.existing > 0) {
+        description = `${summary.new} estudiantes nuevos creados, ${summary.existing} estudiantes existentes asociados al aula`;
+      } else if (summary.new > 0) {
+        description = `${summary.new} estudiantes nuevos creados y asociados al aula`;
+      } else if (summary.existing > 0) {
+        description = `${summary.existing} estudiantes existentes asociados al aula`;
+      }
+
+      if (summary.errors > 0) {
+        description += `. ${summary.errors} errores encontrados`;
+      }
+
       toast({
-        title: "Importación exitosa",
-        description: `Se importaron ${studentsToImport.length} estudiantes correctamente`,
+        title: "Importación completada",
+        description: description || data?.message || `${studentsToImport.length} estudiantes procesados`,
       });
 
       setImportStatus('completed');
@@ -216,6 +237,14 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
                     <li>SEXO (M/F)</li>
                     <li>FECHA DE NACIMIENTO (YYYY-MM-DD)</li>
                   </ul>
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      ℹ️ Estudiantes duplicados
+                    </p>
+                    <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                      Si un estudiante ya existe (mismo DNI o código), será reconocido y asociado automáticamente al aula virtual seleccionada sin crear un duplicado.
+                    </p>
+                  </div>
                 </div>
                 <Button
                   variant="outline"
