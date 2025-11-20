@@ -34,6 +34,7 @@ interface WeeklyResource {
   allows_student_submissions?: boolean;
   assignment_deadline?: string;
   max_score?: number;
+  assignment_id?: string;
   settings?: any;
 }
 
@@ -264,10 +265,11 @@ export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetai
                 className="flex-1"
                 onClick={() => {
                   onClose();
+                  const assignmentId = resource.assignment_id || resource.id;
                   if (profile?.role === 'student') {
-                    navigate(`/assignments/${resource.id}`);
+                    navigate(`/assignments/${assignmentId}`);
                   } else if (profile?.role === 'teacher' || profile?.role === 'admin') {
-                    navigate(`/assignments/${resource.id}/review`);
+                    navigate(`/assignments/${assignmentId}/review`);
                   }
                 }}
               >
