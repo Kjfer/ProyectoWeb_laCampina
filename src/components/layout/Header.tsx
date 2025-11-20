@@ -90,6 +90,7 @@ export function Header() {
       case 'teacher': return 'Docente';
       case 'student': return 'Estudiante';
       case 'parent': return 'Padre de Familia';
+      case 'tutor': return 'Tutor';
       default: return 'Usuario';
     }
   };
