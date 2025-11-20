@@ -37,6 +37,12 @@ interface WeeklyResource {
   assignment_id?: string;
   section_id?: string;
   settings?: any;
+  teacher_files?: Array<{
+    file_path: string;
+    file_name: string;
+    file_size: number;
+    mime_type: string;
+  }>;
 }
 
 interface ResourceDetailModalProps {
@@ -187,6 +193,32 @@ export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetai
     }
   };
 
+  const handleDownloadTeacherFile = async (filePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('download-file', {
+        body: {
+          bucket: 'course-documents',
+          filePath: filePath,
+          fileName: fileName
+        }
+      });
+
+      if (error) throw error;
+
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = data.fileName || fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('Descarga iniciada');
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('Error al descargar el archivo');
+    }
+  };
+
   const handleOpenLink = () => {
     if (resource.resource_url) {
       window.open(resource.resource_url, '_blank');
@@ -296,29 +328,38 @@ export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetai
                   )}
                 </div>
 
-                {/* Archivo adjunto del profesor para la tarea */}
-                {resource.file_path && (
-                  <div className="mt-4 p-4 rounded-lg bg-muted/50 border border-border">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Archivo de instrucciones del profesor</p>
-                          <p className="text-sm font-medium">{resource.title}</p>
-                          {resource.file_size && (
-                            <p className="text-xs text-muted-foreground">{formatFileSize(resource.file_size)}</p>
-                          )}
+                {/* Archivos adjuntos del profesor para la tarea */}
+                {resource.teacher_files && resource.teacher_files.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Archivos de instrucciones del profesor ({resource.teacher_files.length})
+                    </p>
+                    {resource.teacher_files.map((file, index) => (
+                      <div key={index} className="p-4 rounded-lg bg-muted/50 border border-border">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <FileText className="h-5 h-5 text-primary flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {file.file_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.file_size)}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadTeacherFile(file.file_path, file.file_name)}
+                            className="flex-shrink-0"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Descargar
+                          </Button>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleDownload}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Descargar
-                      </Button>
-                    </div>
+                    ))}
                   </div>
                 )}
               </div>
