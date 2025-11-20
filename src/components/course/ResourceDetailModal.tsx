@@ -295,6 +295,32 @@ export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetai
                     </div>
                   )}
                 </div>
+
+                {/* Archivo adjunto del profesor para la tarea */}
+                {resource.file_path && (
+                  <div className="mt-4 p-4 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Archivo de instrucciones del profesor</p>
+                          <p className="text-sm font-medium">{resource.title}</p>
+                          {resource.file_size && (
+                            <p className="text-xs text-muted-foreground">{formatFileSize(resource.file_size)}</p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleDownload}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Descargar
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
               <Separator />
             </>
@@ -302,30 +328,35 @@ export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetai
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
-            {isDownloadable && (
-              <Button 
-                onClick={handleDownload}
-                className="flex-1"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Descargar
-              </Button>
+            {/* For non-assignment resources, show download/link buttons */}
+            {resource.resource_type !== 'assignment' && (
+              <>
+                {isDownloadable && (
+                  <Button 
+                    onClick={handleDownload}
+                    className="flex-1"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Descargar
+                  </Button>
+                )}
+                
+                {isExternalLink && (
+                  <Button 
+                    onClick={handleOpenLink}
+                    variant={isDownloadable ? "outline" : "default"}
+                    className={isDownloadable ? "" : "flex-1"}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Abrir Enlace
+                  </Button>
+                )}
+              </>
             )}
             
-            {isExternalLink && (
-              <Button 
-                onClick={handleOpenLink}
-                variant={isDownloadable ? "outline" : "default"}
-                className={isDownloadable ? "" : "flex-1"}
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Abrir Enlace
-              </Button>
-            )}
-            
+            {/* For assignments, only show the assignment action button */}
             {resource.resource_type === 'assignment' && resource.allows_student_submissions && (
               <Button 
-                variant="secondary"
                 className="flex-1"
                 onClick={handleAssignmentNavigation}
                 disabled={isCreatingAssignment}
