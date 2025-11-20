@@ -1473,6 +1473,7 @@ export type Database = {
         Args: { student_profile_id: string }
         Returns: string[]
       }
+      get_tutor_student_ids: { Args: never; Returns: string[] }
       has_role:
         | {
             Args: { _role: Database["public"]["Enums"]["user_role"] }
