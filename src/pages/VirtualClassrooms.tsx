@@ -333,37 +333,54 @@ export default function VirtualClassrooms() {
                     Crear Aula Virtual
                   </Button>
                 </DialogTrigger>
-              <DialogContent className="max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
+              <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader className="pb-4">
+                  <DialogTitle className="text-2xl">Crear Nueva Aula Virtual</DialogTitle>
                   <DialogTitle>Crear Nueva Aula Virtual</DialogTitle>
-                  <DialogDescription>
-                    Complete los datos para crear una nueva aula virtual con generación automática de semanas
+                  <DialogDescription className="text-base">
+                    Complete los datos para crear una nueva aula virtual. Las semanas se generarán automáticamente basadas en las fechas del calendario académico.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleCreateClassroom} className="space-y-4">
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium">Información Básica</h3>
+                <form onSubmit={handleCreateClassroom} className="space-y-6">
+                  <div className="space-y-5 bg-muted/30 p-6 rounded-lg">
+                    <h3 className="text-base font-semibold text-primary">Información Básica</h3>
                     
-                    <div>
-                      <Label htmlFor="name">Nombre del Aula *</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Ej: Aula 1ro A"
-                        required
-                      />
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="name" className="text-base">Nombre del Aula *</Label>
+                        <Input
+                          id="name"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          placeholder="Ej: Aula 1ro A"
+                          required
+                          className="h-11 text-base"
+                        />
+                      </div>
+                    
+                      <div>
+                        <Label htmlFor="academic_year" className="text-base">Año Académico *</Label>
+                        <Input
+                          id="academic_year"
+                          value={formData.academic_year}
+                          onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
+                          placeholder="2024"
+                          required
+                          className="h-11 text-base"
+                        />
+                      </div>
                     </div>
-                    
-                    <div>
-                      <Label htmlFor="education_level">Nivel Educativo *</Label>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="education_level" className="text-base">Nivel Educativo *</Label>
                         <Select 
                           value={formData.education_level} 
                           onValueChange={(value: 'primaria' | 'secundaria') => 
                             setFormData({ ...formData, education_level: value, grade: '' })
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="h-11">
                             <SelectValue placeholder="Seleccionar nivel" />
                           </SelectTrigger>
                           <SelectContent>
@@ -371,29 +388,30 @@ export default function VirtualClassrooms() {
                             <SelectItem value="secundaria">Secundaria</SelectItem>
                           </SelectContent>
                         </Select>
-                    </div>
+                      </div>
 
-                    {formData.education_level && (
-                      <div>
-                        <Label htmlFor="grade">Grado *</Label>
+                      {formData.education_level && (
+                        <div>
+                          <Label htmlFor="grade" className="text-base">Grado *</Label>
                         <Select 
                           value={formData.grade} 
                           onValueChange={(value) => setFormData({ ...formData, grade: value })}
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar grado" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {grades[formData.education_level].map((grade) => (
-                              <SelectItem key={grade} value={grade}>{grade}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                            <SelectTrigger className="h-11">
+                              <SelectValue placeholder="Seleccionar grado" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {grades[formData.education_level].map((grade) => (
+                                <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
 
                     <div>
-                      <Label htmlFor="section">Sección *</Label>
+                      <Label htmlFor="section" className="text-base">Sección *</Label>
                       <Input
                         id="section"
                         value={formData.section}
@@ -407,37 +425,28 @@ export default function VirtualClassrooms() {
                         placeholder="A"
                         maxLength={1}
                         required
+                        className="h-11 text-base text-center text-lg font-semibold"
                       />
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-sm text-muted-foreground mt-1.5">
                         Ingresa una letra de A a Z
                       </p>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="academic_year">Año Académico *</Label>
-                      <Input
-                        id="academic_year"
-                        value={formData.academic_year}
-                        onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
-                        placeholder="2024"
-                        required
-                      />
                     </div>
                   </div>
 
                   {isAdmin && (
-                    <div className="space-y-4 border-t pt-4">
-                      <h3 className="text-sm font-medium">Responsables</h3>
+                    <div className="space-y-5 bg-muted/30 p-6 rounded-lg">
+                      <h3 className="text-base font-semibold text-primary">Responsables</h3>
                       
                       <div>
-                        <Label htmlFor="teacher">Profesor *</Label>
+                        <Label htmlFor="teacher" className="text-base">Profesor Asignado *</Label>
+                        <p className="text-sm text-muted-foreground mb-2">Busca y selecciona el profesor responsable</p>
                         <Popover open={teacherOpen} onOpenChange={setTeacherOpen}>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
                               role="combobox"
                               aria-expanded={teacherOpen}
-                              className="w-full justify-between"
+                              className="w-full justify-between h-11"
                             >
                               {formData.teacher_id
                                 ? teachers.find((teacher) => teacher.id === formData.teacher_id)
@@ -486,14 +495,15 @@ export default function VirtualClassrooms() {
                       </div>
 
                       <div>
-                        <Label htmlFor="tutor">Tutor (Opcional)</Label>
+                        <Label htmlFor="tutor" className="text-base">Tutor (Opcional)</Label>
+                        <p className="text-sm text-muted-foreground mb-2">Busca y selecciona un tutor si deseas asignarlo</p>
                         <Popover open={tutorOpen} onOpenChange={setTutorOpen}>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
                               role="combobox"
                               aria-expanded={tutorOpen}
-                              className="w-full justify-between"
+                              className="w-full justify-between h-11"
                             >
                               {formData.tutor_id
                                 ? tutors.find((tutor) => tutor.id === formData.tutor_id)
@@ -558,17 +568,23 @@ export default function VirtualClassrooms() {
                     </div>
                   )}
 
-                  <div className="space-y-4 border-t pt-4">
-                    <h3 className="text-sm font-medium">Calendario Académico</h3>
-                    
+                  <div className="space-y-5 bg-muted/30 p-6 rounded-lg">
                     <div>
-                      <Label htmlFor="start_date">Fecha de Inicio *</Label>
+                      <h3 className="text-base font-semibold text-primary">Calendario Académico</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Define el periodo del año académico. Las semanas se generarán automáticamente para todos los cursos.
+                      </p>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="start_date" className="text-base">Fecha de Inicio *</Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
                             className={cn(
-                              "w-full justify-start text-left font-normal",
+                              "w-full justify-start text-left font-normal h-11",
                               !formData.start_date && "text-muted-foreground"
                             )}
                           >
@@ -586,16 +602,16 @@ export default function VirtualClassrooms() {
                           />
                         </PopoverContent>
                       </Popover>
-                    </div>
+                      </div>
 
-                    <div>
-                      <Label htmlFor="end_date">Fecha de Fin *</Label>
+                      <div>
+                        <Label htmlFor="end_date" className="text-base">Fecha de Fin *</Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
                             className={cn(
-                              "w-full justify-start text-left font-normal",
+                              "w-full justify-start text-left font-normal h-11",
                               !formData.end_date && "text-muted-foreground"
                             )}
                           >
@@ -613,24 +629,24 @@ export default function VirtualClassrooms() {
                             className="pointer-events-auto"
                           />
                         </PopoverContent>
-                      </Popover>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Las semanas se generarán automáticamente para todos los cursos
-                      </p>
+                        </Popover>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex justify-end space-x-2 border-t pt-4">
+                  <div className="flex justify-end gap-3 pt-4 border-t">
                     <Button 
                       type="button" 
                       variant="outline" 
                       onClick={() => setIsCreateDialogOpen(false)}
+                      className="h-11 px-6"
                     >
                       Cancelar
                     </Button>
                     <Button 
                       type="submit"
                       disabled={!formData.name || !formData.education_level || !formData.grade || !formData.section || !formData.start_date || !formData.end_date}
+                      className="h-11 px-6"
                     >
                       Crear Aula Virtual
                     </Button>
