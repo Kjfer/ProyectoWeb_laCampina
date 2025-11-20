@@ -30,7 +30,15 @@ export const navigationItems: NavItem[] = [
     title: 'Dashboard',
     url: '/',
     icon: Home,
-    roles: ['admin', 'teacher', 'student', 'parent', 'tutor']
+    roles: ['admin', 'teacher', 'student', 'parent']
+  },
+  
+  // Dashboard Tutor
+  {
+    title: 'Dashboard',
+    url: '/tutor-dashboard',
+    icon: Home,
+    roles: ['tutor']
   },
   
   // Aulas Virtuales
