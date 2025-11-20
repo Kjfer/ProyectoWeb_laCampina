@@ -3,11 +3,13 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Users, GraduationCap, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
+import { Users, GraduationCap, Calendar, TrendingUp, AlertCircle, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { StudentDetailDialog } from '@/components/tutor/StudentDetailDialog';
 
 interface VirtualClassroom {
   id: string;
@@ -26,6 +28,9 @@ interface Student {
   maternal_surname: string;
   student_code: string;
   email: string;
+  phone?: string;
+  document_number?: string;
+  birth_date?: string;
 }
 
 interface AttendanceRecord {
@@ -55,6 +60,7 @@ export default function TutorDashboard() {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [gradeData, setGradeData] = useState<GradeRecord[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   useEffect(() => {
     if (profile?.role === 'tutor') {
@@ -364,20 +370,29 @@ export default function TutorDashboard() {
                     const grades = gradeData.find(g => g.student_id === student.id);
                     if (!grades || grades.total_graded === 0) {
                       return (
-                        <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div>
+                        <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg gap-4">
+                          <div className="flex-1">
                             <p className="font-medium">
                               {student.paternal_surname} {student.maternal_surname}, {student.first_name}
                             </p>
                             <p className="text-sm text-muted-foreground">{student.student_code}</p>
                           </div>
-                          <Badge variant="outline">Sin calificaciones</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">Sin calificaciones</Badge>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedStudent(student)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     }
 
                     return (
-                      <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+                      <div key={student.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border rounded-lg gap-4">
                         <div className="flex-1">
                           <p className="font-medium">
                             {student.paternal_surname} {student.maternal_surname}, {student.first_name}
@@ -402,13 +417,22 @@ export default function TutorDashboard() {
                             <div className="font-bold text-red-700 dark:text-red-400">{grades.c_count}</div>
                           </div>
                         </div>
-                        <div className="text-center">
-                          <Badge variant="default">
-                            {grades.average_score.toFixed(1)} - {getGradeLetter(grades.average_score)}
-                          </Badge>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {grades.total_graded} tareas
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div className="text-center">
+                            <Badge variant="default">
+                              {grades.average_score.toFixed(1)} - {getGradeLetter(grades.average_score)}
+                            </Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {grades.total_graded} tareas
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setSelectedStudent(student)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     );
@@ -432,14 +456,23 @@ export default function TutorDashboard() {
                     const attendance = attendanceData.find(a => a.student_id === student.id);
                     if (!attendance || attendance.total === 0) {
                       return (
-                        <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div>
+                        <div key={student.id} className="flex items-center justify-between p-4 border rounded-lg gap-4">
+                          <div className="flex-1">
                             <p className="font-medium">
                               {student.paternal_surname} {student.maternal_surname}, {student.first_name}
                             </p>
                             <p className="text-sm text-muted-foreground">{student.student_code}</p>
                           </div>
-                          <Badge variant="outline">Sin registros</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">Sin registros</Badge>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedStudent(student)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     }
@@ -447,7 +480,7 @@ export default function TutorDashboard() {
                     const status = getAttendanceStatus(attendance.attendance_rate);
 
                     return (
-                      <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-4">
+                      <div key={student.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border rounded-lg gap-4">
                         <div className="flex-1">
                           <p className="font-medium">
                             {student.paternal_surname} {student.maternal_surname}, {student.first_name}
@@ -472,13 +505,22 @@ export default function TutorDashboard() {
                             <div className="font-bold text-blue-700 dark:text-blue-400">{attendance.justified}</div>
                           </div>
                         </div>
-                        <div className="text-center">
-                          <Badge variant={status.variant}>
-                            {attendance.attendance_rate.toFixed(1)}% - {status.label}
-                          </Badge>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {attendance.total} clases
-                          </p>
+                        <div className="flex items-center gap-3">
+                          <div className="text-center">
+                            <Badge variant={status.variant}>
+                              {attendance.attendance_rate.toFixed(1)}% - {status.label}
+                            </Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {attendance.total} clases
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setSelectedStudent(student)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     );
@@ -488,6 +530,13 @@ export default function TutorDashboard() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <StudentDetailDialog
+          student={selectedStudent}
+          open={!!selectedStudent}
+          onOpenChange={(open) => !open && setSelectedStudent(null)}
+          classroomId={classroom?.id || ''}
+        />
       </div>
     </DashboardLayout>
   );
