@@ -4,10 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, AlertCircle, ClipboardList, Users } from 'lucide-react';
+import { Calendar, Clock, AlertCircle, ClipboardList, Users, Pencil } from 'lucide-react';
 import { format, isAfter, isBefore, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { EditExamDialog } from './EditExamDialog';
 
 interface Exam {
   id: string;
@@ -28,6 +29,7 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
   const navigate = useNavigate();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingExam, setEditingExam] = useState<Exam | null>(null);
 
   useEffect(() => {
     fetchExams();
@@ -126,6 +128,15 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
 
   return (
     <>
+      {editingExam && (
+        <EditExamDialog
+          open={!!editingExam}
+          onOpenChange={(open) => !open && setEditingExam(null)}
+          exam={editingExam}
+          onEditSuccess={fetchExams}
+        />
+      )}
+      
       <div className="space-y-4">
         {exams.map((exam) => {
           const status = getExamStatus(exam);
@@ -189,15 +200,26 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
                 )}
 
                 {canEdit && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/exam-submissions/${exam.id}?courseId=${courseId}`)}
-                    className="w-full mt-4"
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    Ver Respuestas de Estudiantes
-                  </Button>
+                  <div className="flex gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingExam(exam)}
+                      className="flex-1"
+                    >
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/exam-submissions/${exam.id}?courseId=${courseId}`)}
+                      className="flex-1"
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      Ver Respuestas
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
