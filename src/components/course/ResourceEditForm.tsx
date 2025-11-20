@@ -34,6 +34,9 @@ interface ResourceEditFormProps {
 export function ResourceEditForm({ resource, sectionId, onClose, onSuccess }: ResourceEditFormProps) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{file_path: string; file_name: string; file_size: number; mime_type: string}>>(
+    (resource as any).teacher_files || []
+  );
   const [formData, setFormData] = useState({
     title: resource.title,
     description: resource.description || '',
@@ -57,33 +60,48 @@ export function ResourceEditForm({ resource, sectionId, onClose, onSuccess }: Re
 
   const handleFileUpload = async (files: File[]) => {
     if (files.length === 0) return;
-    const file = files[0];
     
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
       const bucketName = formData.resource_type === 'video' ? 'course-videos' : 'course-documents';
+      const newFiles: Array<{file_path: string; file_name: string; file_size: number; mime_type: string}> = [];
       
-      const { data, error } = await supabase.storage
-        .from(bucketName)
-        .upload(`${sectionId}/${fileName}`, file);
+      for (const file of files) {
+        // Validar tamaño de archivo (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error(`${file.name} excede el límite de 5MB. Usa Google Drive para archivos más grandes.`);
+          continue;
+        }
 
-      if (error) throw error;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from(bucketName)
+          .upload(`${sectionId}/${fileName}`, file);
 
-      setFormData(prev => ({ 
-        ...prev, 
-        file_path: data.path,
-        title: prev.title || file.name.replace(/\.[^/.]+$/, "")
-      }));
+        if (error) throw error;
+
+        newFiles.push({
+          file_path: data.path,
+          file_name: file.name,
+          file_size: file.size,
+          mime_type: file.type
+        });
+      }
       
-      toast.success('Archivo subido exitosamente');
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+      toast.success(`${newFiles.length} archivo(s) subido(s) exitosamente`);
     } catch (error) {
       console.error('Error uploading file:', error);
       toast.error('Error al subir el archivo');
     } finally {
       setUploading(false);
     }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,11 +139,12 @@ export function ResourceEditForm({ resource, sectionId, onClose, onSuccess }: Re
         description: formData.description.trim() || null,
         resource_type: formData.resource_type,
         resource_url: formData.resource_url.trim() || null,
-        file_path: formData.file_path || null,
+        file_path: uploadedFiles.length > 0 ? uploadedFiles[0].file_path : (formData.file_path || null),
         is_published: formData.is_published,
         assignment_deadline: deadlineISO,
         max_score: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.max_score : null,
-        allows_student_submissions: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.allows_student_submissions : false
+        allows_student_submissions: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.allows_student_submissions : false,
+        teacher_files: uploadedFiles
       };
 
       const { error } = await supabase
@@ -217,17 +236,37 @@ export function ResourceEditForm({ resource, sectionId, onClose, onSuccess }: Re
 
           {formData.resource_type !== 'link' && (
             <div className="space-y-2">
-              <Label>Archivo</Label>
+              <Label>Archivos (máximo 5MB por archivo)</Label>
               <FileUpload
                 onFileSelect={handleFileUpload}
                 accept={formData.resource_type === 'video' ? 'video/*,audio/*' : '*'}
-                multiple={false}
+                multiple={true}
                 disabled={uploading}
               />
-              {formData.file_path && (
-                <p className="text-xs text-muted-foreground">
-                  Archivo actual: {formData.file_path.split('/').pop()}
-                </p>
+              {uploadedFiles.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm font-medium">Archivos adjuntos ({uploadedFiles.length}):</p>
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="h-4 w-4 flex-shrink-0 text-primary" />
+                        <div className="min-w-0">
+                          <p className="text-sm truncate">{file.file_name}</p>
+                          <p className="text-xs text-muted-foreground">{(file.file_size / 1024).toFixed(2)} KB</p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(index)}
+                        className="flex-shrink-0"
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
