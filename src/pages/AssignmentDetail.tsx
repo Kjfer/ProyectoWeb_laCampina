@@ -167,16 +167,16 @@ const AssignmentDetail = () => {
       if (selectedFile) {
         const fileExt = selectedFile.name.split('.').pop();
         const timestamp = new Date().getTime();
-        const newFilePath = `assignment-submissions/${id}/${timestamp}.${fileExt}`;
+        const newFilePath = `${profile?.id}/${id}/${timestamp}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
-          .from('course-files')
+          .from('student-submissions')
           .upload(newFilePath, selectedFile);
 
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
-          .from('course-files')
+          .from('student-submissions')
           .getPublicUrl(newFilePath);
 
         fileUrl = publicUrl;
