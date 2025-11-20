@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +18,6 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { StudentSubmissions } from './StudentSubmissions';
-import { AssignmentSubmissionManager } from './AssignmentSubmissionManager';
 import { toast } from 'sonner';
 
 interface WeeklyResource {
@@ -90,7 +89,7 @@ const formatFileSize = (bytes?: number) => {
 
 export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetailModalProps) {
   const { profile } = useAuth();
-  const [showSubmissions, setShowSubmissions] = useState(false);
+  const navigate = useNavigate();
 
   const handleDownload = async () => {
     try {
@@ -263,34 +262,20 @@ export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetai
               <Button 
                 variant="secondary"
                 className="flex-1"
-                onClick={() => setShowSubmissions(true)}
+                onClick={() => {
+                  onClose();
+                  if (profile?.role === 'student') {
+                    navigate(`/assignments/${resource.id}`);
+                  } else if (profile?.role === 'teacher' || profile?.role === 'admin') {
+                    navigate(`/assignments/${resource.id}/review`);
+                  }
+                }}
               >
                 <ClipboardList className="h-4 w-4 mr-2" />
                 {profile?.role === 'student' ? 'Ver/Enviar Tarea' : 'Ver Entregas'}
               </Button>
             )}
           </div>
-
-          {/* Student Submissions Section */}
-          {showSubmissions && resource.resource_type === 'assignment' && (
-            <div className="mt-6 border-t pt-6 space-y-4">
-              {profile?.role === 'student' ? (
-                <StudentSubmissions
-                  resourceId={resource.id}
-                  assignmentTitle={resource.title}
-                  deadline={resource.assignment_deadline}
-                  maxScore={resource.max_score}
-                  canSubmit={resource.allows_student_submissions || false}
-                />
-              ) : (profile?.role === 'teacher' || profile?.role === 'admin') ? (
-                <AssignmentSubmissionManager
-                  resourceId={resource.id}
-                  assignmentTitle={resource.title}
-                  maxScore={resource.max_score}
-                />
-              ) : null}
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>
