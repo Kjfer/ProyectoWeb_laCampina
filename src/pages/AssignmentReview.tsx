@@ -47,6 +47,13 @@ interface Assignment {
   };
 }
 
+interface FileInfo {
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+}
+
 interface Submission {
   id: string;
   student_id: string;
@@ -55,6 +62,7 @@ interface Submission {
   file_name: string | null;
   file_size: number | null;
   mime_type: string | null;
+  student_files: any;
   score: number | null;
   feedback: string | null;
   submitted_at: string;
@@ -125,6 +133,7 @@ const AssignmentReview = () => {
           file_name,
           file_size,
           mime_type,
+          student_files,
           score,
           feedback,
           submitted_at,
@@ -266,11 +275,31 @@ const AssignmentReview = () => {
     setFeedbackFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleDownloadFile = (fileUrl: string, fileName: string) => {
-    const link = document.createElement('a');
-    link.href = fileUrl;
-    link.download = fileName;
-    link.click();
+  const handleDownloadFile = async (filePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('download-file', {
+        body: {
+          bucket: 'student-submissions',
+          filePath: filePath,
+          fileName: fileName
+        }
+      });
+
+      if (error) throw error;
+
+      // Download the file using the signed URL
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = data.fileName || fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('Descarga iniciada');
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('No se pudo descargar el archivo');
+    }
   };
 
   if (loading) {
@@ -466,8 +495,37 @@ const AssignmentReview = () => {
                     </div>
                   </div>
 
-                  {/* File Attachment */}
-                  {selectedSubmission.file_path && selectedSubmission.file_name && (
+                  {/* File Attachments */}
+                  {selectedSubmission.student_files && selectedSubmission.student_files.length > 0 && (
+                    <div>
+                      <Label className="text-base font-semibold">Archivos adjuntos del estudiante</Label>
+                      <div className="mt-2 space-y-2">
+                        {selectedSubmission.student_files.map((file, index) => (
+                          <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
+                            <FileText className="w-5 h-5 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{file.file_name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {file.file_size ? (file.file_size / 1024).toFixed(2) : '0.00'} KB
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownloadFile(file.file_path, file.file_name)}
+                            >
+                              <Download className="w-4 h-4 mr-1" />
+                              Descargar
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fallback para entregas antiguas con un solo archivo */}
+                  {(!selectedSubmission.student_files || selectedSubmission.student_files.length === 0) && 
+                   selectedSubmission.file_path && selectedSubmission.file_name && (
                     <div>
                       <Label className="text-base font-semibold">Archivo adjunto</Label>
                       <div className="mt-2 flex items-center gap-3 p-3 border rounded-lg">
