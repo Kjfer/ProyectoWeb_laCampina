@@ -25,7 +25,6 @@ interface Question {
   question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay';
   options?: string[];
   correct_answer?: string;
-  points: number;
 }
 
 export function QuizForm({ courseId, onClose, onSuccess }: QuizFormProps) {
@@ -45,8 +44,7 @@ export function QuizForm({ courseId, onClose, onSuccess }: QuizFormProps) {
       question_text: '',
       question_type: 'multiple_choice',
       options: ['', '', '', ''],
-      correct_answer: '',
-      points: 1
+      correct_answer: ''
     }]);
   };
 
@@ -220,35 +218,22 @@ export function QuizForm({ courseId, onClose, onSuccess }: QuizFormProps) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Tipo de pregunta</Label>
-                      <Select
-                        value={question.question_type}
-                        onValueChange={(value) => updateQuestion(questionIndex, 'question_type', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="multiple_choice">Opción múltiple</SelectItem>
-                          <SelectItem value="true_false">Verdadero/Falso</SelectItem>
-                          <SelectItem value="short_answer">Respuesta corta</SelectItem>
-                          <SelectItem value="essay">Ensayo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Puntos</Label>
-                      <Input
-                        type="number"
-                        min="0.5"
-                        step="0.5"
-                        value={question.points}
-                        onChange={(e) => updateQuestion(questionIndex, 'points', parseFloat(e.target.value) || 1)}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Tipo de pregunta</Label>
+                    <Select
+                      value={question.question_type}
+                      onValueChange={(value) => updateQuestion(questionIndex, 'question_type', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="multiple_choice">Opción múltiple</SelectItem>
+                        <SelectItem value="true_false">Verdadero/Falso</SelectItem>
+                        <SelectItem value="short_answer">Respuesta corta</SelectItem>
+                        <SelectItem value="essay">Ensayo</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {question.question_type === 'multiple_choice' && (

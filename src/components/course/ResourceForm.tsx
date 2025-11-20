@@ -27,7 +27,6 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
     file_path: '',
     is_published: false,
     assignment_deadline: '',
-    max_score: 100,
     allows_student_submissions: false
   });
 
@@ -108,7 +107,6 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
             title: formData.title.trim(),
             description: formData.description.trim() || null,
             due_date: deadlineISO,
-            max_score: formData.max_score,
             is_published: formData.is_published
           })
           .select()
@@ -128,7 +126,6 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
         is_published: formData.is_published,
         position: 0,
         assignment_deadline: deadlineISO,
-        max_score: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.max_score : null,
         allows_student_submissions: (formData.resource_type === 'assignment' || formData.resource_type === 'exam') ? formData.allows_student_submissions : false,
         assignment_id: assignmentId
       };
@@ -269,28 +266,14 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
                 <Label className="font-medium">Configuración de Actividad</Label>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="assignment_deadline">Fecha límite</Label>
-                  <Input
-                    id="assignment_deadline"
-                    type="datetime-local"
-                    value={formData.assignment_deadline}
-                    onChange={(e) => setFormData(prev => ({ ...prev, assignment_deadline: e.target.value }))}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="max_score">Puntuación máxima</Label>
-                  <Input
-                    id="max_score"
-                    type="number"
-                    min="1"
-                    max="1000"
-                    value={formData.max_score}
-                    onChange={(e) => setFormData(prev => ({ ...prev, max_score: parseInt(e.target.value) || 100 }))}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignment_deadline">Fecha límite</Label>
+                <Input
+                  id="assignment_deadline"
+                  type="datetime-local"
+                  value={formData.assignment_deadline}
+                  onChange={(e) => setFormData(prev => ({ ...prev, assignment_deadline: e.target.value }))}
+                />
               </div>
               
               <div className="flex items-center space-x-2">

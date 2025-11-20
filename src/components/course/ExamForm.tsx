@@ -26,7 +26,6 @@ interface Question {
   question_type: 'multiple_choice' | 'true_false' | 'short_answer' | 'essay';
   options?: string[];
   correct_answer?: string;
-  points: number;
 }
 
 export function ExamForm({ courseId, onClose, onSuccess }: ExamFormProps) {
@@ -37,7 +36,6 @@ export function ExamForm({ courseId, onClose, onSuccess }: ExamFormProps) {
     description: '',
     start_time: null as Date | null,
     duration_minutes: 60,
-    max_score: 100,
     is_published: false
   });
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -47,8 +45,7 @@ export function ExamForm({ courseId, onClose, onSuccess }: ExamFormProps) {
       question_text: '',
       question_type: 'multiple_choice',
       options: ['', '', '', ''],
-      correct_answer: '',
-      points: 1
+      correct_answer: ''
     }]);
   };
 
@@ -106,7 +103,6 @@ export function ExamForm({ courseId, onClose, onSuccess }: ExamFormProps) {
           description: formData.description.trim() || null,
           start_time: formData.start_time.toISOString(),
           duration_minutes: formData.duration_minutes,
-          max_score: formData.max_score,
           is_published: formData.is_published
         })
         .select()
@@ -138,7 +134,6 @@ export function ExamForm({ courseId, onClose, onSuccess }: ExamFormProps) {
         question_type: q.question_type,
         options: q.options || null,
         correct_answer: q.correct_answer || null,
-        points: q.points,
         position: index
       }));
 
@@ -269,17 +264,6 @@ export function ExamForm({ courseId, onClose, onSuccess }: ExamFormProps) {
                 </PopoverContent>
               </Popover>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="max_score">Puntuación Máxima</Label>
-              <Input
-                id="max_score"
-                type="number"
-                min="1"
-                value={formData.max_score}
-                onChange={(e) => setFormData(prev => ({ ...prev, max_score: parseInt(e.target.value) || 100 }))}
-              />
-            </div>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -337,35 +321,22 @@ export function ExamForm({ courseId, onClose, onSuccess }: ExamFormProps) {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Tipo de pregunta</Label>
-                      <Select
-                        value={question.question_type}
-                        onValueChange={(value) => updateQuestion(questionIndex, 'question_type', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="multiple_choice">Opción múltiple</SelectItem>
-                          <SelectItem value="true_false">Verdadero/Falso</SelectItem>
-                          <SelectItem value="short_answer">Respuesta corta</SelectItem>
-                          <SelectItem value="essay">Ensayo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Puntos</Label>
-                      <Input
-                        type="number"
-                        min="0.5"
-                        step="0.5"
-                        value={question.points}
-                        onChange={(e) => updateQuestion(questionIndex, 'points', parseFloat(e.target.value) || 1)}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Tipo de pregunta</Label>
+                    <Select
+                      value={question.question_type}
+                      onValueChange={(value) => updateQuestion(questionIndex, 'question_type', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="multiple_choice">Opción múltiple</SelectItem>
+                        <SelectItem value="true_false">Verdadero/Falso</SelectItem>
+                        <SelectItem value="short_answer">Respuesta corta</SelectItem>
+                        <SelectItem value="essay">Ensayo</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {question.question_type === 'multiple_choice' && (
