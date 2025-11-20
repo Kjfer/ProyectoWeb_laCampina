@@ -84,6 +84,14 @@ const AssignmentDetail = () => {
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [existingFiles, setExistingFiles] = useState<Array<{
+    file_path: string;
+    file_name: string;
+    file_size: number;
+    mime_type: string;
+    file_url: string;
+  }>>([]);
+  const [filesToDelete, setFilesToDelete] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -212,12 +220,29 @@ const AssignmentDetail = () => {
       }
 
       if (isEditingSubmission && submission) {
+        // Delete files marked for deletion from storage
+        for (const filePath of filesToDelete) {
+          const { error: deleteError } = await supabase.storage
+            .from('student-submissions')
+            .remove([filePath]);
+          
+          if (deleteError) {
+            console.error('Error deleting file:', deleteError);
+          }
+        }
+
+        // Combine existing files (not deleted) with new uploaded files
+        const remainingExistingFiles = existingFiles.filter(
+          file => !filesToDelete.includes(file.file_path)
+        );
+        const updatedFiles = [...remainingExistingFiles, ...uploadedFiles];
+
         // Update existing submission
         const { error } = await supabase
           .from('assignment_submissions')
           .update({
             content: content.trim(),
-            student_files: uploadedFiles.length > 0 ? uploadedFiles : submission.student_files,
+            student_files: updatedFiles,
             submitted_at: new Date().toISOString(),
           })
           .eq('id', submission.id);
@@ -251,6 +276,8 @@ const AssignmentDetail = () => {
       fetchAssignmentDetails();
       setContent('');
       setSelectedFiles([]);
+      setExistingFiles([]);
+      setFilesToDelete([]);
       setIsEditingSubmission(false);
     } catch (error: any) {
       console.error('Error submitting assignment:', error);
@@ -268,13 +295,25 @@ const AssignmentDetail = () => {
     if (!submission) return;
     setContent(submission.content || '');
     setSelectedFiles([]);
+    setExistingFiles(submission.student_files || []);
+    setFilesToDelete([]);
     setIsEditingSubmission(true);
   };
 
   const handleCancelEdit = () => {
     setContent('');
     setSelectedFiles([]);
+    setExistingFiles([]);
+    setFilesToDelete([]);
     setIsEditingSubmission(false);
+  };
+
+  const handleDeleteExistingFile = (filePath: string) => {
+    setFilesToDelete(prev => [...prev, filePath]);
+  };
+
+  const handleUndoDeleteFile = (filePath: string) => {
+    setFilesToDelete(prev => prev.filter(path => path !== filePath));
   };
 
   const handleDelete = async () => {
@@ -703,6 +742,60 @@ const AssignmentDetail = () => {
                 <label className="text-sm font-medium text-foreground">
                   Archivos adjuntos (opcional)
                 </label>
+                
+                {/* Archivos existentes en modo edición */}
+                {isEditingSubmission && existingFiles.length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Archivos actuales ({existingFiles.filter(f => !filesToDelete.includes(f.file_path)).length}):
+                    </p>
+                    {existingFiles.map((file, index) => {
+                      const isMarkedForDeletion = filesToDelete.includes(file.file_path);
+                      return (
+                        <div 
+                          key={index} 
+                          className={`flex items-center justify-between p-3 rounded-lg border ${
+                            isMarkedForDeletion 
+                              ? 'bg-destructive/10 border-destructive/30 opacity-50' 
+                              : 'bg-muted/50 border-border'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <FileText className={`w-4 h-4 flex-shrink-0 ${isMarkedForDeletion ? 'text-destructive' : 'text-primary'}`} />
+                            <div className="min-w-0">
+                              <p className={`text-xs font-medium truncate ${isMarkedForDeletion ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                                {file.file_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {(file.file_size / 1024).toFixed(2)} KB
+                              </p>
+                            </div>
+                          </div>
+                          {isMarkedForDeletion ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUndoDeleteFile(file.file_path)}
+                              className="flex-shrink-0"
+                            >
+                              Restaurar
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteExistingFile(file.file_path)}
+                              className="flex-shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <FileUpload
                   onFileSelect={(files) => setSelectedFiles(files)}
                   accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.zip,.rar"
@@ -712,7 +805,7 @@ const AssignmentDetail = () => {
                 {selectedFiles.length > 0 && (
                   <div className="space-y-2 mt-3">
                     <p className="text-xs font-medium text-foreground">
-                      Archivos a entregar ({selectedFiles.length}):
+                      {isEditingSubmission ? 'Nuevos archivos a agregar' : 'Archivos a entregar'} ({selectedFiles.length}):
                     </p>
                     {selectedFiles.map((file, index) => (
                       <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted/50 border border-border">
@@ -728,13 +821,18 @@ const AssignmentDetail = () => {
                     ))}
                     <div className="pt-2 border-t border-border">
                       <p className="text-xs font-medium text-foreground">
-                        Tamaño total: {(selectedFiles.reduce((sum, f) => sum + f.size, 0) / 1024).toFixed(2)} KB
-                        {selectedFiles.reduce((sum, f) => sum + f.size, 0) > 5 * 1024 * 1024 && (
-                          <span className="text-destructive ml-2">
-                            (Supera los 5MB - Por favor comprime los archivos)
-                          </span>
-                        )}
+                        Tamaño total de nuevos archivos: {(selectedFiles.reduce((sum, f) => sum + f.size, 0) / 1024).toFixed(2)} KB
                       </p>
+                      {isEditingSubmission && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Archivos existentes que se mantendrán: {existingFiles.filter(f => !filesToDelete.includes(f.file_path)).length}
+                        </p>
+                      )}
+                      {selectedFiles.reduce((sum, f) => sum + f.size, 0) > 5 * 1024 * 1024 && (
+                        <p className="text-xs text-destructive mt-1">
+                          (Supera los 5MB - Por favor comprime los archivos)
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
