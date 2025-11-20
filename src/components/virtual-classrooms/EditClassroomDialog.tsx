@@ -16,6 +16,7 @@ interface VirtualClassroom {
   academic_year: string;
   section: string;
   teacher_id: string;
+  tutor_id?: string | null;
   is_active: boolean;
   teacher?: {
     first_name: string;
@@ -84,7 +85,7 @@ export function EditClassroomDialog({
         education_level: classroom.education_level,
         academic_year: classroom.academic_year,
         teacher_id: classroom.teacher_id,
-        tutor_id: '', // TODO: Agregar campo tutor_id en virtual_classrooms
+        tutor_id: classroom.tutor_id || '',
         section: classroom.section,
         is_active: classroom.is_active
       });

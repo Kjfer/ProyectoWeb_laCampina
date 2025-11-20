@@ -67,6 +67,7 @@ serve(async (req: Request) => {
         academic_year,
         section,
         teacher_id,
+        tutor_id,
         is_active,
         created_at
       `)
