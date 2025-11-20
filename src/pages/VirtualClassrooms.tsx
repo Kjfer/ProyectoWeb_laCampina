@@ -71,6 +71,7 @@ export default function VirtualClassrooms() {
   const [tutors, setTutors] = useState<Tutor[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [lastFetch, setLastFetch] = useState<number>(0);
   const [editingClassroom, setEditingClassroom] = useState<VirtualClassroom | null>(null);
   const [deletingClassroom, setDeletingClassroom] = useState<VirtualClassroom | null>(null);
@@ -241,6 +242,8 @@ export default function VirtualClassrooms() {
       return;
     }
 
+    setIsCreating(true);
+
     try {
       console.log('🔄 Creando nueva aula virtual con Edge Function...', formData);
 
@@ -300,6 +303,8 @@ export default function VirtualClassrooms() {
     } catch (error: any) {
       console.error('❌ Error creando aula virtual:', error);
       toast.error(`Error al crear el aula virtual: ${error.message}`);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -645,10 +650,17 @@ export default function VirtualClassrooms() {
                     </Button>
                     <Button 
                       type="submit"
-                      disabled={!formData.name || !formData.education_level || !formData.grade || !formData.section || !formData.start_date || !formData.end_date}
+                      disabled={isCreating || !formData.name || !formData.education_level || !formData.grade || !formData.section || !formData.start_date || !formData.end_date}
                       className="h-11 px-6"
                     >
-                      Crear Aula Virtual
+                      {isCreating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creando...
+                        </>
+                      ) : (
+                        'Crear Aula Virtual'
+                      )}
                     </Button>
                   </div>
                 </form>
