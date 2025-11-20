@@ -48,7 +48,7 @@ serve(async (req: Request) => {
     // Get request body
     const body = await req.json()
     console.log('📥 Request body:', body)
-    const { id, name, grade, education_level, academic_year, teacher_id, section, is_active } = body
+    const { id, name, grade, education_level, academic_year, teacher_id, tutor_id, section, is_active } = body
 
     // Validate required fields
     if (!id) {
@@ -91,9 +91,12 @@ serve(async (req: Request) => {
     if (section !== undefined) updateData.section = section
     if (is_active !== undefined) updateData.is_active = is_active
     
-    // Only allow admin to change teacher
+    // Only allow admin to change teacher and tutor
     if (teacher_id !== undefined && profile.role === 'admin') {
       updateData.teacher_id = teacher_id
+    }
+    if (tutor_id !== undefined && profile.role === 'admin') {
+      updateData.tutor_id = tutor_id || null  // Allow setting to null
     }
 
     // Update virtual classroom
@@ -109,10 +112,17 @@ serve(async (req: Request) => {
         academic_year,
         section,
         teacher_id,
+        tutor_id,
         is_active,
         created_at,
         updated_at,
         teacher:profiles!teacher_id(
+          id,
+          first_name,
+          last_name,
+          email
+        ),
+        tutor:profiles!tutor_id(
           id,
           first_name,
           last_name,

@@ -1405,6 +1405,7 @@ export type Database = {
           name: string
           section: string
           teacher_id: string
+          tutor_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1417,6 +1418,7 @@ export type Database = {
           name: string
           section?: string
           teacher_id: string
+          tutor_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1429,12 +1431,20 @@ export type Database = {
           name?: string
           section?: string
           teacher_id?: string
+          tutor_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "virtual_classrooms_teacher_id_fkey"
             columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "virtual_classrooms_tutor_id_fkey"
+            columns: ["tutor_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

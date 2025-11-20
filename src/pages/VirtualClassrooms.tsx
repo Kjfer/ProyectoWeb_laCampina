@@ -23,9 +23,15 @@ interface VirtualClassroom {
   academic_year: string;
   section: string;
   teacher_id: string;
+  tutor_id?: string | null;
   is_active: boolean;
   created_at: string;
   teacher?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
+  tutor?: {
     first_name: string;
     last_name: string;
     email: string;
@@ -69,6 +75,7 @@ export default function VirtualClassrooms() {
     education_level: '' as 'primaria' | 'secundaria' | '',
     academic_year: new Date().getFullYear().toString(),
     teacher_id: '',
+    tutor_id: '',
     section: ''
   });
 
@@ -226,6 +233,7 @@ export default function VirtualClassrooms() {
           education_level: formData.education_level as 'primaria' | 'secundaria',
           academic_year: formData.academic_year,
           teacher_id: formData.teacher_id || profile.id,
+          tutor_id: formData.tutor_id || null,
           section: formData.section.toUpperCase()
         }
       });
@@ -249,6 +257,7 @@ export default function VirtualClassrooms() {
         education_level: '',
         academic_year: new Date().getFullYear().toString(),
         teacher_id: '',
+        tutor_id: '',
         section: ''
       });
       
@@ -380,24 +389,46 @@ export default function VirtualClassrooms() {
                   </div>
 
                   {profile?.role === 'admin' && (
-                    <div>
-                      <Label htmlFor="teacher">Profesor Asignado</Label>
-                      <Select 
-                        value={formData.teacher_id} 
-                        onValueChange={(value) => setFormData({ ...formData, teacher_id: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar profesor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {teachers.map((teacher) => (
-                            <SelectItem key={teacher.id} value={teacher.id}>
-                              {teacher.first_name} {teacher.last_name} - {teacher.email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <>
+                      <div>
+                        <Label htmlFor="teacher">Profesor Asignado</Label>
+                        <Select 
+                          value={formData.teacher_id} 
+                          onValueChange={(value) => setFormData({ ...formData, teacher_id: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar profesor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teachers.map((teacher) => (
+                              <SelectItem key={teacher.id} value={teacher.id}>
+                                {teacher.first_name} {teacher.last_name} - {teacher.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="tutor">Tutor (Opcional)</Label>
+                        <Select 
+                          value={formData.tutor_id} 
+                          onValueChange={(value) => setFormData({ ...formData, tutor_id: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sin tutor asignado" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">Sin tutor</SelectItem>
+                            {tutors.map((tutor) => (
+                              <SelectItem key={tutor.id} value={tutor.id}>
+                                {tutor.first_name} {tutor.last_name} - {tutor.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
                   )}
 
                   <div className="flex justify-end space-x-2">

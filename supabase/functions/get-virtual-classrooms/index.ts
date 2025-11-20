@@ -86,20 +86,22 @@ serve(async (req: Request) => {
     // Optimized: Get all data with fewer queries
     console.log('📊 Optimizando consultas para mejor rendimiento...')
     
-    // Get all unique teacher IDs
+    // Get all unique teacher and tutor IDs
     const teacherIds = [...new Set(classrooms.map(c => c.teacher_id).filter(Boolean))]
+    const tutorIds = [...new Set(classrooms.map(c => c.tutor_id).filter(Boolean))]
+    const allProfileIds = [...new Set([...teacherIds, ...tutorIds])]
     
-    // Get all teachers in one query
-    let teachersMap = new Map()
-    if (teacherIds.length > 0) {
-      const { data: teachers, error: teachersError } = await supabaseClient
+    // Get all teachers and tutors in one query
+    let profilesMap = new Map()
+    if (allProfileIds.length > 0) {
+      const { data: profiles, error: profilesError } = await supabaseClient
         .from('profiles')
         .select('id, first_name, last_name, email')
-        .in('id', teacherIds)
+        .in('id', allProfileIds)
       
-      if (!teachersError && teachers) {
-        teachers.forEach(teacher => {
-          teachersMap.set(teacher.id, teacher)
+      if (!profilesError && profiles) {
+        profiles.forEach(profile => {
+          profilesMap.set(profile.id, profile)
         })
       }
     }
@@ -145,7 +147,8 @@ serve(async (req: Request) => {
 
     // Build final data structure
     const classroomsWithCounts = classrooms.map(classroom => {
-      const teacher = teachersMap.get(classroom.teacher_id) || null
+      const teacher = profilesMap.get(classroom.teacher_id) || null
+      const tutor = classroom.tutor_id ? profilesMap.get(classroom.tutor_id) || null : null
       const classroomCourses = coursesMap.get(classroom.id) || []
       const coursesCount = classroomCourses.length
       
@@ -161,6 +164,7 @@ serve(async (req: Request) => {
       return {
         ...classroom,
         teacher,
+        tutor,
         courses_count: coursesCount,
         students_count: uniqueStudents.size
       }
