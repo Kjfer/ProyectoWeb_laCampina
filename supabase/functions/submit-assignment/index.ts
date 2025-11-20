@@ -26,15 +26,9 @@ serve(async (req) => {
     }
 
     const { 
-      resourceId, 
       assignmentTitle, 
-      deadline, 
-      maxScore, 
       content, 
-      filePath, 
-      fileName, 
-      fileSize, 
-      mimeType,
+      files,
       courseId 
     } = await req.json();
 
@@ -69,8 +63,7 @@ serve(async (req) => {
         .insert({
           title: assignmentTitle,
           description: `Tarea: ${assignmentTitle}`,
-          due_date: deadline,
-          max_score: maxScore || 100,
+          max_score: 100,
           course_id: courseId,
           is_published: true
         })
@@ -95,16 +88,21 @@ serve(async (req) => {
       }
     );
 
+    // If multiple files, we'll store the first one in the old fields for backwards compatibility
+    // and all files in a JSON field if needed
+    const firstFile = files && files.length > 0 ? files[0] : null;
+
     const { error: submissionError } = await userSupabase
       .from('assignment_submissions')
       .insert({
         assignment_id: assignmentId,
         student_id: profile.id,
         content: content || null,
-        file_path: filePath,
-        file_name: fileName,
-        file_size: fileSize,
-        mime_type: mimeType
+        file_path: firstFile?.filePath,
+        file_name: firstFile?.fileName,
+        file_size: firstFile?.fileSize,
+        mime_type: firstFile?.mimeType,
+        file_url: firstFile?.fileUrl
       });
 
     if (submissionError) {

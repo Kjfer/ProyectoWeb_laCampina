@@ -76,7 +76,7 @@ const AssignmentDetail = () => {
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -145,10 +145,23 @@ const AssignmentDetail = () => {
   };
 
   const handleSubmit = async () => {
-    if (!content.trim() && !selectedFile) {
+    if (!content.trim() && selectedFiles.length === 0) {
       toast({
         title: "Error",
-        description: "Debes escribir una respuesta o adjuntar un archivo",
+        description: "Debes escribir una respuesta o adjuntar al menos un archivo",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar tamaño total de archivos
+    const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+    const maxTotalSize = 5 * 1024 * 1024; // 5MB en bytes
+
+    if (totalSize > maxTotalSize) {
+      toast({
+        title: "Archivos muy pesados",
+        description: "El tamaño total de los archivos supera los 5MB. Por favor, comprime tus archivos antes de subirlos.",
         variant: "destructive",
       });
       return;
@@ -157,33 +170,34 @@ const AssignmentDetail = () => {
     setIsSubmitting(true);
 
     try {
-      let fileUrl = null;
-      let filePath = null;
-      let fileName = null;
-      let fileSize = null;
-      let mimeType = null;
+      const uploadedFiles = [];
 
-      // Upload file if selected
-      if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop();
-        const timestamp = new Date().getTime();
-        const newFilePath = `${profile?.id}/${id}/${timestamp}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('student-submissions')
-          .upload(newFilePath, selectedFile);
+      // Upload multiple files if selected
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          const fileExt = file.name.split('.').pop();
+          const timestamp = new Date().getTime();
+          const randomId = Math.random().toString(36).substring(7);
+          const newFilePath = `${profile?.id}/${id}/${timestamp}_${randomId}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('student-submissions')
+            .upload(newFilePath, file);
 
-        if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('student-submissions')
-          .getPublicUrl(newFilePath);
+          const { data: { publicUrl } } = supabase.storage
+            .from('student-submissions')
+            .getPublicUrl(newFilePath);
 
-        fileUrl = publicUrl;
-        filePath = newFilePath;
-        fileName = selectedFile.name;
-        fileSize = selectedFile.size;
-        mimeType = selectedFile.type;
+          uploadedFiles.push({
+            fileUrl: publicUrl,
+            filePath: newFilePath,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type,
+          });
+        }
       }
 
       // Call the edge function to create submission
@@ -192,11 +206,7 @@ const AssignmentDetail = () => {
           assignmentTitle: assignment?.title,
           courseId: assignment?.course_id,
           content: content.trim(),
-          fileUrl,
-          filePath,
-          fileName,
-          fileSize,
-          mimeType,
+          files: uploadedFiles,
         },
       });
 
@@ -210,7 +220,7 @@ const AssignmentDetail = () => {
       // Refresh to show submission
       fetchAssignmentDetails();
       setContent('');
-      setSelectedFile(null);
+      setSelectedFiles([]);
     } catch (error: any) {
       console.error('Error submitting assignment:', error);
       toast({
@@ -591,24 +601,49 @@ const AssignmentDetail = () => {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">
-                  Archivo adjunto (opcional)
+                  Archivos adjuntos (opcional)
                 </label>
                 <FileUpload
-                  onFileSelect={(files) => setSelectedFile(files[0])}
-                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-                  maxSize={10 * 1024 * 1024}
+                  onFileSelect={(files) => setSelectedFiles(files)}
+                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.zip,.rar"
+                  maxSize={5}
+                  multiple={true}
                 />
-                {selectedFile && (
-                  <p className="text-xs text-muted-foreground">
-                    Archivo seleccionado: {selectedFile.name}
-                  </p>
+                {selectedFiles.length > 0 && (
+                  <div className="space-y-2 mt-3">
+                    <p className="text-xs font-medium text-foreground">
+                      Archivos a entregar ({selectedFiles.length}):
+                    </p>
+                    {selectedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted/50 border border-border">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-foreground truncate">
+                            {file.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {(file.size / 1024).toFixed(2)} KB
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t border-border">
+                      <p className="text-xs font-medium text-foreground">
+                        Tamaño total: {(selectedFiles.reduce((sum, f) => sum + f.size, 0) / 1024).toFixed(2)} KB
+                        {selectedFiles.reduce((sum, f) => sum + f.size, 0) > 5 * 1024 * 1024 && (
+                          <span className="text-destructive ml-2">
+                            (Supera los 5MB - Por favor comprime los archivos)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
 
               <div className="flex gap-3 pt-4">
                 <Button
                   onClick={handleSubmit}
-                  disabled={isSubmitting || (!content.trim() && !selectedFile)}
+                  disabled={isSubmitting || (!content.trim() && selectedFiles.length === 0)}
                   className="bg-gradient-primary shadow-glow"
                 >
                   {isSubmitting ? (
