@@ -63,8 +63,8 @@ serve(async (req) => {
       } else if (profile.role === 'teacher') {
         hasPermission = true // Teachers can view submissions in their courses
       } else if (profile.role === 'student') {
-        // Students can only download their own submissions
-        hasPermission = filePath.startsWith(user.id)
+        // Students can only download their own submissions (files are stored with profile.id)
+        hasPermission = filePath.startsWith(profile.id)
       }
     }
 
