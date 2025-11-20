@@ -578,6 +578,7 @@ export type Database = {
           resource_url: string | null
           section_id: string
           settings: Json | null
+          teacher_files: Json | null
           title: string
           updated_at: string | null
         }
@@ -598,6 +599,7 @@ export type Database = {
           resource_url?: string | null
           section_id: string
           settings?: Json | null
+          teacher_files?: Json | null
           title: string
           updated_at?: string | null
         }
@@ -618,6 +620,7 @@ export type Database = {
           resource_url?: string | null
           section_id?: string
           settings?: Json | null
+          teacher_files?: Json | null
           title?: string
           updated_at?: string | null
         }

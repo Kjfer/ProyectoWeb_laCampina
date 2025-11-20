@@ -49,9 +49,12 @@ interface Assignment {
     name: string;
     code: string;
   };
-  teacher_file_path?: string;
-  teacher_file_name?: string;
-  teacher_file_size?: number;
+  teacher_files?: Array<{
+    file_path: string;
+    file_name: string;
+    file_size: number;
+    mime_type: string;
+  }>;
 }
 
 interface Submission {
@@ -104,18 +107,16 @@ const AssignmentDetail = () => {
 
       if (assignmentError) throw assignmentError;
 
-      // Fetch teacher's file if this assignment is linked to a course_weekly_resource
+      // Fetch teacher's files if this assignment is linked to a course_weekly_resource
       const { data: resourceData } = await supabase
         .from('course_weekly_resources')
-        .select('file_path, file_size, title')
+        .select('teacher_files')
         .eq('assignment_id', id)
         .maybeSingle();
 
       setAssignment({
         ...assignmentData,
-        teacher_file_path: resourceData?.file_path,
-        teacher_file_name: resourceData?.title,
-        teacher_file_size: resourceData?.file_size
+        teacher_files: Array.isArray(resourceData?.teacher_files) ? resourceData.teacher_files as any : []
       });
 
       // Fetch student's submission if exists
@@ -254,16 +255,14 @@ const AssignmentDetail = () => {
     }
   };
 
-  const handleDownloadTeacherFile = async () => {
-    if (!assignment?.teacher_file_path) return;
-
+  const handleDownloadTeacherFile = async (filePath: string, fileName: string) => {
     setIsDownloading(true);
     try {
       const { data, error } = await supabase.functions.invoke('download-file', {
         body: {
           bucket: 'course-documents',
-          filePath: assignment.teacher_file_path,
-          fileName: assignment.teacher_file_name || 'archivo'
+          filePath: filePath,
+          fileName: fileName
         }
       });
 
@@ -272,7 +271,7 @@ const AssignmentDetail = () => {
       // Download the file using the signed URL
       const link = document.createElement('a');
       link.href = data.signedUrl;
-      link.download = data.fileName || assignment.teacher_file_name || 'archivo';
+      link.download = data.fileName || fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -433,38 +432,42 @@ const AssignmentDetail = () => {
               </div>
             </div>
 
-            {/* Archivo adjunto del profesor */}
-            {assignment.teacher_file_path && (
+            {/* Archivos adjuntos del profesor */}
+            {assignment.teacher_files && assignment.teacher_files.length > 0 && (
               <>
                 <Separator />
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Archivo de instrucciones del profesor</h3>
-                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <FileText className="w-5 h-5 text-primary flex-shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {assignment.teacher_file_name || 'Archivo adjunto'}
-                          </p>
-                          {assignment.teacher_file_size && (
-                            <p className="text-xs text-muted-foreground">
-                              {(assignment.teacher_file_size / 1024).toFixed(2)} KB
-                            </p>
-                          )}
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">
+                    Archivos de instrucciones del profesor ({assignment.teacher_files.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {assignment.teacher_files.map((file, index) => (
+                      <div key={index} className="p-4 rounded-lg bg-muted/50 border border-border">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {file.file_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {(file.file_size / 1024).toFixed(2)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadTeacherFile(file.file_path, file.file_name)}
+                            disabled={isDownloading}
+                            className="flex-shrink-0"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            {isDownloading ? 'Descargando...' : 'Descargar'}
+                          </Button>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleDownloadTeacherFile}
-                        disabled={isDownloading}
-                        className="flex-shrink-0"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        {isDownloading ? 'Descargando...' : 'Descargar'}
-                      </Button>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </>
