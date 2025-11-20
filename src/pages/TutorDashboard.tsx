@@ -5,11 +5,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Users, GraduationCap, Calendar, TrendingUp, AlertCircle, Eye } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Users, GraduationCap, Calendar, AlertCircle, Eye, Search, BookOpen, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { StudentDetailDialog } from '@/components/tutor/StudentDetailDialog';
+import { StatCard } from '@/components/tutor/StatCard';
+import { AttendanceBarChart } from '@/components/tutor/AttendanceBarChart';
+import { GradeDistributionChart } from '@/components/tutor/GradeDistributionChart';
+import { StudentsAtRiskTable } from '@/components/tutor/StudentsAtRiskTable';
+import { CoursePerformanceTable } from '@/components/tutor/CoursePerformanceTable';
 
 interface VirtualClassroom {
   id: string;
@@ -53,6 +59,12 @@ interface GradeRecord {
   average_score: number;
 }
 
+interface CourseData {
+  id: string;
+  name: string;
+  code: string;
+}
+
 export default function TutorDashboard() {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -61,6 +73,8 @@ export default function TutorDashboard() {
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [gradeData, setGradeData] = useState<GradeRecord[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [courses, setCourses] = useState<CourseData[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (profile?.role === 'tutor') {
@@ -90,14 +104,15 @@ export default function TutorDashboard() {
 
       setClassroom(classroomData);
 
-      // Fetch students enrolled in classroom courses
+      // Fetch courses in classroom
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
-        .select('id')
+        .select('id, name, code')
         .eq('classroom_id', classroomData.id);
 
       if (coursesError) throw coursesError;
 
+      setCourses(coursesData || []);
       const courseIds = coursesData.map(c => c.id);
 
       if (courseIds.length > 0) {
@@ -282,6 +297,84 @@ export default function TutorDashboard() {
     ? gradeData.reduce((acc, r) => acc + r.average_score, 0) / gradeData.length
     : 0;
 
+  // Calculate students at risk
+  const studentsAtRisk = students
+    .map(student => {
+      const attendance = attendanceData.find(a => a.student_id === student.id);
+      const grades = gradeData.find(g => g.student_id === student.id);
+      
+      const attendanceRate = attendance?.attendance_rate || 0;
+      const averageScore = grades?.average_score || 0;
+      
+      const riskFactors: string[] = [];
+      if (attendanceRate < 75) riskFactors.push('Asistencia baja');
+      if (averageScore > 0 && averageScore < 11) riskFactors.push('Bajo rendimiento');
+      if (attendanceRate < 60) riskFactors.push('Asistencia crítica');
+      
+      return {
+        student,
+        attendanceRate,
+        averageScore,
+        riskFactors
+      };
+    })
+    .filter(item => item.riskFactors.length > 0);
+
+  // Calculate course performance
+  const coursePerformance = courses.map(course => {
+    const courseAttendance = attendanceData.filter(a => {
+      // We need to check if this attendance belongs to this course
+      // Since we're aggregating, we'll calculate average across all courses for now
+      return true;
+    });
+    
+    const courseGrades = gradeData.filter(g => g.total_graded > 0);
+    
+    const avgAttendance = courseAttendance.length > 0
+      ? courseAttendance.reduce((acc, a) => acc + a.attendance_rate, 0) / courseAttendance.length
+      : 0;
+      
+    const avgScore = courseGrades.length > 0
+      ? courseGrades.reduce((acc, g) => acc + g.average_score, 0) / courseGrades.length
+      : 0;
+    
+    return {
+      courseName: course.name,
+      attendanceRate: avgAttendance,
+      averageScore: avgScore,
+      studentCount: students.length
+    };
+  });
+
+  // Prepare attendance chart data
+  const attendanceChartData = courses.map(course => ({
+    course: course.name,
+    attendanceRate: coursePerformance.find(cp => cp.courseName === course.name)?.attendanceRate || 0
+  }));
+
+  // Prepare grade distribution data
+  const totalGradeDistribution = gradeData.reduce(
+    (acc, g) => ({
+      ad: acc.ad + g.ad_count,
+      a: acc.a + g.a_count,
+      b: acc.b + g.b_count,
+      c: acc.c + g.c_count
+    }),
+    { ad: 0, a: 0, b: 0, c: 0 }
+  );
+
+  // Filter students by search
+  const filteredStudents = students.filter(student => {
+    const fullName = `${student.paternal_surname} ${student.maternal_surname} ${student.first_name} ${student.student_code}`.toLowerCase();
+    return fullName.includes(searchTerm.toLowerCase());
+  });
+
+  const studentsWithGoodPerformance = students.filter(student => {
+    const attendance = attendanceData.find(a => a.student_id === student.id);
+    const grades = gradeData.find(g => g.student_id === student.id);
+    return (attendance?.attendance_rate || 0) >= 90 && (grades?.average_score || 0) >= 14;
+  }).length;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -292,64 +385,81 @@ export default function TutorDashboard() {
           </p>
         </div>
 
-        {/* Stats Cards */}
+        {/* Enhanced Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Estudiantes</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{students.length}</div>
-              <p className="text-xs text-muted-foreground">
-                En el aula virtual
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Asistencia Promedio</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overallAttendanceRate.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground">
-                Del aula virtual
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Promedio General</CardTitle>
-              <GraduationCap className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {overallAverageScore.toFixed(1)} - {getGradeLetter(overallAverageScore)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                De tareas calificadas
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Año Académico</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{classroom.academic_year}</div>
-              <p className="text-xs text-muted-foreground">
-                Actual
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Total Estudiantes"
+            value={students.length}
+            icon={Users}
+            description="En el aula virtual"
+          />
+          
+          <StatCard
+            title="Asistencia Promedio"
+            value={`${overallAttendanceRate.toFixed(1)}%`}
+            icon={Calendar}
+            description="Del aula virtual"
+            trend={overallAttendanceRate >= 85 ? 'up' : overallAttendanceRate >= 75 ? 'neutral' : 'down'}
+            trendValue={overallAttendanceRate >= 85 ? 'Excelente' : overallAttendanceRate >= 75 ? 'Buena' : 'Requiere atención'}
+          />
+          
+          <StatCard
+            title="Promedio General"
+            value={`${overallAverageScore.toFixed(1)} - ${getGradeLetter(overallAverageScore)}`}
+            icon={GraduationCap}
+            description="De tareas calificadas"
+            trend={overallAverageScore >= 14 ? 'up' : overallAverageScore >= 11 ? 'neutral' : 'down'}
+            trendValue={overallAverageScore >= 14 ? 'Sobresaliente' : overallAverageScore >= 11 ? 'Satisfactorio' : 'Necesita mejorar'}
+          />
+          
+          <StatCard
+            title="Estudiantes Destacados"
+            value={studentsWithGoodPerformance}
+            icon={Target}
+            description="Con +90% asistencia y +14 promedio"
+            trend={studentsWithGoodPerformance > students.length * 0.5 ? 'up' : 'neutral'}
+            trendValue={`${((studentsWithGoodPerformance / students.length) * 100).toFixed(0)}% del aula`}
+          />
         </div>
 
-        {/* Student Details */}
+        {/* Visualizations */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <AttendanceBarChart data={attendanceChartData} />
+          <GradeDistributionChart data={totalGradeDistribution} />
+        </div>
+
+        {/* Students at Risk */}
+        <StudentsAtRiskTable 
+          students={studentsAtRisk}
+          onViewDetails={setSelectedStudent}
+        />
+
+        {/* Course Performance */}
+        {coursePerformance.length > 0 && (
+          <CoursePerformanceTable courses={coursePerformance} />
+        )}
+
+        {/* Student Details with Search */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Detalles por Estudiante</CardTitle>
+                <CardDescription>Busca y revisa el desempeño individual</CardDescription>
+              </div>
+              <div className="relative w-64">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar estudiante..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+
         <Tabs defaultValue="grades" className="space-y-4">
           <TabsList>
             <TabsTrigger value="grades">Calificaciones</TabsTrigger>
@@ -366,7 +476,12 @@ export default function TutorDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {students.map(student => {
+                  {filteredStudents.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No se encontraron estudiantes que coincidan con la búsqueda
+                    </div>
+                  )}
+                  {filteredStudents.map(student => {
                     const grades = gradeData.find(g => g.student_id === student.id);
                     if (!grades || grades.total_graded === 0) {
                       return (
@@ -452,7 +567,12 @@ export default function TutorDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {students.map(student => {
+                  {filteredStudents.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No se encontraron estudiantes que coincidan con la búsqueda
+                    </div>
+                  )}
+                  {filteredStudents.map(student => {
                     const attendance = attendanceData.find(a => a.student_id === student.id);
                     if (!attendance || attendance.total === 0) {
                       return (
