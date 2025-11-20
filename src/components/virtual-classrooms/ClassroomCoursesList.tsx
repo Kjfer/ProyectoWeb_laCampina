@@ -159,98 +159,125 @@ export function ClassroomCoursesList({ classroomId, classroomName }: ClassroomCo
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center py-4">
-        <h2 className="text-2xl font-bold text-foreground mb-2">
+    <div className="space-y-8">
+      <div className="text-center py-6">
+        <h2 className="text-3xl font-bold text-foreground mb-3 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
           Cursos Disponibles
         </h2>
-        <p className="text-muted-foreground">
-          {classroomName} - {courses.length} curso{courses.length !== 1 ? 's' : ''} disponible{courses.length !== 1 ? 's' : ''}
+        <p className="text-muted-foreground text-lg">
+          {courses.length} curso{courses.length !== 1 ? 's' : ''} en {classroomName}
         </p>
       </div>
 
       {courses.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-8">
-            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">
-              No hay cursos disponibles en esta aula virtual.
+        <Card className="border-dashed border-2">
+          <CardContent className="text-center py-16">
+            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
+              <BookOpen className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No hay cursos disponibles</h3>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Esta aula virtual aún no tiene cursos creados. Los cursos aparecerán aquí cuando estén disponibles.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {courses.map((course) => {
             const progressPercentage = getProgressPercentage(course.completed_sections, course.total_sections);
             
             return (
-              <Card key={course.id} className="transition-all hover:shadow-lg">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="secondary" className="text-xs">
+              <Card 
+                key={course.id} 
+                className={`group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${
+                  course.is_enrolled 
+                    ? 'border-primary/50 bg-gradient-to-br from-primary/5 to-transparent' 
+                    : 'hover:border-primary/30'
+                }`}
+              >
+                {/* Decorative gradient overlay */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full opacity-50 group-hover:opacity-100 transition-opacity" />
+                
+                <CardHeader className="relative pb-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-3 flex-wrap">
+                        <Badge variant="secondary" className="text-xs font-medium shadow-sm">
                           {course.code}
                         </Badge>
-                        <Badge 
-                          variant={course.is_enrolled ? "default" : "outline"}
-                          className="text-xs"
-                        >
-                          {course.is_enrolled ? 'Inscrito' : 'Disponible'}
-                        </Badge>
+                        {course.is_enrolled ? (
+                          <Badge className="text-xs bg-green-500 hover:bg-green-600">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Inscrito
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            Disponible
+                          </Badge>
+                        )}
                       </div>
-                      <CardTitle className="text-xl mb-1">{course.name}</CardTitle>
-                      <CardDescription className="flex items-center gap-4 text-sm">
-                        <span className="flex items-center gap-1">
-                          <GraduationCap className="h-3 w-3" />
-                          Prof. {course.teacher?.first_name || 'Sin asignar'} {course.teacher?.last_name || ''}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {course.academic_year}
-                        </span>
+                      <CardTitle className="text-xl mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+                        {course.name}
+                      </CardTitle>
+                      <CardDescription className="space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <GraduationCap className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">
+                            Prof. {course.teacher?.first_name || 'Sin asignar'} {course.teacher?.last_name || ''}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 shrink-0" />
+                          <span>{course.academic_year}</span>
+                        </div>
                       </CardDescription>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                      <BookOpen className="h-6 w-6 text-primary" />
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                
+                <CardContent className="space-y-4 relative">
                   {course.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
+                    <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
                       {course.description}
                     </p>
                   )}
 
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {formatDate(course.start_date)} - {formatDate(course.end_date)}
-                    </span>
+                  <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg text-sm">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span className="text-xs">{formatDate(course.start_date)}</span>
+                    </div>
                     {course.total_sections > 0 && (
-                      <span className="flex items-center gap-1">
-                        <BookOpen className="h-3 w-3" />
-                        {course.total_sections} semana{course.total_sections !== 1 ? 's' : ''}
-                      </span>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <BookOpen className="h-3.5 w-3.5" />
+                        <span className="text-xs font-medium">{course.total_sections} semanas</span>
+                      </div>
                     )}
                   </div>
 
                   {course.is_enrolled && course.total_sections > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Progreso del curso</span>
-                        <span className="font-medium">{progressPercentage}%</span>
+                    <div className="space-y-2.5 p-3 bg-gradient-to-br from-primary/5 to-transparent rounded-lg border border-primary/10">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground font-medium">Tu progreso</span>
+                        <span className="font-bold text-primary">{progressPercentage}%</span>
                       </div>
-                      <Progress value={progressPercentage} className="h-2" />
-                      <p className="text-xs text-muted-foreground">
+                      <Progress value={progressPercentage} className="h-2.5" />
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <CheckCircle className="h-3 w-3 text-green-500" />
                         {course.completed_sections} de {course.total_sections} semanas completadas
                       </p>
                     </div>
                   )}
 
-                  <div className="flex gap-2 pt-2">
+                  <div className="pt-2">
                     {course.is_enrolled ? (
                       <Button 
                         onClick={() => navigate(`/courses/${course.id}`)}
-                        className="flex-1"
+                        className="w-full font-medium shadow-md hover:shadow-lg transition-all"
+                        size="lg"
                       >
                         <BookOpen className="h-4 w-4 mr-2" />
                         Acceder al Curso
@@ -259,7 +286,9 @@ export function ClassroomCoursesList({ classroomId, classroomName }: ClassroomCo
                       <Button 
                         onClick={() => handleEnroll(course.id)}
                         disabled={enrolling === course.id}
-                        className="flex-1"
+                        className="w-full font-medium"
+                        variant="outline"
+                        size="lg"
                       >
                         {enrolling === course.id ? (
                           <>
@@ -269,7 +298,7 @@ export function ClassroomCoursesList({ classroomId, classroomName }: ClassroomCo
                         ) : (
                           <>
                             <Users className="h-4 w-4 mr-2" />
-                            Inscribirse
+                            Inscribirse Ahora
                           </>
                         )}
                       </Button>
