@@ -233,7 +233,7 @@ export default function VirtualClassrooms() {
           education_level: formData.education_level as 'primaria' | 'secundaria',
           academic_year: formData.academic_year,
           teacher_id: formData.teacher_id || profile.id,
-          tutor_id: formData.tutor_id || null,
+          tutor_id: formData.tutor_id && formData.tutor_id !== "none" ? formData.tutor_id : null,
           section: formData.section.toUpperCase()
         }
       });
@@ -412,14 +412,14 @@ export default function VirtualClassrooms() {
                       <div>
                         <Label htmlFor="tutor">Tutor (Opcional)</Label>
                         <Select 
-                          value={formData.tutor_id} 
-                          onValueChange={(value) => setFormData({ ...formData, tutor_id: value })}
+                          value={formData.tutor_id || "none"} 
+                          onValueChange={(value) => setFormData({ ...formData, tutor_id: value === "none" ? "" : value })}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Sin tutor asignado" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Sin tutor</SelectItem>
+                            <SelectItem value="none">Sin tutor</SelectItem>
                             {tutors.map((tutor) => (
                               <SelectItem key={tutor.id} value={tutor.id}>
                                 {tutor.first_name} {tutor.last_name} - {tutor.email}

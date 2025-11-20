@@ -386,7 +386,7 @@ const AdminCourseManagement = () => {
           </SelectTrigger>
           <SelectContent>
             {teachers.length === 0 ? (
-              <SelectItem value="" disabled>
+              <SelectItem value="no-teachers" disabled>
                 No hay profesores disponibles
               </SelectItem>
             ) : (
