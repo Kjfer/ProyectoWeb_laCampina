@@ -34,8 +34,6 @@ const WEEKDAYS = [
 export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseScheduleManagerProps) {
   const { profile } = useAuth();
   
-  // Solo los administradores pueden editar el horario
-  const canEdit = profile?.role === 'admin';
   const [daySchedules, setDaySchedules] = useState<DaySchedule[]>(
     WEEKDAYS.map(day => ({
       day: day.value,
@@ -46,10 +44,54 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
 
   useEffect(() => {
     fetchSchedule();
-  }, [courseId]);
+    checkEditPermissions();
+  }, [courseId, profile]);
+
+  const checkEditPermissions = async () => {
+    if (!profile) return;
+
+    // Admins siempre pueden editar
+    if (profile.role === 'admin') {
+      setCanEdit(true);
+      return;
+    }
+
+    // Verificar si es tutor del aula virtual del curso
+    if (profile.role === 'tutor') {
+      try {
+        const { data: courseData, error } = await supabase
+          .from('courses')
+          .select('classroom_id')
+          .eq('id', courseId)
+          .single();
+
+        if (error) throw error;
+
+        if (courseData?.classroom_id) {
+          const { data: classroomData, error: classroomError } = await supabase
+            .from('virtual_classrooms')
+            .select('tutor_id')
+            .eq('id', courseData.classroom_id)
+            .single();
+
+          if (classroomError) throw classroomError;
+
+          if (classroomData?.tutor_id === profile.id) {
+            setCanEdit(true);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking tutor permissions:', error);
+      }
+    }
+
+    setCanEdit(false);
+  };
 
   const fetchSchedule = async () => {
     try {
