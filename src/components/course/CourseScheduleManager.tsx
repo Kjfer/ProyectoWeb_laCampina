@@ -55,13 +55,13 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
     if (!profile) return;
 
     // Admins siempre pueden editar
-    if (profile.role === 'admin') {
+    if (profile.role === 'admin' || profile.roles?.includes('admin')) {
       setCanEdit(true);
       return;
     }
 
     // Verificar si es tutor del aula virtual del curso
-    if (profile.role === 'tutor') {
+    if (profile.role === 'tutor' || profile.roles?.includes('tutor')) {
       try {
         const { data: courseData, error } = await supabase
           .from('courses')
