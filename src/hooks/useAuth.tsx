@@ -23,6 +23,8 @@ interface AuthContextType {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  activeRole: UserRole | null;
+  setActiveRole: (role: UserRole) => void;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, userData: { first_name: string; last_name: string; role: string; document_number: string }) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -35,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeRole, setActiveRoleState] = useState<UserRole | null>(null);
 
   useEffect(() => {
     // Set up auth state listener
@@ -74,6 +77,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               };
               
               setProfile(profile);
+
+              // Load active role from localStorage or use primary role
+              const savedActiveRole = localStorage.getItem('activeRole') as UserRole;
+              if (savedActiveRole && allRoles.includes(savedActiveRole)) {
+                setActiveRoleState(savedActiveRole);
+              } else {
+                setActiveRoleState(primaryRole);
+              }
             
               // Fetch unread notifications for students
               if (profile && profile.role === 'student') {
@@ -133,11 +144,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Use the first role as the primary role
             const primaryRole = allRoles[0];
 
-            setProfile({
+            const profile = {
               ...profileData,
               role: primaryRole,
               roles: allRoles
-            });
+            };
+            
+            setProfile(profile);
+
+            // Load active role from localStorage or use primary role
+            const savedActiveRole = localStorage.getItem('activeRole') as UserRole;
+            if (savedActiveRole && allRoles.includes(savedActiveRole)) {
+              setActiveRoleState(savedActiveRole);
+            } else {
+              setActiveRoleState(primaryRole);
+            }
           }
           
           setLoading(false);
@@ -172,6 +193,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem('activeRole');
+  };
+
+  const setActiveRole = (role: UserRole) => {
+    setActiveRoleState(role);
+    localStorage.setItem('activeRole', role);
+    // Reload to update navigation and permissions
+    window.location.reload();
   };
 
   const value = {
@@ -179,6 +208,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     session,
     loading,
+    activeRole,
+    setActiveRole,
     signIn,
     signUp,
     signOut,
