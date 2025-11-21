@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 
 export function AppSidebar() {
-  const { profile } = useAuth();
+  const { profile, activeRole } = useAuth();
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
@@ -28,8 +28,9 @@ export function AppSidebar() {
 
   const isActive = (path: string) => currentPath === path;
   
-  // Get navigation items based on user role(s)
-  const navigationItems = profile ? getNavigationForRole(profile.role, profile.roles) : [];
+  // Get navigation items based on active role
+  const currentRole = activeRole || profile?.role;
+  const navigationItems = profile && currentRole ? getNavigationForRole(currentRole, profile.roles) : [];
   const mainItems = navigationItems.filter(item => 
     !adminNavigationItems.some(adminItem => adminItem.url === item.url)
   );
@@ -55,7 +56,7 @@ export function AppSidebar() {
         {/* Navigation */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            {!collapsed && (profile?.role === 'admin' ? 'Navegación' : 'Principal')}
+            {!collapsed && (currentRole === 'admin' ? 'Navegación' : 'Principal')}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
@@ -74,7 +75,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Admin Panel - Only for admin users */}
-        {profile?.role === 'admin' && (
+        {currentRole === 'admin' && (
           <SidebarGroup className="mt-6">
             <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
               {!collapsed && (

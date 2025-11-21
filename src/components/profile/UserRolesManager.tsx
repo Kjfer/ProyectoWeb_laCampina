@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 const AVAILABLE_ROLES: { value: UserRole; label: string }[] = [
   { value: 'student', label: 'Estudiante' },
@@ -17,7 +18,7 @@ const AVAILABLE_ROLES: { value: UserRole; label: string }[] = [
 ];
 
 export function UserRolesManager() {
-  const { profile, user } = useAuth();
+  const { profile, user, activeRole, setActiveRole } = useAuth();
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
@@ -76,10 +77,7 @@ export function UserRolesManager() {
 
       toast.success('Rol agregado correctamente');
       setSelectedRole('');
-      fetchUserRoles();
-      
-      // Refresh page to update navigation
-      window.location.reload();
+      await fetchUserRoles();
     } catch (error: any) {
       console.error('Error adding role:', error);
       toast.error(error.message || 'Error al agregar rol');
@@ -113,10 +111,16 @@ export function UserRolesManager() {
       if (error) throw error;
 
       toast.success('Rol eliminado correctamente');
-      fetchUserRoles();
       
-      // Refresh page to update navigation
-      window.location.reload();
+      // If deleted role was active, switch to primary role
+      if (activeRole === roleToRemove) {
+        const remainingRoles = userRoles.filter(r => r !== roleToRemove);
+        if (remainingRoles.length > 0) {
+          setActiveRole(remainingRoles[0]);
+        }
+      }
+      
+      await fetchUserRoles();
     } catch (error: any) {
       console.error('Error removing role:', error);
       toast.error(error.message || 'Error al eliminar rol');
@@ -143,12 +147,39 @@ export function UserRolesManager() {
           Administra los roles asignados a tu cuenta. Puedes tener múltiples roles simultáneamente.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        {userRoles.length > 1 && (
+          <div className="space-y-2">
+            <Label htmlFor="active-role" className="text-sm font-medium">
+              Rol Activo
+            </Label>
+            <Select value={activeRole || ''} onValueChange={(value) => setActiveRole(value as UserRole)}>
+              <SelectTrigger id="active-role" className="w-full">
+                <SelectValue placeholder="Selecciona el rol activo" />
+              </SelectTrigger>
+              <SelectContent>
+                {userRoles.map(role => (
+                  <SelectItem key={role} value={role}>
+                    {getRoleLabel(role)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              El rol activo determina qué funcionalidades y menús puedes ver en la aplicación.
+            </p>
+          </div>
+        )}
         <div>
           <h3 className="text-sm font-medium mb-3">Roles Actuales</h3>
           <div className="flex flex-wrap gap-2">
             {userRoles.map(role => (
-              <Badge key={role} variant="secondary" className="flex items-center gap-2">
+              <Badge 
+                key={role} 
+                variant={role === activeRole ? "default" : "secondary"} 
+                className="flex items-center gap-2"
+              >
+                {role === activeRole && <CheckCircle className="w-3 h-3" />}
                 {getRoleLabel(role)}
                 {profile && role === profile.role && (
                   <span className="text-xs">(Principal)</span>
