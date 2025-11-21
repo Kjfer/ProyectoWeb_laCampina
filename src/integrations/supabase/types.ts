@@ -1474,6 +1474,17 @@ export type Database = {
         Returns: string[]
       }
       get_tutor_student_ids: { Args: never; Returns: string[] }
+      get_user_roles: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role:
         | {
             Args: { _role: Database["public"]["Enums"]["user_role"] }
@@ -1526,7 +1537,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "teacher" | "student" | "parent"
+      app_role: "admin" | "teacher" | "student" | "parent" | "tutor"
       education_level: "primaria" | "secundaria"
       event_type: "vacation" | "holiday" | "exam" | "meeting" | "other"
       user_role: "admin" | "teacher" | "student" | "parent" | "tutor"
@@ -1657,7 +1668,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "teacher", "student", "parent"],
+      app_role: ["admin", "teacher", "student", "parent", "tutor"],
       education_level: ["primaria", "secundaria"],
       event_type: ["vacation", "holiday", "exam", "meeting", "other"],
       user_role: ["admin", "teacher", "student", "parent", "tutor"],

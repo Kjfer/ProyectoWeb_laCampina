@@ -11,7 +11,8 @@ interface Profile {
   email: string;
   first_name: string;
   last_name: string;
-  role: UserRole;
+  role: UserRole; // Primary role from profiles table
+  roles: UserRole[]; // All roles from user_roles table
   phone?: string;
   avatar_url?: string;
   is_active: boolean;
@@ -58,14 +59,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .select('role')
                 .eq('user_id', session.user.id);
 
+              // Get all roles or use profile role as fallback
+              const allRoles = rolesData && rolesData.length > 0 
+                ? rolesData.map(r => r.role as UserRole)
+                : [profileData.role as UserRole];
+
               // Use the first role as the primary role
-              const primaryRole = rolesData && rolesData.length > 0 
-                ? rolesData[0].role as UserRole
-                : profileData.role as UserRole;
+              const primaryRole = allRoles[0];
 
               const profile = {
                 ...profileData,
-                role: primaryRole
+                role: primaryRole,
+                roles: allRoles
               };
               
               setProfile(profile);
@@ -120,14 +125,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .select('role')
               .eq('user_id', session.user.id);
 
+            // Get all roles or use profile role as fallback
+            const allRoles = rolesData && rolesData.length > 0 
+              ? rolesData.map(r => r.role as UserRole)
+              : [profileData.role as UserRole];
+
             // Use the first role as the primary role
-            const primaryRole = rolesData && rolesData.length > 0 
-              ? rolesData[0].role as UserRole
-              : profileData.role as UserRole;
+            const primaryRole = allRoles[0];
 
             setProfile({
               ...profileData,
-              role: primaryRole
+              role: primaryRole,
+              roles: allRoles
             });
           }
           

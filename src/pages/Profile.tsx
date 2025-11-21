@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User, Camera, Mail, Phone, Calendar, Shield, ClipboardCheck } from "lucide-react";
 import { StudentAttendance } from "@/components/profile/StudentAttendance";
 import { Notifications } from "@/components/Notifications";
+import { UserRolesManager } from "@/components/profile/UserRolesManager";
 
 const profileFormSchema = z.object({
   first_name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
@@ -138,15 +139,26 @@ export default function Profile() {
                   {profile.first_name} {profile.last_name}
                 </h1>
                 <p className="text-muted-foreground text-lg">{profile.email}</p>
-                <Badge className={`mt-2 ${getRoleColor(profile.role)}`}>
-                  <Shield className="w-4 h-4 mr-1" />
-                  {getRoleLabel(profile.role)}
-                </Badge>
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {profile.roles && profile.roles.length > 0 ? (
+                    profile.roles.map(role => (
+                      <Badge key={role} className={getRoleColor(role)}>
+                        <Shield className="w-4 h-4 mr-1" />
+                        {getRoleLabel(role)}
+                      </Badge>
+                    ))
+                  ) : (
+                    <Badge className={getRoleColor(profile.role)}>
+                      <Shield className="w-4 h-4 mr-1" />
+                      {getRoleLabel(profile.role)}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="info">Información Personal</TabsTrigger>
                           {profile.role === 'student' ? (
                             <TabsTrigger value="attendance" className="flex items-center gap-2">
@@ -156,6 +168,7 @@ export default function Profile() {
                           ) : (
                             <TabsTrigger value="attendance" disabled className="opacity-50">Mi Asistencia</TabsTrigger>
                           )}
+                          <TabsTrigger value="roles">Roles</TabsTrigger>
                           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
               </TabsList>
 
@@ -318,6 +331,10 @@ export default function Profile() {
 
                 <TabsContent value="attendance">
                   {profile.role === 'student' ? <StudentAttendance /> : <div className="p-4 text-muted-foreground">La sección de asistencia está disponible sólo para estudiantes.</div>}
+                </TabsContent>
+
+                <TabsContent value="roles">
+                  <UserRolesManager />
                 </TabsContent>
 
                 <TabsContent value="notifications">

@@ -28,8 +28,8 @@ export function AppSidebar() {
 
   const isActive = (path: string) => currentPath === path;
   
-  // Get navigation items based on user role
-  const navigationItems = profile ? getNavigationForRole(profile.role) : [];
+  // Get navigation items based on user role(s)
+  const navigationItems = profile ? getNavigationForRole(profile.role, profile.roles) : [];
   const mainItems = navigationItems.filter(item => 
     !adminNavigationItems.some(adminItem => adminItem.url === item.url)
   );

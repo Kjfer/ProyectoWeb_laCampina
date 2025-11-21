@@ -26,7 +26,9 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/auth" replace />;
   }
 
-  if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
+  if (allowedRoles && profile && !allowedRoles.some(role => 
+    profile.roles?.includes(role) || profile.role === role
+  )) {
     return <Navigate to="/" replace />;
   }
 
