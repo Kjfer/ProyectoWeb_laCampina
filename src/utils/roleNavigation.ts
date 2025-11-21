@@ -167,22 +167,31 @@ export const adminNavigationItems: NavItem[] = [
   }
 ];
 
-export function getNavigationForRole(role: UserRole): NavItem[] {
-  if (role === 'admin') {
-    return [
-      ...navigationItems.filter(item => item.roles.includes(role)),
-      ...adminNavigationItems
-    ];
+export function getNavigationForRole(role: UserRole, allRoles?: UserRole[]): NavItem[] {
+  // Use all roles if provided, otherwise just use the primary role
+  const rolesToCheck = allRoles || [role];
+  
+  if (rolesToCheck.includes('admin')) {
+    // Combine all items that match any of the user's roles
+    const matchingItems = navigationItems.filter(item => 
+      item.roles.some(r => rolesToCheck.includes(r))
+    );
+    return [...matchingItems, ...adminNavigationItems];
   }
   
-  return navigationItems.filter(item => item.roles.includes(role));
+  // Filter items that match any of the user's roles
+  return navigationItems.filter(item => 
+    item.roles.some(r => rolesToCheck.includes(r))
+  );
 }
 
-export function canAccessRoute(role: UserRole, path: string): boolean {
+export function canAccessRoute(role: UserRole, path: string, allRoles?: UserRole[]): boolean {
   const allItems = [...navigationItems, ...adminNavigationItems];
   const item = allItems.find(item => item.url === path);
   
   if (!item) return true; // Allow access to unregistered routes
   
-  return item.roles.includes(role);
+  // Check if any of the user's roles match
+  const rolesToCheck = allRoles || [role];
+  return item.roles.some(r => rolesToCheck.includes(r));
 }

@@ -31,7 +31,9 @@ export function RoleBasedRoute({
     return <Navigate to="/auth" replace />;
   }
 
-  if (profile && !allowedRoles.includes(profile.role)) {
+  if (profile && !allowedRoles.some(role => 
+    profile.roles?.includes(role) || profile.role === role
+  )) {
     return <Navigate to={redirectTo} replace />;
   }
 
