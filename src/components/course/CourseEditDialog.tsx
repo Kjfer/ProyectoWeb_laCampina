@@ -9,13 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { X, UserCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-
-interface Teacher {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-}
+import { fetchAllTeachers, Teacher } from '@/utils/teacherUtils';
 
 interface CourseEditDialogProps {
   courseId: string;
@@ -73,17 +67,11 @@ export function CourseEditDialog({ courseId, open, onOpenChange, onSuccess }: Co
 
   const fetchTeachers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .eq('role', 'teacher')
-        .eq('is_active', true)
-        .order('first_name');
-
-      if (error) throw error;
-      setTeachers(data || []);
+      const teachers = await fetchAllTeachers();
+      setTeachers(teachers);
     } catch (error) {
       console.error('Error fetching teachers:', error);
+      toast.error('Error al cargar profesores');
     }
   };
 

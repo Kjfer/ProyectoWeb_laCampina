@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, BookOpen, Users, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fetchAllTeachers } from '@/utils/teacherUtils';
 
 interface Course {
   id: string;
@@ -60,15 +61,9 @@ export function ClassroomCourses({ classroomId, canManage, onUpdate }: Classroom
 
   const fetchTeachers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .eq('role', 'teacher')
-        .eq('is_active', true);
-
-      if (error) throw error;
-      console.log('📚 Profesores cargados:', data?.length || 0);
-      setTeachers(data || []);
+      const data = await fetchAllTeachers();
+      console.log('📚 Profesores cargados:', data.length);
+      setTeachers(data);
     } catch (error) {
       console.error('Error fetching teachers:', error);
       toast.error('Error al cargar la lista de profesores');

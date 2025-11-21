@@ -14,6 +14,7 @@ import { Plus, Edit, Trash2, Users } from 'lucide-react';
 import { CourseEditDialog } from '@/components/course/CourseEditDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { fetchAllTeachers } from '@/utils/teacherUtils';
 
 interface Course {
   id: string;
@@ -97,19 +98,10 @@ const SimpleCourseManagement = () => {
 
   const fetchTeachers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .eq('role', 'teacher')
-        .eq('is_active', true);
-
-      if (error) {
-        console.error('Error fetching teachers:', error);
-      } else {
-        setTeachers(data || []);
-      }
+      const data = await fetchAllTeachers();
+      setTeachers(data);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching teachers:', error);
     }
   };
 
