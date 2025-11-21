@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
-import { Users, GraduationCap, Calendar, AlertCircle, Eye, Search, BookOpen, Target } from 'lucide-react';
+import { Users, GraduationCap, Calendar, AlertCircle, Eye, Search, BookOpen, Target, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -16,6 +16,8 @@ import { AttendanceBarChart } from '@/components/tutor/AttendanceBarChart';
 import { GradeDistributionChart } from '@/components/tutor/GradeDistributionChart';
 import { StudentsAtRiskTable } from '@/components/tutor/StudentsAtRiskTable';
 import { CoursePerformanceTable } from '@/components/tutor/CoursePerformanceTable';
+import { CourseScheduleManager } from '@/components/course/CourseScheduleManager';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface VirtualClassroom {
   id: string;
@@ -66,7 +68,7 @@ interface CourseData {
 }
 
 export default function TutorDashboard() {
-  const { profile } = useAuth();
+  const { profile, activeRole } = useAuth();
   const [loading, setLoading] = useState(true);
   const [classroom, setClassroom] = useState<VirtualClassroom | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
@@ -75,12 +77,14 @@ export default function TutorDashboard() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [courses, setCourses] = useState<CourseData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCourseForSchedule, setSelectedCourseForSchedule] = useState<string | null>(null);
 
   useEffect(() => {
-    if (profile?.role === 'tutor') {
+    const currentRole = activeRole || profile?.role;
+    if (currentRole === 'tutor' || profile?.roles?.includes('tutor')) {
       fetchTutorData();
     }
-  }, [profile]);
+  }, [profile, activeRole]);
 
   const fetchTutorData = async () => {
     try {
@@ -246,7 +250,10 @@ export default function TutorDashboard() {
     return { label: 'Crítica', variant: 'destructive' };
   };
 
-  if (profile?.role !== 'tutor') {
+  const currentRole = activeRole || profile?.role;
+  const hasTutorRole = currentRole === 'tutor' || profile?.roles?.includes('tutor');
+  
+  if (!hasTutorRole) {
     return (
       <DashboardLayout>
         <Alert variant="destructive">
@@ -464,6 +471,7 @@ export default function TutorDashboard() {
           <TabsList>
             <TabsTrigger value="grades">Calificaciones</TabsTrigger>
             <TabsTrigger value="attendance">Asistencia</TabsTrigger>
+            <TabsTrigger value="schedules">Horarios</TabsTrigger>
           </TabsList>
 
           <TabsContent value="grades" className="space-y-4">
@@ -649,6 +657,44 @@ export default function TutorDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="schedules" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gestión de Horarios de Cursos</CardTitle>
+                <CardDescription>
+                  Administra los horarios de los cursos de tu aula virtual
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {courses.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No hay cursos asignados a esta aula virtual
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {courses.map(course => (
+                        <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{course.name}</p>
+                            <p className="text-sm text-muted-foreground">{course.code}</p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            onClick={() => setSelectedCourseForSchedule(course.id)}
+                          >
+                            <Clock className="h-4 w-4 mr-2" />
+                            Editar Horario
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         <StudentDetailDialog
@@ -657,6 +703,24 @@ export default function TutorDashboard() {
           onOpenChange={(open) => !open && setSelectedStudent(null)}
           classroomId={classroom?.id || ''}
         />
+
+        {/* Schedule Edit Dialog */}
+        <Dialog open={!!selectedCourseForSchedule} onOpenChange={(open) => !open && setSelectedCourseForSchedule(null)}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Horario del Curso</DialogTitle>
+              <DialogDescription>
+                Define los días y horarios en que se imparte este curso
+              </DialogDescription>
+            </DialogHeader>
+            {selectedCourseForSchedule && (
+              <CourseScheduleManager
+                courseId={selectedCourseForSchedule}
+                canEdit={true}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
