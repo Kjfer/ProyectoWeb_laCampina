@@ -21,6 +21,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ClassroomCoursesList } from "@/components/virtual-classrooms/ClassroomCoursesList";
+import { fetchAllTeachers } from '@/utils/teacherUtils';
 
 interface VirtualClassroom {
   id: string;
@@ -52,7 +53,7 @@ interface Teacher {
   first_name: string;
   last_name: string;
   email: string;
-  role: string;
+  role?: string;
 }
 
 interface Tutor {
@@ -114,14 +115,8 @@ export default function VirtualClassrooms() {
 
   const fetchTeachers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, role')
-        .eq('role', 'teacher')
-        .eq('is_active', true);
-
-      if (error) throw error;
-      setTeachers(data || []);
+      const data = await fetchAllTeachers();
+      setTeachers(data);
     } catch (error) {
       console.error('Error fetching teachers:', error);
       toast.error('Error al cargar la lista de profesores');

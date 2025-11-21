@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { fetchAllTeachers } from '@/utils/teacherUtils';
 import {
   Plus,
   Search,
@@ -137,26 +138,16 @@ const AdminCourseManagement = () => {
 
   const fetchTeachers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .eq('role', 'teacher')
-        .eq('is_active', true)
-        .order('first_name');
-
-      if (error) {
-        console.error('Error fetching teachers:', error);
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los profesores",
-          variant: "destructive",
-        });
-      } else {
-        console.log('Profesores cargados:', data);
-        setTeachers(data || []);
-      }
+      const data = await fetchAllTeachers();
+      console.log('Profesores cargados:', data);
+      setTeachers(data);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching teachers:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los profesores",
+        variant: "destructive",
+      });
     }
   };
 
