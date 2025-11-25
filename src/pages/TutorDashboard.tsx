@@ -246,10 +246,12 @@ export default function TutorDashboard() {
         console.log('📊 Total submissions found:', submissionsData?.length || 0);
         console.log('📝 Sample submission:', submissionsData?.[0]);
         console.log('📋 All submissions:', submissionsData?.map(s => ({
+          student_id: s.student_id,
           course_id: (s.assignments as any).courses.id,
           course_name: (s.assignments as any).courses.name,
           score: s.score
         })));
+        console.log('👥 Student IDs:', studentIds);
 
         // NO FILTER - Show all grades from all courses the students are enrolled in
         const allSubmissions = submissionsData || [];
@@ -305,7 +307,7 @@ export default function TutorDashboard() {
           courseData.count++;
         });
 
-        gradeMap.forEach((record) => {
+        gradeMap.forEach((record, studentId) => {
           if (record.total_graded > 0) {
             const studentSubmissions = allSubmissions.filter(s => s.student_id === record.student_id);
             const sum = studentSubmissions.reduce((acc, s) => acc + convertLetterGrade(s.score), 0);
@@ -321,11 +323,16 @@ export default function TutorDashboard() {
                 average: data.total / data.count,
                 count: data.count
               }));
+              console.log(`📚 Student ${studentId} course grades:`, record.course_grades);
+            } else {
+              console.log(`⚠️ No course grades map for student ${studentId}`);
             }
           }
         });
 
-        setGradeData(Array.from(gradeMap.values()));
+        const finalGradeData = Array.from(gradeMap.values());
+        console.log('✅ Final grade data:', finalGradeData);
+        setGradeData(finalGradeData);
       }
 
     } catch (error) {
