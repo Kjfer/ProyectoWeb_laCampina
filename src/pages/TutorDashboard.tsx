@@ -716,7 +716,7 @@ export default function TutorDashboard() {
                                       <p className="text-xs text-muted-foreground">{cg.course_code}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <Badge variant={getGradeBadgeVariant(cg.average)} size="sm">
+                                      <Badge variant={getGradeBadgeVariant(cg.average)}>
                                         {cg.average.toFixed(1)} - {getGradeLetter(cg.average)}
                                       </Badge>
                                       <span className="text-xs text-muted-foreground">({cg.count})</span>
