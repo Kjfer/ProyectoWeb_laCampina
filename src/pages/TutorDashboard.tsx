@@ -12,10 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { StudentDetailDialog } from '@/components/tutor/StudentDetailDialog';
 import { StatCard } from '@/components/tutor/StatCard';
-import { AttendanceBarChart } from '@/components/tutor/AttendanceBarChart';
 import { GradeDistributionChart } from '@/components/tutor/GradeDistributionChart';
 import { StudentsAtRiskTable } from '@/components/tutor/StudentsAtRiskTable';
-import { CoursePerformanceTable } from '@/components/tutor/CoursePerformanceTable';
 import { CourseScheduleManager } from '@/components/course/CourseScheduleManager';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
@@ -436,38 +434,6 @@ export default function TutorDashboard() {
     })
     .filter(item => item.riskFactors.length > 0);
 
-  // Calculate course performance
-  const coursePerformance = courses.map(course => {
-    const courseAttendance = attendanceData.filter(a => {
-      // We need to check if this attendance belongs to this course
-      // Since we're aggregating, we'll calculate average across all courses for now
-      return true;
-    });
-    
-    const courseGrades = gradeData.filter(g => g.total_graded > 0);
-    
-    const avgAttendance = courseAttendance.length > 0
-      ? courseAttendance.reduce((acc, a) => acc + a.attendance_rate, 0) / courseAttendance.length
-      : 0;
-      
-    const avgScore = courseGrades.length > 0
-      ? courseGrades.reduce((acc, g) => acc + g.average_score, 0) / courseGrades.length
-      : 0;
-    
-    return {
-      courseName: course.name,
-      attendanceRate: avgAttendance,
-      averageScore: avgScore,
-      studentCount: students.length
-    };
-  });
-
-  // Prepare attendance chart data
-  const attendanceChartData = courses.map(course => ({
-    course: course.name,
-    attendanceRate: coursePerformance.find(cp => cp.courseName === course.name)?.attendanceRate || 0
-  }));
-
   // Prepare grade distribution data
   const totalGradeDistribution = gradeData.reduce(
     (acc, g) => ({
@@ -539,8 +505,7 @@ export default function TutorDashboard() {
         </div>
 
         {/* Visualizations */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <AttendanceBarChart data={attendanceChartData} />
+        <div className="grid gap-4">
           <GradeDistributionChart data={totalGradeDistribution} />
         </div>
 
@@ -549,11 +514,6 @@ export default function TutorDashboard() {
           students={studentsAtRisk}
           onViewDetails={setSelectedStudent}
         />
-
-        {/* Course Performance */}
-        {coursePerformance.length > 0 && (
-          <CoursePerformanceTable courses={coursePerformance} />
-        )}
 
         {/* Student Details with Search */}
         <Card>
