@@ -122,6 +122,8 @@ export default function TutorDashboard() {
 
       setClassroom(classroomData);
 
+      console.log('🏫 Classroom ID:', classroomData.id);
+
       // Fetch courses in classroom
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
@@ -130,8 +132,12 @@ export default function TutorDashboard() {
 
       if (coursesError) throw coursesError;
 
+      console.log('📚 Courses found:', coursesData?.length || 0, coursesData);
+
       setCourses(coursesData || []);
       const courseIds = coursesData.map(c => c.id);
+
+      console.log('🔑 Course IDs:', courseIds);
 
       if (courseIds.length > 0) {
         // Fetch students
@@ -202,7 +208,7 @@ export default function TutorDashboard() {
 
         setAttendanceData(Array.from(attendanceMap.values()));
 
-        // Fetch grades data
+        // Fetch grades data - Get ALL grades for students, not just classroom courses
         const { data: submissionsData, error: submissionsError } = await supabase
           .from('assignment_submissions')
           .select(`
@@ -223,10 +229,18 @@ export default function TutorDashboard() {
 
         if (submissionsError) throw submissionsError;
 
-        // Filter by course IDs
-        const filteredSubmissions = submissionsData.filter(sub => 
-          courseIds.includes((sub.assignments as any).courses.id)
-        );
+        console.log('📊 Total submissions found:', submissionsData?.length || 0);
+        console.log('📝 Sample submission:', submissionsData?.[0]);
+        console.log('📋 All submissions:', submissionsData?.map(s => ({
+          course_id: (s.assignments as any).courses.id,
+          course_name: (s.assignments as any).courses.name,
+          score: s.score
+        })));
+
+        // NO FILTER - Show all grades from all courses the students are enrolled in
+        const allSubmissions = submissionsData || [];
+
+        console.log('✅ Total submissions to show:', allSubmissions.length);
 
         // Process grades data with course breakdown
         const gradeMap = new Map<string, GradeRecord>();
@@ -246,7 +260,7 @@ export default function TutorDashboard() {
         // Track course grades per student
         const studentCourseGrades = new Map<string, Map<string, { total: number; count: number; course_name: string; course_code: string }>>();
 
-        filteredSubmissions.forEach(sub => {
+        allSubmissions.forEach(sub => {
           const current = gradeMap.get(sub.student_id)!;
           current.total_graded++;
           const score = Number(sub.score);
@@ -279,7 +293,7 @@ export default function TutorDashboard() {
 
         gradeMap.forEach((record) => {
           if (record.total_graded > 0) {
-            const studentSubmissions = filteredSubmissions.filter(s => s.student_id === record.student_id);
+            const studentSubmissions = allSubmissions.filter(s => s.student_id === record.student_id);
             const sum = studentSubmissions.reduce((acc, s) => acc + Number(s.score), 0);
             record.average_score = sum / record.total_graded;
 
