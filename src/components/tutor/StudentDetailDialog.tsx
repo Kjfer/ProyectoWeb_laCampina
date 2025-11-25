@@ -13,6 +13,21 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
 
+// Convert letter grades to numeric scores
+const convertLetterGrade = (score: string): number => {
+  const numericScore = Number(score);
+  if (!isNaN(numericScore)) return numericScore;
+  
+  const letterGrades: { [key: string]: number } = {
+    'AD': 18,
+    'A': 15,
+    'B': 12,
+    'C': 9
+  };
+  
+  return letterGrades[score.toUpperCase()] || 0;
+};
+
 interface Student {
   id: string;
   first_name: string;
@@ -111,7 +126,7 @@ export function StudentDetailDialog({ student, open, onOpenChange, classroomId }
         course_name: (g.assignments as any).courses.name,
         course_code: (g.assignments as any).courses.code,
         assignment_title: (g.assignments as any).title,
-        score: Number(g.score),
+        score: convertLetterGrade(g.score),
         max_score: Number((g.assignments as any).max_score),
         submitted_at: g.submitted_at || '',
         graded_at: g.graded_at || '',
