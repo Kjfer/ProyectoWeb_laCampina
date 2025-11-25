@@ -4,13 +4,15 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Plus, Users, BookOpen, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Plus, Users, BookOpen, GraduationCap, ClipboardCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { ClassroomCourses } from '@/components/virtual-classrooms/ClassroomCourses';
 import { ClassroomStudents } from '@/components/virtual-classrooms/ClassroomStudents';
 import { StudentClassroomCourses } from '@/components/virtual-classrooms/StudentClassroomCourses';
+import { VirtualClassroomAttendance } from '@/components/virtual-classrooms/VirtualClassroomAttendance';
+import { AttendanceHistory } from '@/components/virtual-classrooms/AttendanceHistory';
 
 interface VirtualClassroom {
   id: string;
@@ -132,7 +134,7 @@ export default function VirtualClassroomDetail() {
 
         {/* Tabs for Courses and Students */}
         <Tabs defaultValue="courses" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="courses" className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
               {profile?.role === 'student' ? 'Mis Cursos' : 'Cursos'}
@@ -140,6 +142,14 @@ export default function VirtualClassroomDetail() {
             <TabsTrigger value="students" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Estudiantes
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" />
+              Asistencia
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" />
+              Historial
             </TabsTrigger>
           </TabsList>
 
@@ -161,6 +171,17 @@ export default function VirtualClassroomDetail() {
               canManage={canManage}
               onUpdate={fetchClassroom}
             />
+          </TabsContent>
+
+          <TabsContent value="attendance">
+            <VirtualClassroomAttendance 
+              classroomId={classroom.id}
+              canManage={canManage}
+            />
+          </TabsContent>
+
+          <TabsContent value="history">
+            <AttendanceHistory classroomId={classroom.id} />
           </TabsContent>
         </Tabs>
       </div>
