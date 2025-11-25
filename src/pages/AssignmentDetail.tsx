@@ -474,15 +474,6 @@ const AssignmentDetail = () => {
     }
   };
 
-  const getLetterGrade = (score: number | null, maxScore: number): string => {
-    if (!score) return '';
-    const percentage = (score / maxScore) * 100;
-    if (percentage >= 90) return 'AD';
-    if (percentage >= 75) return 'A';
-    if (percentage >= 60) return 'B';
-    return 'C';
-  };
-
   const isOverdue = assignment ? isAfter(new Date(), new Date(assignment.due_date)) : false;
   const canSubmit = (!submission && !isOverdue) || (isEditingSubmission && !isOverdue);
   const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin';
