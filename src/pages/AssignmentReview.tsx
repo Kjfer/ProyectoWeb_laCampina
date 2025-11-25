@@ -170,6 +170,10 @@ const AssignmentReview = () => {
       return;
     }
 
+    console.log('=== DEBUG: Iniciando calificación ===');
+    console.log('Archivos de retroalimentación nuevos:', feedbackFiles);
+    console.log('Archivos existentes:', selectedSubmission.feedback_files);
+
     // Validate file sizes
     const maxSize = 5 * 1024 * 1024; // 5MB
     const oversizedFiles = feedbackFiles.filter(file => file.size > maxSize);
@@ -187,11 +191,14 @@ const AssignmentReview = () => {
       // Agregar archivos existentes si los hay
       if (selectedSubmission.feedback_files && Array.isArray(selectedSubmission.feedback_files)) {
         feedbackFilesData = [...selectedSubmission.feedback_files];
+        console.log('Archivos existentes preservados:', feedbackFilesData.length);
       }
       
       // Upload nuevos archivos de retroalimentación si hay
       if (feedbackFiles.length > 0) {
+        console.log('Subiendo', feedbackFiles.length, 'archivos nuevos...');
         for (const file of feedbackFiles) {
+          console.log('Subiendo archivo:', file.name, 'Tamaño:', file.size);
           const fileExt = file.name.split('.').pop();
           const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
           const filePath = `feedback/${selectedSubmission.id}/${fileName}`;
@@ -205,6 +212,8 @@ const AssignmentReview = () => {
             throw new Error(`Error al subir el archivo ${file.name}`);
           }
 
+          console.log('Archivo subido exitosamente:', filePath);
+
           const { data: { publicUrl } } = supabase.storage
             .from('student-submissions')
             .getPublicUrl(filePath);
@@ -217,6 +226,9 @@ const AssignmentReview = () => {
           });
         }
       }
+
+      console.log('Total de archivos a guardar:', feedbackFilesData.length);
+      console.log('Datos de archivos:', feedbackFilesData);
 
       const { error } = await supabase
         .from('assignment_submissions')
@@ -623,10 +635,17 @@ const AssignmentReview = () => {
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-2">Agregar nuevos archivos:</p>
                           <FileUpload
-                            onFileSelect={(files) => setFeedbackFiles(prev => [...prev, ...files])}
+                            onFileSelect={(files) => {
+                              console.log('Archivos seleccionados desde FileUpload:', files);
+                              setFeedbackFiles(prev => {
+                                const newFiles = [...prev, ...files];
+                                console.log('Estado actualizado de feedbackFiles:', newFiles);
+                                return newFiles;
+                              });
+                            }}
                             accept="*/*"
                             multiple
-                            maxSize={5 * 1024 * 1024}
+                            maxSize={5}
                           />
                         </div>
                         
