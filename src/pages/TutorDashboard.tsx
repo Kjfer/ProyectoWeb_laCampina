@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
-import { Users, GraduationCap, Calendar, AlertCircle, Eye, Search, BookOpen, Target, Clock } from 'lucide-react';
+import { Users, GraduationCap, Calendar, AlertCircle, Eye, Search, BookOpen, Target, Clock, TrendingUp, TrendingDown, Award, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -18,6 +18,9 @@ import { StudentsAtRiskTable } from '@/components/tutor/StudentsAtRiskTable';
 import { CoursePerformanceTable } from '@/components/tutor/CoursePerformanceTable';
 import { CourseScheduleManager } from '@/components/course/CourseScheduleManager';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Progress } from '@/components/ui/progress';
 
 interface VirtualClassroom {
   id: string;
@@ -49,6 +52,8 @@ interface AttendanceRecord {
   justified: number;
   total: number;
   attendance_rate: number;
+  last_attendance_date?: string;
+  last_recorded_at?: string;
 }
 
 interface GradeRecord {
@@ -135,17 +140,20 @@ export default function TutorDashboard() {
 
         setStudents(uniqueStudents);
 
-        // Fetch attendance data
+        // Fetch attendance data - improved with classroom attendance and date info
         const studentIds = uniqueStudents.map(s => s.id);
+        
+        // Fetch from both course-level and classroom-level attendance
         const { data: attendanceRaw, error: attendanceError } = await supabase
           .from('attendance')
-          .select('student_id, status')
+          .select('student_id, status, date, recorded_at')
           .in('student_id', studentIds)
-          .in('course_id', courseIds);
+          .or(`course_id.in.(${courseIds.join(',')}),classroom_id.eq.${classroomData.id}`)
+          .order('date', { ascending: false });
 
         if (attendanceError) throw attendanceError;
 
-        // Process attendance data
+        // Process attendance data with enhanced info
         const attendanceMap = new Map<string, AttendanceRecord>();
         studentIds.forEach(studentId => {
           attendanceMap.set(studentId, {
@@ -155,12 +163,21 @@ export default function TutorDashboard() {
             late: 0,
             justified: 0,
             total: 0,
-            attendance_rate: 0
+            attendance_rate: 0,
+            last_attendance_date: undefined,
+            last_recorded_at: undefined
           });
         });
 
         attendanceRaw?.forEach(record => {
           const current = attendanceMap.get(record.student_id)!;
+          
+          // Set last attendance date and time
+          if (!current.last_attendance_date) {
+            current.last_attendance_date = record.date;
+            current.last_recorded_at = record.recorded_at;
+          }
+          
           current.total++;
           if (record.status === 'present') current.present++;
           else if (record.status === 'absent') current.absent++;
@@ -168,9 +185,9 @@ export default function TutorDashboard() {
           else if (record.status === 'justified') current.justified++;
         });
 
-        attendanceMap.forEach((record, studentId) => {
+        attendanceMap.forEach((record) => {
           if (record.total > 0) {
-            record.attendance_rate = (record.present / record.total) * 100;
+            record.attendance_rate = ((record.present + record.late) / record.total) * 100;
           }
         });
 
@@ -515,47 +532,85 @@ export default function TutorDashboard() {
                     }
 
                     return (
-                      <div key={student.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border rounded-lg gap-4">
-                        <div className="flex-1">
-                          <p className="font-medium">
-                            {student.paternal_surname} {student.maternal_surname}, {student.first_name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">{student.student_code}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <div className="text-center px-3 py-1 bg-green-100 dark:bg-green-900/20 rounded">
-                            <div className="text-xs text-muted-foreground">AD</div>
-                            <div className="font-bold text-green-700 dark:text-green-400">{grades.ad_count}</div>
+                      <div key={student.id} className="p-4 border rounded-lg hover:border-primary/50 transition-colors">
+                        <div className="flex flex-col space-y-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-lg">
+                                {student.paternal_surname} {student.maternal_surname}, {student.first_name}
+                              </p>
+                              <p className="text-sm text-muted-foreground">{student.student_code}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedStudent(student)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <div className="text-center px-3 py-1 bg-blue-100 dark:bg-blue-900/20 rounded">
-                            <div className="text-xs text-muted-foreground">A</div>
-                            <div className="font-bold text-blue-700 dark:text-blue-400">{grades.a_count}</div>
-                          </div>
-                          <div className="text-center px-3 py-1 bg-yellow-100 dark:bg-yellow-900/20 rounded">
-                            <div className="text-xs text-muted-foreground">B</div>
-                            <div className="font-bold text-yellow-700 dark:text-yellow-400">{grades.b_count}</div>
-                          </div>
-                          <div className="text-center px-3 py-1 bg-red-100 dark:bg-red-900/20 rounded">
-                            <div className="text-xs text-muted-foreground">C</div>
-                            <div className="font-bold text-red-700 dark:text-red-400">{grades.c_count}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-center">
-                            <Badge variant="default">
-                              {grades.average_score.toFixed(1)} - {getGradeLetter(grades.average_score)}
+
+                          {/* Main Score Display */}
+                          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border">
+                            <div className="flex items-center gap-3">
+                              <Award className="h-8 w-8 text-primary" />
+                              <div>
+                                <div className="text-2xl font-bold">{grades.average_score.toFixed(1)}</div>
+                                <div className="text-sm text-muted-foreground">Promedio General</div>
+                              </div>
+                            </div>
+                            <Badge variant="default" className="text-lg px-4 py-1">
+                              {getGradeLetter(grades.average_score)}
                             </Badge>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {grades.total_graded} tareas
-                            </p>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setSelectedStudent(student)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
+
+                          {/* Grade Distribution */}
+                          <div className="grid grid-cols-4 gap-2">
+                            <div className="text-center p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                              <div className="font-bold text-green-700 dark:text-green-400 text-2xl">{grades.ad_count}</div>
+                              <div className="text-xs text-green-600 dark:text-green-500 font-medium">AD (18-20)</div>
+                              <div className="text-xs text-muted-foreground mt-1">Logro Destacado</div>
+                            </div>
+                            <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <div className="font-bold text-blue-700 dark:text-blue-400 text-2xl">{grades.a_count}</div>
+                              <div className="text-xs text-blue-600 dark:text-blue-500 font-medium">A (14-17)</div>
+                              <div className="text-xs text-muted-foreground mt-1">Logro Esperado</div>
+                            </div>
+                            <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                              <div className="font-bold text-yellow-700 dark:text-yellow-400 text-2xl">{grades.b_count}</div>
+                              <div className="text-xs text-yellow-600 dark:text-yellow-500 font-medium">B (11-13)</div>
+                              <div className="text-xs text-muted-foreground mt-1">En Proceso</div>
+                            </div>
+                            <div className="text-center p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                              <div className="font-bold text-red-700 dark:text-red-400 text-2xl">{grades.c_count}</div>
+                              <div className="text-xs text-red-600 dark:text-red-500 font-medium">C (0-10)</div>
+                              <div className="text-xs text-muted-foreground mt-1">En Inicio</div>
+                            </div>
+                          </div>
+
+                          {/* Progress Indicator */}
+                          <div className="flex items-center justify-between text-sm pt-2 border-t">
+                            <span className="text-muted-foreground">
+                              {grades.total_graded} {grades.total_graded === 1 ? 'tarea calificada' : 'tareas calificadas'}
+                            </span>
+                            {grades.average_score >= 14 ? (
+                              <div className="flex items-center gap-1 text-green-600">
+                                <TrendingUp className="h-4 w-4" />
+                                <span className="font-medium">Rendimiento Excelente</span>
+                              </div>
+                            ) : grades.average_score >= 11 ? (
+                              <div className="flex items-center gap-1 text-blue-600">
+                                <Target className="h-4 w-4" />
+                                <span className="font-medium">Rendimiento Satisfactorio</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 text-red-600">
+                                <TrendingDown className="h-4 w-4" />
+                                <span className="font-medium">Necesita Apoyo</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -608,47 +663,75 @@ export default function TutorDashboard() {
                     const status = getAttendanceStatus(attendance.attendance_rate);
 
                     return (
-                      <div key={student.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border rounded-lg gap-4">
-                        <div className="flex-1">
-                          <p className="font-medium">
-                            {student.paternal_surname} {student.maternal_surname}, {student.first_name}
-                          </p>
-                          <p className="text-sm text-muted-foreground">{student.student_code}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <div className="text-center px-3 py-1 bg-green-100 dark:bg-green-900/20 rounded">
-                            <div className="text-xs text-muted-foreground">Presente</div>
-                            <div className="font-bold text-green-700 dark:text-green-400">{attendance.present}</div>
+                      <div key={student.id} className="p-4 border rounded-lg hover:border-primary/50 transition-colors">
+                        <div className="flex flex-col space-y-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-lg">
+                                {student.paternal_surname} {student.maternal_surname}, {student.first_name}
+                              </p>
+                              <div className="flex items-center gap-3 mt-1">
+                                <p className="text-sm text-muted-foreground">{student.student_code}</p>
+                                {attendance.last_attendance_date && (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Clock className="h-3 w-3" />
+                                    Última asistencia: {format(new Date(attendance.last_attendance_date), "d MMM", { locale: es })}
+                                    {attendance.last_recorded_at && 
+                                      ` a las ${format(new Date(attendance.last_recorded_at), 'HH:mm')}`
+                                    }
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedStudent(student)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <div className="text-center px-3 py-1 bg-red-100 dark:bg-red-900/20 rounded">
-                            <div className="text-xs text-muted-foreground">Falta</div>
-                            <div className="font-bold text-red-700 dark:text-red-400">{attendance.absent}</div>
+
+                          {/* Progress Bar */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Tasa de asistencia</span>
+                              <Badge variant={status.variant} className="font-semibold">
+                                {attendance.attendance_rate.toFixed(1)}% - {status.label}
+                              </Badge>
+                            </div>
+                            <Progress value={attendance.attendance_rate} className="h-2" />
                           </div>
-                          <div className="text-center px-3 py-1 bg-yellow-100 dark:bg-yellow-900/20 rounded">
-                            <div className="text-xs text-muted-foreground">Tarde</div>
-                            <div className="font-bold text-yellow-700 dark:text-yellow-400">{attendance.late}</div>
+
+                          {/* Stats Grid */}
+                          <div className="grid grid-cols-4 gap-2">
+                            <div className="text-center p-2 bg-green-50 dark:bg-green-950/30 rounded border border-green-200 dark:border-green-800">
+                              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mx-auto mb-1" />
+                              <div className="font-bold text-green-700 dark:text-green-400 text-lg">{attendance.present}</div>
+                              <div className="text-xs text-green-600 dark:text-green-500">Presente</div>
+                            </div>
+                            <div className="text-center p-2 bg-red-50 dark:bg-red-950/30 rounded border border-red-200 dark:border-red-800">
+                              <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mx-auto mb-1" />
+                              <div className="font-bold text-red-700 dark:text-red-400 text-lg">{attendance.absent}</div>
+                              <div className="text-xs text-red-600 dark:text-red-500">Falta</div>
+                            </div>
+                            <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-950/30 rounded border border-yellow-200 dark:border-yellow-800">
+                              <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mx-auto mb-1" />
+                              <div className="font-bold text-yellow-700 dark:text-yellow-400 text-lg">{attendance.late}</div>
+                              <div className="text-xs text-yellow-600 dark:text-yellow-500">Tarde</div>
+                            </div>
+                            <div className="text-center p-2 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200 dark:border-blue-800">
+                              <BookOpen className="h-4 w-4 text-blue-600 dark:text-blue-400 mx-auto mb-1" />
+                              <div className="font-bold text-blue-700 dark:text-blue-400 text-lg">{attendance.justified}</div>
+                              <div className="text-xs text-blue-600 dark:text-blue-500">Justif.</div>
+                            </div>
                           </div>
-                          <div className="text-center px-3 py-1 bg-blue-100 dark:bg-blue-900/20 rounded">
-                            <div className="text-xs text-muted-foreground">Justif.</div>
-                            <div className="font-bold text-blue-700 dark:text-blue-400">{attendance.justified}</div>
+
+                          {/* Total */}
+                          <div className="text-center text-sm text-muted-foreground pt-2 border-t">
+                            Total: {attendance.total} registros de asistencia
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-center">
-                            <Badge variant={status.variant}>
-                              {attendance.attendance_rate.toFixed(1)}% - {status.label}
-                            </Badge>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {attendance.total} clases
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setSelectedStudent(student)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
                         </div>
                       </div>
                     );
