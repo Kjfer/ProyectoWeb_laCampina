@@ -54,6 +54,7 @@ interface Submission {
   student_files: any;
   score: string | null;  // Ahora es texto (AD, A, B, C)
   feedback: string | null;
+  feedback_files: any;
   submitted_at: string;
   graded_at: string | null;
   student: {
@@ -125,6 +126,7 @@ const AssignmentReview = () => {
           student_files,
           score,
           feedback,
+          feedback_files,
           submitted_at,
           graded_at,
           student:profiles!assignment_submissions_student_id_fkey (
@@ -178,7 +180,7 @@ const AssignmentReview = () => {
       setGrading(true);
 
       // Upload feedback files if any
-      let uploadedFiles: string[] = [];
+      let feedbackFilesData: FileInfo[] = [];
       if (feedbackFiles.length > 0) {
         for (const file of feedbackFiles) {
           const fileExt = file.name.split('.').pop();
@@ -198,21 +200,21 @@ const AssignmentReview = () => {
             .from('student-submissions')
             .getPublicUrl(filePath);
 
-          uploadedFiles.push(publicUrl);
+          feedbackFilesData.push({
+            file_path: filePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type
+          });
         }
-      }
-
-      // Prepare feedback text with file links
-      let finalFeedback = feedback.trim();
-      if (uploadedFiles.length > 0) {
-        finalFeedback += '\n\nArchivos adjuntos:\n' + uploadedFiles.map((url, i) => `${i + 1}. ${url}`).join('\n');
       }
 
       const { error } = await supabase
         .from('assignment_submissions')
         .update({
           score: score,  // Guardar directamente la letra
-          feedback: finalFeedback || null,
+          feedback: feedback.trim() || null,
+          feedback_files: feedbackFilesData as any,
           graded_at: new Date().toISOString()
         })
         .eq('id', selectedSubmission.id);

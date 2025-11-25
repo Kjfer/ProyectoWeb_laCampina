@@ -102,6 +102,7 @@ export type Database = {
           assignment_id: string | null
           content: string | null
           feedback: string | null
+          feedback_files: Json | null
           file_name: string | null
           file_path: string | null
           file_size: number | null
@@ -118,6 +119,7 @@ export type Database = {
           assignment_id?: string | null
           content?: string | null
           feedback?: string | null
+          feedback_files?: Json | null
           file_name?: string | null
           file_path?: string | null
           file_size?: number | null
@@ -134,6 +136,7 @@ export type Database = {
           assignment_id?: string | null
           content?: string | null
           feedback?: string | null
+          feedback_files?: Json | null
           file_name?: string | null
           file_path?: string | null
           file_size?: number | null
