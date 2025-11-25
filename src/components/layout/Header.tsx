@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { useToast } from "@/hooks/use-toast"
 
 export function Header() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, activeRole } = useAuth();
   const { toast } = useToast();
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
@@ -158,7 +158,7 @@ export function Header() {
                   <p className="text-xs leading-none text-muted-foreground">
                     {profile?.email}
                   </p>
-                  <Badge variant="secondary" className="text-xs w-fit">{profile ? getRoleLabel(profile.role) : 'Usuario'}</Badge>
+                  <Badge variant="secondary" className="text-xs w-fit">{profile ? getRoleLabel(activeRole || profile.role) : 'Usuario'}</Badge>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-border/50" />
