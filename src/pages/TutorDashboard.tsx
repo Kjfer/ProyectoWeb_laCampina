@@ -22,6 +22,22 @@ import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
 
+// Convert letter grades to numeric scores
+const convertLetterGrade = (score: string): number => {
+  const numericScore = Number(score);
+  if (!isNaN(numericScore)) return numericScore;
+  
+  // Letter grade conversion
+  const letterGrades: { [key: string]: number } = {
+    'AD': 18,
+    'A': 15,
+    'B': 12,
+    'C': 9
+  };
+  
+  return letterGrades[score.toUpperCase()] || 0;
+};
+
 interface VirtualClassroom {
   id: string;
   name: string;
@@ -263,7 +279,7 @@ export default function TutorDashboard() {
         allSubmissions.forEach(sub => {
           const current = gradeMap.get(sub.student_id)!;
           current.total_graded++;
-          const score = Number(sub.score);
+          const score = convertLetterGrade(sub.score);
 
           if (score >= 18) current.ad_count++;
           else if (score >= 14) current.a_count++;
@@ -294,7 +310,7 @@ export default function TutorDashboard() {
         gradeMap.forEach((record) => {
           if (record.total_graded > 0) {
             const studentSubmissions = allSubmissions.filter(s => s.student_id === record.student_id);
-            const sum = studentSubmissions.reduce((acc, s) => acc + Number(s.score), 0);
+            const sum = studentSubmissions.reduce((acc, s) => acc + convertLetterGrade(s.score), 0);
             record.average_score = sum / record.total_graded;
 
             // Add course breakdown
