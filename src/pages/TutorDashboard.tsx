@@ -64,6 +64,15 @@ interface GradeRecord {
   c_count: number;
   total_graded: number;
   average_score: number;
+  course_grades?: CourseGradeDetail[];
+}
+
+interface CourseGradeDetail {
+  course_id: string;
+  course_name: string;
+  course_code: string;
+  average: number;
+  count: number;
 }
 
 interface CourseData {
@@ -196,7 +205,19 @@ export default function TutorDashboard() {
         // Fetch grades data
         const { data: submissionsData, error: submissionsError } = await supabase
           .from('assignment_submissions')
-          .select('student_id, score, assignment_id, assignments!inner(course_id)')
+          .select(`
+            student_id, 
+            score, 
+            assignment_id, 
+            assignments!inner(
+              course_id,
+              courses!inner(
+                id,
+                name,
+                code
+              )
+            )
+          `)
           .in('student_id', studentIds)
           .not('score', 'is', null);
 
@@ -204,10 +225,10 @@ export default function TutorDashboard() {
 
         // Filter by course IDs
         const filteredSubmissions = submissionsData.filter(sub => 
-          courseIds.includes((sub.assignments as any).course_id)
+          courseIds.includes((sub.assignments as any).courses.id)
         );
 
-        // Process grades data
+        // Process grades data with course breakdown
         const gradeMap = new Map<string, GradeRecord>();
         studentIds.forEach(studentId => {
           gradeMap.set(studentId, {
@@ -217,21 +238,43 @@ export default function TutorDashboard() {
             b_count: 0,
             c_count: 0,
             total_graded: 0,
-            average_score: 0
+            average_score: 0,
+            course_grades: []
           });
         });
 
-        let totalScore = 0;
+        // Track course grades per student
+        const studentCourseGrades = new Map<string, Map<string, { total: number; count: number; course_name: string; course_code: string }>>();
+
         filteredSubmissions.forEach(sub => {
           const current = gradeMap.get(sub.student_id)!;
           current.total_graded++;
           const score = Number(sub.score);
-          totalScore += score;
 
           if (score >= 18) current.ad_count++;
           else if (score >= 14) current.a_count++;
           else if (score >= 11) current.b_count++;
           else current.c_count++;
+
+          // Track by course
+          if (!studentCourseGrades.has(sub.student_id)) {
+            studentCourseGrades.set(sub.student_id, new Map());
+          }
+          const courseGradesMap = studentCourseGrades.get(sub.student_id)!;
+          const courseId = (sub.assignments as any).courses.id;
+          
+          if (!courseGradesMap.has(courseId)) {
+            courseGradesMap.set(courseId, {
+              total: 0,
+              count: 0,
+              course_name: (sub.assignments as any).courses.name,
+              course_code: (sub.assignments as any).courses.code
+            });
+          }
+          
+          const courseData = courseGradesMap.get(courseId)!;
+          courseData.total += score;
+          courseData.count++;
         });
 
         gradeMap.forEach((record) => {
@@ -239,6 +282,18 @@ export default function TutorDashboard() {
             const studentSubmissions = filteredSubmissions.filter(s => s.student_id === record.student_id);
             const sum = studentSubmissions.reduce((acc, s) => acc + Number(s.score), 0);
             record.average_score = sum / record.total_graded;
+
+            // Add course breakdown
+            const courseGradesMap = studentCourseGrades.get(record.student_id);
+            if (courseGradesMap) {
+              record.course_grades = Array.from(courseGradesMap.entries()).map(([courseId, data]) => ({
+                course_id: courseId,
+                course_name: data.course_name,
+                course_code: data.course_code,
+                average: data.total / data.count,
+                count: data.count
+              }));
+            }
           }
         });
 
@@ -258,6 +313,13 @@ export default function TutorDashboard() {
     if (score >= 14) return 'A';
     if (score >= 11) return 'B';
     return 'C';
+  };
+
+  const getGradeBadgeVariant = (score: number): 'default' | 'secondary' | 'outline' | 'destructive' => {
+    if (score >= 18) return 'default';
+    if (score >= 14) return 'secondary';
+    if (score >= 11) return 'outline';
+    return 'destructive';
   };
 
   const getAttendanceStatus = (rate: number): { label: string; variant: 'default' | 'destructive' | 'secondary' | 'outline' } => {
@@ -611,6 +673,29 @@ export default function TutorDashboard() {
                               </div>
                             )}
                           </div>
+
+                          {/* Course Breakdown */}
+                          {grades.course_grades && grades.course_grades.length > 0 && (
+                            <div className="pt-3 border-t space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">Desempeño por Curso:</p>
+                              <div className="grid grid-cols-1 gap-2">
+                                {grades.course_grades.map(cg => (
+                                  <div key={cg.course_id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                                    <div className="flex-1">
+                                      <p className="text-xs font-medium">{cg.course_name}</p>
+                                      <p className="text-xs text-muted-foreground">{cg.course_code}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant={getGradeBadgeVariant(cg.average)} size="sm">
+                                        {cg.average.toFixed(1)} - {getGradeLetter(cg.average)}
+                                      </Badge>
+                                      <span className="text-xs text-muted-foreground">({cg.count})</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

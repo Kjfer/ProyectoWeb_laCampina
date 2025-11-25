@@ -26,6 +26,7 @@ import Calendar from "./pages/Calendar";
 import NotFound from "./pages/NotFound";
 import AdminBulkStudentImport from "./pages/AdminBulkStudentImport";
 import AssignmentDetail from "./pages/AssignmentDetail";
+import StudentDetailView from "./pages/StudentDetailView";
 
 const queryClient = new QueryClient();
 
@@ -121,6 +122,11 @@ const App = () => (
             <Route path="/tutor-dashboard" element={
               <ProtectedRoute>
                 <TutorDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/student/:studentId" element={
+              <ProtectedRoute>
+                <StudentDetailView />
               </ProtectedRoute>
             } />
             <Route path="/admin/bulk-import" element={

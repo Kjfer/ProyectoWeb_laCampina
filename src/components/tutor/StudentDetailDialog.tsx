@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Mail, Phone, Calendar, BookOpen, CheckCircle, XCircle, Clock, FileCheck, TrendingUp, Award, BarChart3 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Mail, Phone, Calendar, BookOpen, CheckCircle, XCircle, Clock, FileCheck, TrendingUp, Award, BarChart3, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -52,6 +54,7 @@ interface StudentDetailDialogProps {
 }
 
 export function StudentDetailDialog({ student, open, onOpenChange, classroomId }: StudentDetailDialogProps) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [grades, setGrades] = useState<CourseGrade[]>([]);
   const [attendance, setAttendance] = useState<CourseAttendance[]>([]);
@@ -240,12 +243,27 @@ export function StudentDetailDialog({ student, open, onOpenChange, classroomId }
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>
-            {student.paternal_surname} {student.maternal_surname}, {student.first_name}
-          </DialogTitle>
-          <DialogDescription>
-            Información detallada del estudiante y su desempeño académico
-          </DialogDescription>
+          <div className="flex items-start justify-between">
+            <div>
+              <DialogTitle>
+                {student.paternal_surname} {student.maternal_surname}, {student.first_name}
+              </DialogTitle>
+              <DialogDescription>
+                Información detallada del estudiante y su desempeño académico
+              </DialogDescription>
+            </div>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                navigate(`/student/${student.id}`);
+                onOpenChange(false);
+              }}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Ver Perfil Completo
+            </Button>
+          </div>
         </DialogHeader>
 
         <ScrollArea className="h-[calc(90vh-120px)]">
