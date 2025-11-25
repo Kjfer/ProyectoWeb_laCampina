@@ -212,36 +212,49 @@ export type Database = {
       }
       attendance: {
         Row: {
+          classroom_id: string | null
           course_id: string | null
           created_at: string | null
           date: string
           id: string
           notes: string | null
+          recorded_at: string | null
           recorded_by: string | null
           status: string | null
           student_id: string | null
         }
         Insert: {
+          classroom_id?: string | null
           course_id?: string | null
           created_at?: string | null
           date: string
           id?: string
           notes?: string | null
+          recorded_at?: string | null
           recorded_by?: string | null
           status?: string | null
           student_id?: string | null
         }
         Update: {
+          classroom_id?: string | null
           course_id?: string | null
           created_at?: string | null
           date?: string
           id?: string
           notes?: string | null
+          recorded_at?: string | null
           recorded_by?: string | null
           status?: string | null
           student_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "attendance_classroom_id_fkey"
+            columns: ["classroom_id"]
+            isOneToOne: false
+            referencedRelation: "virtual_classrooms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "attendance_course_id_fkey"
             columns: ["course_id"]

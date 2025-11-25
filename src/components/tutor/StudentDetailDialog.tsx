@@ -413,38 +413,39 @@ export function StudentDetailDialog({ student, open, onOpenChange, classroomId }
 
                       {/* Individual Grades */}
                       {grades.map((grade, index) => (
-                      <Card key={index}>
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <CardTitle className="text-base">{grade.assignment_title}</CardTitle>
-                              <CardDescription>
-                                {grade.course_name} ({grade.course_code})
-                              </CardDescription>
+                        <Card key={index}>
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <CardTitle className="text-base">{grade.assignment_title}</CardTitle>
+                                <CardDescription>
+                                  {grade.course_name} ({grade.course_code})
+                                </CardDescription>
+                              </div>
+                              <Badge variant={getGradeBadgeVariant(grade.score)}>
+                                {grade.score} - {getGradeLetter(grade.score)}
+                              </Badge>
                             </div>
-                            <Badge variant={getGradeBadgeVariant(grade.score)}>
-                              {grade.score} - {getGradeLetter(grade.score)}
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Puntuación</span>
-                            <span className="font-medium">{grade.score} / {grade.max_score}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Calificado</span>
-                            <span>{format(new Date(grade.graded_at), 'dd/MM/yyyy HH:mm')}</span>
-                          </div>
-                          {grade.feedback && (
-                            <div className="pt-2 border-t">
-                              <p className="text-sm font-medium mb-1">Retroalimentación:</p>
-                              <p className="text-sm text-muted-foreground">{grade.feedback}</p>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Puntuación</span>
+                              <span className="font-medium">{grade.score} / {grade.max_score}</span>
                             </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Calificado</span>
+                              <span>{format(new Date(grade.graded_at), 'dd/MM/yyyy HH:mm')}</span>
+                            </div>
+                            {grade.feedback && (
+                              <div className="pt-2 border-t">
+                                <p className="text-sm font-medium mb-1">Retroalimentación:</p>
+                                <p className="text-sm text-muted-foreground">{grade.feedback}</p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </>
                   )}
                 </TabsContent>
 
@@ -494,44 +495,45 @@ export function StudentDetailDialog({ student, open, onOpenChange, classroomId }
 
                       {/* Individual Records */}
                       {attendance.map((record, index) => (
-                      <Card key={index}>
-                        <CardContent className="py-4">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-1 flex-1">
-                              <div className="flex items-center gap-2">
-                                {getAttendanceIcon(record.status)}
-                                <span className="font-medium">{getAttendanceLabel(record.status)}</span>
+                        <Card key={index}>
+                          <CardContent className="py-4">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-1 flex-1">
+                                <div className="flex items-center gap-2">
+                                  {getAttendanceIcon(record.status)}
+                                  <span className="font-medium">{getAttendanceLabel(record.status)}</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {record.course_name} ({record.course_code})
+                                </p>
+                                {record.notes && (
+                                  <p className="text-sm text-muted-foreground italic">
+                                    📝 {record.notes}
+                                  </p>
+                                )}
+                                {record.recorded_at && (
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    Registrado: {format(new Date(record.recorded_at), "d MMM yyyy 'a las' HH:mm", { locale: es })}
+                                  </p>
+                                )}
                               </div>
-                              <p className="text-sm text-muted-foreground">
-                                {record.course_name} ({record.course_code})
-                              </p>
-                              {record.notes && (
-                                <p className="text-sm text-muted-foreground italic">
-                                  📝 {record.notes}
+                              <div className="text-right">
+                                <p className="text-sm font-medium">
+                                  {format(new Date(record.date), "EEEE", { locale: es })}
                                 </p>
-                              )}
-                              {record.recorded_at && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  Registrado: {format(new Date(record.recorded_at), "d MMM yyyy 'a las' HH:mm", { locale: es })}
+                                <p className="text-lg font-bold">
+                                  {format(new Date(record.date), 'd MMM', { locale: es })}
                                 </p>
-                              )}
+                                <p className="text-xs text-muted-foreground">
+                                  {format(new Date(record.date), 'yyyy', { locale: es })}
+                                </p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium">
-                                {format(new Date(record.date), "EEEE", { locale: es })}
-                              </p>
-                              <p className="text-lg font-bold">
-                                {format(new Date(record.date), 'd MMM', { locale: es })}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {format(new Date(record.date), 'yyyy', { locale: es })}
-                              </p>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </>
                   )}
                 </TabsContent>
               </Tabs>
