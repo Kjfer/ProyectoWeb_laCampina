@@ -54,53 +54,19 @@ Ejecuta el siguiente comando para desplegar la nueva función:
 npx supabase functions deploy create-classroom-attendance
 ```
 
-### 3. Verificar Permisos
+### 3. Verificar que los Cursos Tengan classroom_id
 
-Asegúrate de que la tabla `virtual_classroom_students` existe y tiene la estructura correcta. Si no existe, necesitarás crearla con:
+El sistema obtiene los estudiantes a través de los cursos matriculados. Asegúrate de que la tabla `courses` tenga el campo `classroom_id`:
 
 ```sql
-CREATE TABLE IF NOT EXISTS public.virtual_classroom_students (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  classroom_id UUID REFERENCES public.virtual_classrooms(id) ON DELETE CASCADE NOT NULL,
-  student_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  is_active BOOLEAN DEFAULT true,
-  enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(classroom_id, student_id)
-);
+-- Verificar si existe la columna
+ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS classroom_id UUID REFERENCES public.virtual_classrooms(id) ON DELETE SET NULL;
 
--- Índices
-CREATE INDEX IF NOT EXISTS idx_virtual_classroom_students_classroom_id 
-  ON public.virtual_classroom_students(classroom_id);
-CREATE INDEX IF NOT EXISTS idx_virtual_classroom_students_student_id 
-  ON public.virtual_classroom_students(student_id);
-
--- RLS Policies
-ALTER TABLE public.virtual_classroom_students ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Students can view their classroom enrollments"
-  ON public.virtual_classroom_students
-  FOR SELECT
-  USING (
-    auth.uid() IN (
-      SELECT user_id FROM public.profiles WHERE id = student_id
-    )
-  );
-
-CREATE POLICY "Teachers and admins can manage classroom enrollments"
-  ON public.virtual_classroom_students
-  FOR ALL
-  USING (
-    auth.uid() IN (
-      SELECT user_id FROM public.profiles p
-      JOIN public.virtual_classrooms vc ON vc.teacher_id = p.id
-      WHERE vc.id = virtual_classroom_students.classroom_id
-      
-      UNION
-      
-      SELECT user_id FROM public.profiles WHERE role = 'admin'
-    )
-  );
+-- Crear índice
+CREATE INDEX IF NOT EXISTS idx_courses_classroom_id ON public.courses(classroom_id);
 ```
+
+Los estudiantes del aula virtual son aquellos matriculados en cualquier curso que pertenezca a esa aula virtual (a través de `course_enrollments`).
 
 ## Uso del Sistema
 

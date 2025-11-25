@@ -50,27 +50,33 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
   const fetchStudents = async () => {
     try {
       setLoading(true);
+      
+      // Get students enrolled in courses of this classroom
       const { data, error } = await supabase
-        .from('virtual_classroom_students')
+        .from('course_enrollments')
         .select(`
-          student_id,
-          student:profiles!virtual_classroom_students_student_id_fkey(
+          student:profiles!course_enrollments_student_id_fkey(
             id,
             first_name,
             last_name,
             email
+          ),
+          course:courses!course_enrollments_course_id_fkey(
+            classroom_id
           )
-        `)
-        .eq('classroom_id', classroomId)
-        .eq('is_active', true);
+        `);
 
       if (error) throw error;
 
-      const enrolledStudents = (data || [])
-        .filter(e => e.student)
-        .map(e => e.student) as Student[];
-      
-      setStudents(enrolledStudents);
+      // Filter by classroom and extract unique students
+      const uniqueStudents = data
+        ?.filter(enrollment => enrollment.course?.classroom_id === classroomId)
+        ?.map(enrollment => enrollment.student)
+        .filter((student, index, self) => 
+          student && self.findIndex(s => s?.id === student?.id) === index
+        ) || [];
+
+      setStudents(uniqueStudents.filter(Boolean) as Student[]);
     } catch (error) {
       console.error('Error fetching students:', error);
       toast.error('Error al cargar estudiantes');
