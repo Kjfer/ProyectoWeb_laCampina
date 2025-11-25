@@ -96,7 +96,7 @@ interface CourseData {
 }
 
 export default function TutorDashboard() {
-  const { profile, activeRole } = useAuth();
+  const { profile, activeRole, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [classroom, setClassroom] = useState<VirtualClassroom | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
@@ -108,25 +108,51 @@ export default function TutorDashboard() {
   const [selectedCourseForSchedule, setSelectedCourseForSchedule] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('🔐 === TUTOR DASHBOARD AUTH DEBUG ===');
+    console.log('👤 User:', user);
+    console.log('📋 Profile:', profile);
+    console.log('🎭 Active Role:', activeRole);
+    console.log('📝 Profile ID:', profile?.id);
+    console.log('🎯 Profile Role:', profile?.role);
+    console.log('🎪 Profile Roles Array:', profile?.roles);
+    console.log('=====================================');
+
     const currentRole = activeRole || profile?.role;
     if (currentRole === 'tutor' || profile?.roles?.includes('tutor')) {
       fetchTutorData();
+    } else {
+      console.warn('⚠️ Usuario no tiene rol de tutor');
+      setLoading(false);
     }
-  }, [profile, activeRole]);
+  }, [profile, activeRole, user]);
 
   const fetchTutorData = async () => {
     try {
+      console.log('🚀 === INICIANDO fetchTutorData ===');
+      console.log('🆔 Profile ID para consulta:', profile?.id);
+      
+      if (!profile?.id) {
+        console.error('❌ NO HAY PROFILE ID - Usuario no autenticado o perfil no cargado');
+        toast.error('No se pudo cargar tu perfil. Por favor, inicia sesión nuevamente.');
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
 
       // Fetch assigned classroom
+      console.log('📡 Consultando aula virtual asignada para tutor_id:', profile.id);
       const { data: classroomData, error: classroomError } = await supabase
         .from('virtual_classrooms')
         .select('*')
-        .eq('tutor_id', profile?.id)
+        .eq('tutor_id', profile.id)
         .single();
+
+      console.log('📦 Respuesta de classroom:', { classroomData, classroomError });
 
       if (classroomError) {
         if (classroomError.code === 'PGRST116') {
+          console.warn('⚠️ No se encontró aula asignada al tutor');
           toast.error('No tienes un aula virtual asignada');
           setLoading(false);
           return;
@@ -134,15 +160,19 @@ export default function TutorDashboard() {
         throw classroomError;
       }
 
+      console.log('✅ Aula encontrada:', classroomData);
       setClassroom(classroomData);
 
       console.log('🏫 Classroom ID:', classroomData.id);
 
       // Fetch courses in classroom
+      console.log('📡 Consultando cursos del aula:', classroomData.id);
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
         .select('id, name, code')
         .eq('classroom_id', classroomData.id);
+
+      console.log('📦 Respuesta de cursos:', { coursesData, coursesError });
 
       if (coursesError) throw coursesError;
 
@@ -155,10 +185,13 @@ export default function TutorDashboard() {
 
       if (courseIds.length > 0) {
         // Fetch students
+        console.log('📡 Consultando estudiantes matriculados en los cursos...');
         const { data: studentsData, error: studentsError } = await supabase
           .from('course_enrollments')
           .select('student_id, profiles!inner(*)')
           .in('course_id', courseIds);
+
+        console.log('📦 Respuesta de estudiantes:', { studentsData, studentsError });
 
         if (studentsError) throw studentsError;
 
@@ -166,6 +199,13 @@ export default function TutorDashboard() {
         const uniqueStudents = Array.from(
           new Map(studentsData.map(item => [item.student_id, item.profiles])).values()
         ) as Student[];
+
+        console.log('👥 Total estudiantes únicos encontrados:', uniqueStudents.length);
+        console.log('📋 Lista de estudiantes:', uniqueStudents.map(s => ({
+          id: s.id,
+          nombre: `${s.first_name} ${s.paternal_surname}`,
+          codigo: s.student_code
+        })));
 
         setStudents(uniqueStudents);
 
@@ -223,6 +263,7 @@ export default function TutorDashboard() {
         setAttendanceData(Array.from(attendanceMap.values()));
 
         // Fetch grades data - Get ALL grades for students, not just classroom courses
+        console.log('📡 Consultando calificaciones de estudiantes...');
         const { data: submissionsData, error: submissionsError } = await supabase
           .from('assignment_submissions')
           .select(`
@@ -240,6 +281,8 @@ export default function TutorDashboard() {
           `)
           .in('student_id', studentIds)
           .not('score', 'is', null);
+
+        console.log('📦 Respuesta de calificaciones:', { submissionsData, submissionsError });
 
         if (submissionsError) throw submissionsError;
 
@@ -331,14 +374,32 @@ export default function TutorDashboard() {
         });
 
         const finalGradeData = Array.from(gradeMap.values());
-        console.log('✅ Final grade data:', finalGradeData);
+        console.log('📊 === RESUMEN DE CALIFICACIONES ===');
+        console.log('✅ Total estudiantes con datos:', finalGradeData.length);
+        console.log('📋 Detalle de calificaciones por estudiante:');
+        finalGradeData.forEach(grade => {
+          const student = uniqueStudents.find(s => s.id === grade.student_id);
+          console.log(`  👤 ${student?.first_name} ${student?.paternal_surname}:`, {
+            total_calificadas: grade.total_graded,
+            promedio: grade.average_score.toFixed(2),
+            AD: grade.ad_count,
+            A: grade.a_count,
+            B: grade.b_count,
+            C: grade.c_count,
+            cursos_con_notas: grade.course_grades?.length || 0
+          });
+        });
+        console.log('=====================================');
         setGradeData(finalGradeData);
       }
 
     } catch (error) {
-      console.error('Error fetching tutor data:', error);
+      console.error('❌ === ERROR EN fetchTutorData ===');
+      console.error('Error completo:', error);
+      console.error('=====================================');
       toast.error('Error al cargar los datos del dashboard');
     } finally {
+      console.log('🏁 fetchTutorData finalizado');
       setLoading(false);
     }
   };
@@ -464,14 +525,62 @@ export default function TutorDashboard() {
     return (attendance?.attendance_rate || 0) >= 90 && (grades?.average_score || 0) >= 14;
   }).length;
 
+  // Show auth error state
+  if (!user) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No hay una sesión activa. Por favor, inicia sesión para ver el dashboard de tutoría.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!profile?.id) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No se pudo cargar tu perfil de usuario. Por favor, intenta cerrar sesión e iniciar sesión nuevamente.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!classroom && !loading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No tienes un aula virtual asignada como tutor. Contacta con el administrador para que te asigne un aula.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard de Tutoría</h1>
-          <p className="text-muted-foreground">
-            {classroom.name} - {classroom.grade} {classroom.section} ({classroom.education_level})
-          </p>
+          {classroom && (
+            <p className="text-muted-foreground">
+              {classroom.name} - {classroom.grade} {classroom.section} ({classroom.education_level})
+            </p>
+          )}
         </div>
 
         {/* Enhanced Stats Cards */}
