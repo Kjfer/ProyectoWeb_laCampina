@@ -66,6 +66,12 @@ interface Submission {
   submitted_at: string;
   score: string | null;  // Ahora es texto (AD, A, B, C)
   feedback: string | null;
+  feedback_files?: Array<{
+    file_path: string;
+    file_name: string;
+    file_size: number;
+    mime_type: string;
+  }>;
   student_files?: Array<{
     file_path: string;
     file_name: string;
@@ -150,7 +156,8 @@ const AssignmentDetail = () => {
 
       setSubmission(submissionData ? {
         ...submissionData,
-        student_files: Array.isArray(submissionData.student_files) ? submissionData.student_files as any : []
+        student_files: Array.isArray(submissionData.student_files) ? submissionData.student_files as any : [],
+        feedback_files: Array.isArray(submissionData.feedback_files) ? submissionData.feedback_files as any : []
       } : null);
     } catch (error) {
       console.error('Error fetching assignment details:', error);
@@ -423,6 +430,43 @@ const AssignmentDetail = () => {
       toast({
         title: "Error",
         description: "No se pudo descargar el archivo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleDownloadFeedbackFile = async (filePath: string, fileName: string) => {
+    setIsDownloading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('download-file', {
+        body: {
+          bucket: 'student-submissions',
+          filePath: filePath,
+          fileName: fileName
+        }
+      });
+
+      if (error) throw error;
+
+      // Download the file using the signed URL
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = data.fileName || fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Descarga iniciada",
+        description: "El archivo de feedback se está descargando",
+      });
+    } catch (error) {
+      console.error('Error downloading feedback file:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el archivo de feedback",
         variant: "destructive",
       });
     } finally {
@@ -749,6 +793,45 @@ const AssignmentDetail = () => {
                       <p className="text-sm text-foreground whitespace-pre-wrap">
                         {submission.feedback}
                       </p>
+                    </div>
+                  )}
+
+                  {/* Archivos de feedback del profesor */}
+                  {submission.feedback_files && submission.feedback_files.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Archivos adjuntos del profesor ({submission.feedback_files.length})
+                      </p>
+                      <div className="space-y-2">
+                        {submission.feedback_files.map((file: any, index: number) => (
+                          <div 
+                            key={index} 
+                            className="flex items-center justify-between p-3 rounded-lg border bg-muted/50 border-border"
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <FileText className="w-4 h-4 flex-shrink-0 text-primary" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium truncate text-foreground">
+                                  {file.file_name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {file.file_size ? (file.file_size / 1024).toFixed(2) : '0.00'} KB
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownloadFeedbackFile(file.file_path, file.file_name)}
+                              disabled={isDownloading}
+                              className="flex-shrink-0"
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              {isDownloading ? 'Descargando...' : 'Descargar'}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
