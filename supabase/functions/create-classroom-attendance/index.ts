@@ -130,6 +130,7 @@ serve(async (req) => {
       status: record.status,
       notes: record.notes || null,
       recorded_by: profile.id,
+      recorded_at: new Date().toISOString(),
     }));
 
     // Insert new attendance records

@@ -3,12 +3,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle, XCircle, Clock, FileCheck, Calendar, Download, TrendingUp } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, FileCheck, Calendar, Download, TrendingUp, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWeekend, addDays, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 interface Student {
   id: string;
@@ -23,12 +26,20 @@ interface AttendanceRecord {
   date: string;
   status: 'present' | 'late' | 'absent' | 'justified';
   notes: string | null;
+  recorded_at: string | null;
+  recorded_by: string | null;
   student?: Student;
+  recorder?: {
+    first_name: string;
+    last_name: string;
+  };
 }
 
 interface AttendanceHistoryProps {
   classroomId: string;
 }
+
+type FilterType = 'month' | 'week' | 'range' | 'today';
 
 export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
   const [students, setStudents] = useState<Student[]>([]);
@@ -36,6 +47,12 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
   const [loading, setLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
+  const [filterType, setFilterType] = useState<FilterType>('month');
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  });
+  const [selectedWeek, setSelectedWeek] = useState<Date>(new Date());
 
   useEffect(() => {
     fetchStudents();
@@ -45,7 +62,7 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
     if (students.length > 0) {
       fetchAttendanceRecords();
     }
-  }, [selectedMonth, selectedStudent, students]);
+  }, [selectedStudent, students, filterType, dateRange, selectedWeek, selectedMonth]);
 
   const fetchStudents = async () => {
     try {
@@ -89,8 +106,31 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
     try {
       setLoading(true);
       
-      const startDate = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
-      const endDate = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+      // Calcular rango de fechas según el tipo de filtro
+      let startDate: string;
+      let endDate: string;
+
+      switch (filterType) {
+        case 'today':
+          startDate = format(startOfDay(new Date()), 'yyyy-MM-dd');
+          endDate = format(endOfDay(new Date()), 'yyyy-MM-dd');
+          break;
+        case 'week':
+          const weekStart = startOfWeek(selectedWeek, { weekStartsOn: 1 }); // Lunes
+          const weekEnd = endOfWeek(selectedWeek, { weekStartsOn: 1 }); // Domingo
+          startDate = format(weekStart, 'yyyy-MM-dd');
+          endDate = format(weekEnd, 'yyyy-MM-dd');
+          break;
+        case 'range':
+          startDate = format(dateRange.from, 'yyyy-MM-dd');
+          endDate = format(dateRange.to, 'yyyy-MM-dd');
+          break;
+        case 'month':
+        default:
+          startDate = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
+          endDate = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
+          break;
+      }
 
       let query = supabase
         .from('attendance')
@@ -101,12 +141,17 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
             first_name,
             last_name,
             email
+          ),
+          recorder:profiles!attendance_recorded_by_fkey(
+            first_name,
+            last_name
           )
         `)
         .eq('classroom_id', classroomId)
         .gte('date', startDate)
         .lte('date', endDate)
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .order('recorded_at', { ascending: false });
 
       if (selectedStudent !== 'all') {
         query = query.eq('student_id', selectedStudent);
@@ -178,13 +223,15 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
   const stats = calculateStats();
 
   const handleExportToCSV = () => {
-    const headers = ['Fecha', 'Estudiante', 'Email', 'Estado', 'Observaciones'];
+    const headers = ['Fecha', 'Hora Registro', 'Estudiante', 'Email', 'Estado', 'Observaciones', 'Registrado por'];
     const rows = attendanceRecords.map(record => [
       format(new Date(record.date), 'dd/MM/yyyy'),
+      record.recorded_at ? format(new Date(record.recorded_at), 'HH:mm:ss') : '-',
       `${record.student?.first_name} ${record.student?.last_name}`,
       record.student?.email || '',
       getStatusLabel(record.status),
-      record.notes || ''
+      record.notes || '',
+      record.recorder ? `${record.recorder.first_name} ${record.recorder.last_name}` : '-'
     ]);
 
     const csvContent = [
@@ -197,13 +244,27 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
     const url = URL.createObjectURL(blob);
     
     link.setAttribute('href', url);
-    link.setAttribute('download', `asistencia_${format(selectedMonth, 'yyyy-MM')}.csv`);
+    link.setAttribute('download', `asistencia_${format(new Date(), 'yyyy-MM-dd_HHmm')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
     toast.success('Historial exportado exitosamente');
+  };
+
+  const getFilterLabel = () => {
+    switch (filterType) {
+      case 'today':
+        return 'Hoy';
+      case 'week':
+        return `Semana del ${format(startOfWeek(selectedWeek, { weekStartsOn: 1 }), 'd MMM', { locale: es })}`;
+      case 'range':
+        return `${format(dateRange.from, 'd MMM', { locale: es })} - ${format(dateRange.to, 'd MMM', { locale: es })}`;
+      case 'month':
+      default:
+        return format(selectedMonth, 'MMMM yyyy', { locale: es });
+    }
   };
 
   // Get unique dates from records
@@ -233,32 +294,114 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
+            {/* Tipo de Filtro */}
             <div>
-              <label className="text-sm font-medium mb-2 block">Mes</label>
-              <Select
-                value={format(selectedMonth, 'yyyy-MM')}
-                onValueChange={(value) => {
-                  const [year, month] = value.split('-');
-                  setSelectedMonth(new Date(parseInt(year), parseInt(month) - 1));
-                }}
-              >
+              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filtrar por
+              </label>
+              <Select value={filterType} onValueChange={(value: FilterType) => setFilterType(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const date = new Date();
-                    date.setMonth(date.getMonth() - i);
-                    return date;
-                  }).map(date => (
-                    <SelectItem key={format(date, 'yyyy-MM')} value={format(date, 'yyyy-MM')}>
-                      {format(date, 'MMMM yyyy', { locale: es })}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="today">Hoy</SelectItem>
+                  <SelectItem value="week">Esta Semana</SelectItem>
+                  <SelectItem value="month">Mes</SelectItem>
+                  <SelectItem value="range">Rango Personalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Selector según tipo de filtro */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Período</label>
+              {filterType === 'month' && (
+                <Select
+                  value={format(selectedMonth, 'yyyy-MM')}
+                  onValueChange={(value) => {
+                    const [year, month] = value.split('-');
+                    setSelectedMonth(new Date(parseInt(year), parseInt(month) - 1));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const date = new Date();
+                      date.setMonth(date.getMonth() - i);
+                      return date;
+                    }).map(date => (
+                      <SelectItem key={format(date, 'yyyy-MM')} value={format(date, 'yyyy-MM')}>
+                        {format(date, 'MMMM yyyy', { locale: es })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              
+              {filterType === 'week' && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {format(startOfWeek(selectedWeek, { weekStartsOn: 1 }), 'd MMM', { locale: es })} - {format(endOfWeek(selectedWeek, { weekStartsOn: 1 }), 'd MMM', { locale: es })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarComponent
+                      mode="single"
+                      selected={selectedWeek}
+                      onSelect={(date) => date && setSelectedWeek(date)}
+                      locale={es}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+
+              {filterType === 'range' && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {format(dateRange.from, 'd MMM', { locale: es })} - {format(dateRange.to, 'd MMM', { locale: es })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <div className="p-3 space-y-2">
+                      <div>
+                        <label className="text-xs font-medium">Desde</label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={dateRange.from}
+                          onSelect={(date) => date && setDateRange(prev => ({ ...prev, from: date }))}
+                          locale={es}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium">Hasta</label>
+                        <CalendarComponent
+                          mode="single"
+                          selected={dateRange.to}
+                          onSelect={(date) => date && setDateRange(prev => ({ ...prev, to: date }))}
+                          locale={es}
+                        />
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+
+              {filterType === 'today' && (
+                <div className="flex items-center h-10 px-3 border rounded-md bg-muted">
+                  <span className="text-sm">{format(new Date(), "d 'de' MMMM, yyyy", { locale: es })}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Filtro por estudiante */}
             <div>
               <label className="text-sm font-medium mb-2 block">Estudiante</label>
               <Select value={selectedStudent} onValueChange={setSelectedStudent}>
@@ -275,6 +418,17 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Resumen del filtro actual */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Filter className="h-4 w-4" />
+            <span>Mostrando: {getFilterLabel()}</span>
+            {selectedStudent !== 'all' && (
+              <Badge variant="outline">
+                {students.find(s => s.id === selectedStudent)?.first_name}
+              </Badge>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -341,7 +495,7 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
         <CardHeader>
           <CardTitle>Registros por Fecha</CardTitle>
           <CardDescription>
-            Mostrando {attendanceRecords.length} registros para {format(selectedMonth, 'MMMM yyyy', { locale: es })}
+            Mostrando {attendanceRecords.length} registros para {getFilterLabel()}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -368,9 +522,17 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
                 return (
                   <div key={date} className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-lg">
-                        {format(new Date(date), "EEEE, d 'de' MMMM yyyy", { locale: es })}
-                      </h3>
+                      <div>
+                        <h3 className="font-semibold text-lg">
+                          {format(new Date(date), "EEEE, d 'de' MMMM yyyy", { locale: es })}
+                        </h3>
+                        {dateRecords[0]?.recorded_at && (
+                          <p className="text-xs text-muted-foreground">
+                            Registrado a las {format(new Date(dateRecords[0].recorded_at), 'HH:mm:ss')}
+                            {dateRecords[0].recorder && ` por ${dateRecords[0].recorder.first_name} ${dateRecords[0].recorder.last_name}`}
+                          </p>
+                        )}
+                      </div>
                       <div className="flex gap-2">
                         <Badge variant="outline" className="bg-green-50">
                           <CheckCircle className="h-3 w-3 mr-1 text-green-600" />
@@ -397,6 +559,7 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
                           <TableHead>Estudiante</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead className="w-[150px]">Estado</TableHead>
+                          <TableHead className="w-[100px]">Hora</TableHead>
                           <TableHead>Observaciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -417,6 +580,12 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
                                   {getStatusLabel(record.status)}
                                 </div>
                               </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {record.recorded_at 
+                                ? format(new Date(record.recorded_at), 'HH:mm')
+                                : '-'
+                              }
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {record.notes || '-'}
