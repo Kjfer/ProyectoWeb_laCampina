@@ -158,6 +158,8 @@ const AssignmentReview = () => {
     console.log('Submission content:', submission.content);
     setScore(submission.score || '');  // Score ya es una letra
     setFeedback(submission.feedback || '');
+    // Limpiar archivos nuevos cuando se selecciona una entrega diferente
+    setFeedbackFiles([]);
   };
 
   const handleGradeSubmission = async () => {
@@ -179,8 +181,15 @@ const AssignmentReview = () => {
     try {
       setGrading(true);
 
-      // Upload feedback files if any
+      // Preservar archivos de retroalimentación existentes
       let feedbackFilesData: FileInfo[] = [];
+      
+      // Agregar archivos existentes si los hay
+      if (selectedSubmission.feedback_files && Array.isArray(selectedSubmission.feedback_files)) {
+        feedbackFilesData = [...selectedSubmission.feedback_files];
+      }
+      
+      // Upload nuevos archivos de retroalimentación si hay
       if (feedbackFiles.length > 0) {
         for (const file of feedbackFiles) {
           const fileExt = file.name.split('.').pop();
@@ -577,17 +586,57 @@ const AssignmentReview = () => {
                         Máximo 5MB por archivo. Para archivos grandes, sube a Google Drive y comparte el enlace en los comentarios.
                       </p>
                       <div className="mt-2 space-y-2">
-                        <FileUpload
-                          onFileSelect={(files) => setFeedbackFiles(prev => [...prev, ...files])}
-                          accept="*/*"
-                          multiple
-                          maxSize={5 * 1024 * 1024}
-                        />
+                        {/* Mostrar archivos existentes guardados */}
+                        {selectedSubmission.feedback_files && selectedSubmission.feedback_files.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">Archivos ya guardados:</p>
+                            {selectedSubmission.feedback_files.map((file: any, index: number) => {
+                              const filePath = file.file_path || file.filePath;
+                              const fileName = file.file_name || file.fileName;
+                              const fileSize = file.file_size || file.fileSize;
+                              
+                              return (
+                                <div key={`existing-${index}`} className="flex items-center gap-2 p-2 border rounded-lg bg-green-50 dark:bg-green-950/20">
+                                  <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{fileName}</p>
+                                    {fileSize && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {(fileSize / 1024).toFixed(2)} KB
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDownloadFile(filePath, fileName)}
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        
+                        {/* Upload para nuevos archivos */}
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Agregar nuevos archivos:</p>
+                          <FileUpload
+                            onFileSelect={(files) => setFeedbackFiles(prev => [...prev, ...files])}
+                            accept="*/*"
+                            multiple
+                            maxSize={5 * 1024 * 1024}
+                          />
+                        </div>
+                        
+                        {/* Mostrar nuevos archivos que se van a subir */}
                         {feedbackFiles.length > 0 && (
                           <div className="space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">Nuevos archivos a subir:</p>
                             {feedbackFiles.map((file, index) => (
-                              <div key={index} className="flex items-center gap-2 p-2 border rounded-lg bg-muted/50">
-                                <FileText className="w-4 h-4 text-muted-foreground" />
+                              <div key={`new-${index}`} className="flex items-center gap-2 p-2 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                                <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                 <span className="text-sm flex-1 truncate">{file.name}</span>
                                 <Button
                                   variant="ghost"
