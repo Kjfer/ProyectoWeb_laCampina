@@ -161,7 +161,7 @@ export function AttendanceHistory({ classroomId }: AttendanceHistoryProps) {
 
       if (error) throw error;
 
-      setAttendanceRecords(data || []);
+      setAttendanceRecords((data || []) as AttendanceRecord[]);
     } catch (error) {
       console.error('Error fetching attendance records:', error);
       toast.error('Error al cargar el historial de asistencia');
