@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
-import { Users, GraduationCap, Calendar, AlertCircle, Eye, Search, BookOpen, Target, Clock, TrendingUp, TrendingDown, Award, CheckCircle2 } from 'lucide-react';
+import { Users, GraduationCap, Calendar, AlertCircle, Eye, Search, BookOpen, Target, Clock, TrendingUp, TrendingDown, Award, CheckCircle2, Building2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -98,7 +99,8 @@ interface CourseData {
 export default function TutorDashboard() {
   const { profile, activeRole, user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [classroom, setClassroom] = useState<VirtualClassroom | null>(null);
+  const [classrooms, setClassrooms] = useState<VirtualClassroom[]>([]);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [gradeData, setGradeData] = useState<GradeRecord[]>([]);
@@ -140,41 +142,60 @@ export default function TutorDashboard() {
 
       setLoading(true);
 
-      // Fetch assigned classroom
-      console.log('📡 Consultando aula virtual asignada para tutor_id:', profile.id);
-      const { data: classroomData, error: classroomError } = await supabase
+      // Fetch ALL assigned classrooms
+      console.log('📡 Consultando TODAS las aulas virtuales asignadas para tutor_id:', profile.id);
+      const { data: classroomsData, error: classroomsError } = await supabase
         .from('virtual_classrooms')
         .select('*')
         .eq('tutor_id', profile.id)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
-      console.log('📦 Respuesta de classroom:', { classroomData, classroomError });
+      console.log('📦 Respuesta de classrooms:', { classroomsData, classroomsError });
 
-      if (classroomError) {
-        throw classroomError;
+      if (classroomsError) {
+        throw classroomsError;
       }
       
-      if (!classroomData) {
-        console.warn('⚠️ No se encontró aula activa asignada al tutor');
-        toast.error('No tienes un aula virtual activa asignada');
+      if (!classroomsData || classroomsData.length === 0) {
+        console.warn('⚠️ No se encontraron aulas activas asignadas al tutor');
+        toast.error('No tienes aulas virtuales activas asignadas');
         setLoading(false);
         return;
       }
 
-      console.log('✅ Aula encontrada:', classroomData);
-      setClassroom(classroomData);
+      console.log(`✅ ${classroomsData.length} aulas encontradas:`, classroomsData);
+      setClassrooms(classroomsData);
+      
+      // Select the first classroom by default
+      const firstClassroomId = classroomsData[0].id;
+      setSelectedClassroomId(firstClassroomId);
+      
+      // Load data for the first classroom
+      await loadClassroomData(firstClassroomId);
 
-      console.log('🏫 Classroom ID:', classroomData.id);
+    } catch (error) {
+      console.error('❌ === ERROR EN fetchTutorData ===');
+      console.error('Error completo:', error);
+      console.error('=====================================');
+      toast.error('Error al cargar los datos del dashboard');
+    } finally {
+      console.log('🏁 fetchTutorData finalizado');
+      setLoading(false);
+    }
+  };
+
+  const loadClassroomData = async (classroomId: string) => {
+    try {
+      console.log('🏫 === CARGANDO DATOS DEL AULA ===');
+      console.log('🆔 Classroom ID:', classroomId);
 
       // Fetch courses in classroom
-      console.log('📡 Consultando cursos del aula:', classroomData.id);
+      console.log('📡 Consultando cursos del aula:', classroomId);
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
         .select('id, name, code')
-        .eq('classroom_id', classroomData.id);
+        .eq('classroom_id', classroomId);
 
       console.log('📦 Respuesta de cursos:', { coursesData, coursesError });
 
@@ -221,7 +242,7 @@ export default function TutorDashboard() {
           .from('attendance')
           .select('student_id, status, date, recorded_at')
           .in('student_id', studentIds)
-          .or(`course_id.in.(${courseIds.join(',')}),classroom_id.eq.${classroomData.id}`)
+          .or(`course_id.in.(${courseIds.join(',')}),classroom_id.eq.${classroomId}`)
           .order('date', { ascending: false });
 
         if (attendanceError) throw attendanceError;
@@ -398,14 +419,18 @@ export default function TutorDashboard() {
       }
 
     } catch (error) {
-      console.error('❌ === ERROR EN fetchTutorData ===');
+      console.error('❌ === ERROR EN loadClassroomData ===');
       console.error('Error completo:', error);
       console.error('=====================================');
-      toast.error('Error al cargar los datos del dashboard');
-    } finally {
-      console.log('🏁 fetchTutorData finalizado');
-      setLoading(false);
+      toast.error('Error al cargar los datos del aula');
     }
+  };
+
+  const handleClassroomChange = async (classroomId: string) => {
+    setSelectedClassroomId(classroomId);
+    setLoading(true);
+    await loadClassroomData(classroomId);
+    setLoading(false);
   };
 
   const getGradeLetter = (score: number): string => {
@@ -462,7 +487,9 @@ export default function TutorDashboard() {
     );
   }
 
-  if (!classroom) {
+  const selectedClassroom = classrooms.find(c => c.id === selectedClassroomId);
+
+  if (!selectedClassroom && !loading && classrooms.length === 0) {
     return (
       <DashboardLayout>
         <Alert>
@@ -560,14 +587,14 @@ export default function TutorDashboard() {
     );
   }
 
-  if (!classroom && !loading) {
+  if (!selectedClassroom && !loading && classrooms.length > 0) {
     return (
       <DashboardLayout>
         <div className="space-y-6">
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              No tienes un aula virtual asignada como tutor. Contacta con el administrador para que te asigne un aula.
+              Selecciona un aula virtual para ver los datos.
             </AlertDescription>
           </Alert>
         </div>
@@ -578,12 +605,32 @@ export default function TutorDashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard de Tutoría</h1>
-          {classroom && (
-            <p className="text-muted-foreground">
-              {classroom.name} - {classroom.grade} {classroom.section} ({classroom.education_level})
-            </p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard de Tutoría</h1>
+            {selectedClassroom && (
+              <p className="text-muted-foreground">
+                {selectedClassroom.name} - {selectedClassroom.grade} {selectedClassroom.section} ({selectedClassroom.education_level})
+              </p>
+            )}
+          </div>
+          
+          {classrooms.length > 1 && (
+            <div className="flex items-center gap-3">
+              <Building2 className="h-5 w-5 text-muted-foreground" />
+              <Select value={selectedClassroomId || undefined} onValueChange={handleClassroomChange}>
+                <SelectTrigger className="w-[280px] bg-background z-50">
+                  <SelectValue placeholder="Selecciona un aula" />
+                </SelectTrigger>
+                <SelectContent className="bg-background z-50">
+                  {classrooms.map((classroom) => (
+                    <SelectItem key={classroom.id} value={classroom.id}>
+                      {classroom.name} - {classroom.grade} {classroom.section}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
 
@@ -979,7 +1026,7 @@ export default function TutorDashboard() {
           student={selectedStudent}
           open={!!selectedStudent}
           onOpenChange={(open) => !open && setSelectedStudent(null)}
-          classroomId={classroom?.id || ''}
+          classroomId={selectedClassroom?.id || ''}
         />
 
         {/* Schedule Edit Dialog */}
