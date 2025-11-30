@@ -146,18 +146,22 @@ export default function TutorDashboard() {
         .from('virtual_classrooms')
         .select('*')
         .eq('tutor_id', profile.id)
-        .single();
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       console.log('📦 Respuesta de classroom:', { classroomData, classroomError });
 
       if (classroomError) {
-        if (classroomError.code === 'PGRST116') {
-          console.warn('⚠️ No se encontró aula asignada al tutor');
-          toast.error('No tienes un aula virtual asignada');
-          setLoading(false);
-          return;
-        }
         throw classroomError;
+      }
+      
+      if (!classroomData) {
+        console.warn('⚠️ No se encontró aula activa asignada al tutor');
+        toast.error('No tienes un aula virtual activa asignada');
+        setLoading(false);
+        return;
       }
 
       console.log('✅ Aula encontrada:', classroomData);
