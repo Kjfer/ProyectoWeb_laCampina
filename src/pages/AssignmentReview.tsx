@@ -1,23 +1,49 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { FileText, Calendar, Clock, Download, ArrowLeft, User, CheckCircle, XCircle, Edit, Trash2, Upload, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
+import {
+  FileText,
+  Calendar,
+  Download,
+  ArrowLeft,
+  User,
+  CheckCircle,
+  Edit,
+  Trash2,
+  X,
+  Eye
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { EditAssignmentDialog } from '@/components/assignments/EditAssignmentDialog';
 import { FileUpload } from '@/components/ui/file-upload';
+import PdfAnnotator from '@/components/assignments/PdfAnnotator';
 
 // Las calificaciones ahora se almacenan como letras en la base de datos
 const VALID_GRADES = ['AD', 'A', 'B', 'C'] as const;
@@ -52,7 +78,7 @@ interface Submission {
   file_size: number | null;
   mime_type: string | null;
   student_files: any;
-  score: string | null;  // Ahora es texto (AD, A, B, C)
+  score: string | null; // (AD, A, B, C)
   feedback: string | null;
   feedback_files: any;
   submitted_at: string;
@@ -65,21 +91,39 @@ interface Submission {
   };
 }
 
+type PreviewFile = {
+  filePath: string;
+  fileName: string;
+  mimeType?: string | null;
+  fileSize?: number | null;
+};
+
 const AssignmentReview = () => {
   const { assignmentId } = useParams();
   const { profile } = useAuth();
   const navigate = useNavigate();
+
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+
   const [score, setScore] = useState<string>('');
   const [feedback, setFeedback] = useState<string>('');
   const [grading, setGrading] = useState(false);
+
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
   const [feedbackFiles, setFeedbackFiles] = useState<File[]>([]);
+
+  // ✅ PREVIEW (FASE 1)
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
 
   useEffect(() => {
     if (profile?.role !== 'teacher' && profile?.role !== 'admin') {
@@ -87,6 +131,7 @@ const AssignmentReview = () => {
       return;
     }
     fetchAssignmentData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignmentId, profile]);
 
   const fetchAssignmentData = async () => {
@@ -98,14 +143,16 @@ const AssignmentReview = () => {
       // Fetch assignment details
       const { data: assignmentData, error: assignmentError } = await supabase
         .from('assignments')
-        .select(`
+        .select(
+          `
           *,
           course:courses (
             id,
             name,
             code
           )
-        `)
+        `
+        )
         .eq('id', assignmentId)
         .single();
 
@@ -115,7 +162,8 @@ const AssignmentReview = () => {
       // Fetch submissions
       const { data: submissionsData, error: submissionsError } = await supabase
         .from('assignment_submissions')
-        .select(`
+        .select(
+          `
           id,
           student_id,
           content,
@@ -135,7 +183,8 @@ const AssignmentReview = () => {
             last_name,
             email
           )
-        `)
+        `
+        )
         .eq('assignment_id', assignmentId)
         .order('submitted_at', { ascending: false });
 
@@ -143,7 +192,6 @@ const AssignmentReview = () => {
 
       if (submissionsError) throw submissionsError;
       setSubmissions(submissionsData || []);
-
     } catch (error) {
       console.error('Error fetching assignment data:', error);
       toast.error('Error al cargar la información de la tarea');
@@ -156,10 +204,83 @@ const AssignmentReview = () => {
     setSelectedSubmission(submission);
     console.log('Selected submission:', submission);
     console.log('Submission content:', submission.content);
-    setScore(submission.score || '');  // Score ya es una letra
+    setScore(submission.score || '');
     setFeedback(submission.feedback || '');
-    // Limpiar archivos nuevos cuando se selecciona una entrega diferente
     setFeedbackFiles([]);
+  };
+
+  const formatKB = (bytes?: number | null) => {
+    if (!bytes || Number.isNaN(bytes)) return '0.00 KB';
+    return `${(bytes / 1024).toFixed(2)} KB`;
+  };
+
+  const canPreview = (mimeType?: string | null, fileName?: string | null) => {
+    const mt = (mimeType || '').toLowerCase();
+    const fn = (fileName || '').toLowerCase();
+
+    if (mt.startsWith('image/')) return true;
+    if (mt.includes('pdf')) return true;
+
+    // fallback por extensión si mime_type viene vacío
+    if (fn.endsWith('.png') || fn.endsWith('.jpg') || fn.endsWith('.jpeg') || fn.endsWith('.webp') || fn.endsWith('.gif'))
+      return true;
+    if (fn.endsWith('.pdf')) return true;
+
+    return false;
+  };
+
+  const handleDownloadFile = async (filePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('download-file', {
+        body: {
+          bucket: 'student-submissions',
+          filePath,
+          fileName
+        }
+      });
+
+      if (error) throw error;
+
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = data.fileName || fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success('Descarga iniciada');
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast.error('No se pudo descargar el archivo');
+    }
+  };
+
+  // ✅ NUEVO: abrir vista previa (sin descargar)
+  const handlePreviewFile = async (file: PreviewFile) => {
+    try {
+      setPreviewLoading(true);
+      setPreviewFile(file);
+      setPreviewUrl('');
+      setPreviewOpen(true);
+
+      const { data, error } = await supabase.functions.invoke('download-file', {
+        body: {
+          bucket: 'student-submissions',
+          filePath: file.filePath,
+          fileName: file.fileName
+        }
+      });
+
+      if (error) throw error;
+
+      setPreviewUrl(data.signedUrl);
+    } catch (error) {
+      console.error('Error previewing file:', error);
+      toast.error('No se pudo abrir la vista previa');
+      setPreviewOpen(false);
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   const handleGradeSubmission = async () => {
@@ -172,9 +293,11 @@ const AssignmentReview = () => {
 
     // Validate file sizes
     const maxSize = 5 * 1024 * 1024; // 5MB
-    const oversizedFiles = feedbackFiles.filter(file => file.size > maxSize);
+    const oversizedFiles = feedbackFiles.filter((file) => file.size > maxSize);
     if (oversizedFiles.length > 0) {
-      toast.error('Algunos archivos superan los 5MB. Para archivos grandes, te recomendamos subirlos a Google Drive y compartir el enlace en los comentarios.');
+      toast.error(
+        'Algunos archivos superan los 5MB. Para archivos grandes, te recomendamos subirlos a Google Drive y compartir el enlace en los comentarios.'
+      );
       return;
     }
 
@@ -183,12 +306,11 @@ const AssignmentReview = () => {
 
       // Preservar archivos de retroalimentación existentes
       let feedbackFilesData: FileInfo[] = [];
-      
-      // Agregar archivos existentes si los hay
+
       if (selectedSubmission.feedback_files && Array.isArray(selectedSubmission.feedback_files)) {
         feedbackFilesData = [...selectedSubmission.feedback_files];
       }
-      
+
       // Upload nuevos archivos de retroalimentación si hay
       if (feedbackFiles.length > 0) {
         for (const file of feedbackFiles) {
@@ -196,18 +318,12 @@ const AssignmentReview = () => {
           const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
           const filePath = `feedback/${selectedSubmission.id}/${fileName}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('student-submissions')
-            .upload(filePath, file);
+          const { error: uploadError } = await supabase.storage.from('student-submissions').upload(filePath, file);
 
           if (uploadError) {
             console.error('Error uploading file:', uploadError);
             throw new Error(`Error al subir el archivo ${file.name}`);
           }
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('student-submissions')
-            .getPublicUrl(filePath);
 
           feedbackFilesData.push({
             file_path: filePath,
@@ -221,7 +337,7 @@ const AssignmentReview = () => {
       const { error } = await supabase
         .from('assignment_submissions')
         .update({
-          score: score,  // Guardar directamente la letra
+          score: score,
           feedback: feedback.trim() || null,
           feedback_files: feedbackFilesData as any,
           graded_at: new Date().toISOString()
@@ -232,11 +348,11 @@ const AssignmentReview = () => {
 
       toast.success('Calificación guardada exitosamente');
       fetchAssignmentData();
+
       setSelectedSubmission(null);
       setScore('');
       setFeedback('');
       setFeedbackFiles([]);
-
     } catch (error) {
       console.error('Error grading submission:', error);
       toast.error(error instanceof Error ? error.message : 'Error al guardar la calificación');
@@ -251,10 +367,7 @@ const AssignmentReview = () => {
     try {
       setDeleting(true);
 
-      const { error } = await supabase
-        .from('assignments')
-        .delete()
-        .eq('id', assignmentId);
+      const { error } = await supabase.from('assignments').delete().eq('id', assignmentId);
 
       if (error) throw error;
 
@@ -270,34 +383,7 @@ const AssignmentReview = () => {
   };
 
   const removeFeedbackFile = (index: number) => {
-    setFeedbackFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleDownloadFile = async (filePath: string, fileName: string) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('download-file', {
-        body: {
-          bucket: 'student-submissions',
-          filePath: filePath,
-          fileName: fileName
-        }
-      });
-
-      if (error) throw error;
-
-      // Download the file using the signed URL
-      const link = document.createElement('a');
-      link.href = data.signedUrl;
-      link.download = data.fileName || fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success('Descarga iniciada');
-    } catch (error) {
-      console.error('Error downloading file:', error);
-      toast.error('No se pudo descargar el archivo');
-    }
+    setFeedbackFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   if (loading) {
@@ -322,9 +408,7 @@ const AssignmentReview = () => {
             <CardContent className="p-8 text-center">
               <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">Tarea no encontrada</h3>
-              <Button onClick={() => navigate('/assignments')}>
-                Volver a Tareas
-              </Button>
+              <Button onClick={() => navigate('/assignments')}>Volver a Tareas</Button>
             </CardContent>
           </Card>
         </div>
@@ -332,7 +416,7 @@ const AssignmentReview = () => {
     );
   }
 
-  const gradedCount = submissions.filter(s => s.score !== null).length;
+  const gradedCount = submissions.filter((s) => s.score !== null).length;
   const pendingCount = submissions.length - gradedCount;
 
   return (
@@ -340,10 +424,7 @@ const AssignmentReview = () => {
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/assignments')}
-          >
+          <Button variant="ghost" onClick={() => navigate('/assignments')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver
           </Button>
@@ -355,17 +436,11 @@ const AssignmentReview = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setEditDialogOpen(true)}
-            >
+            <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
               <Edit className="w-4 h-4 mr-2" />
               Editar
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteDialogOpen(true)}
-            >
+            <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
               <Trash2 className="w-4 h-4 mr-2" />
               Eliminar
             </Button>
@@ -434,7 +509,8 @@ const AssignmentReview = () => {
                         <div className="flex items-start gap-3">
                           <Avatar className="h-10 w-10">
                             <AvatarFallback>
-                              {submission.student.first_name[0]}{submission.student.last_name[0]}
+                              {submission.student.first_name[0]}
+                              {submission.student.last_name[0]}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
@@ -442,17 +518,17 @@ const AssignmentReview = () => {
                               {submission.student.first_name} {submission.student.last_name}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {format(new Date(submission.submitted_at), "d MMM, HH:mm", { locale: es })}
+                              {format(new Date(submission.submitted_at), 'd MMM, HH:mm', { locale: es })}
                             </p>
-                        {submission.score !== null ? (
-                          <Badge variant="default" className="text-xs mt-1">
-                            {submission.score}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs mt-1">
-                            Sin calificar
-                          </Badge>
-                        )}
+                            {submission.score !== null ? (
+                              <Badge variant="default" className="text-xs mt-1">
+                                {submission.score}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs mt-1">
+                                Sin calificar
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -473,15 +549,14 @@ const AssignmentReview = () => {
                       <CardTitle>
                         {selectedSubmission.student.first_name} {selectedSubmission.student.last_name}
                       </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {selectedSubmission.student.email}
-                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">{selectedSubmission.student.email}</p>
                     </div>
-                    <Badge variant={selectedSubmission.score !== null ? "default" : "secondary"}>
+                    <Badge variant={selectedSubmission.score !== null ? 'default' : 'secondary'}>
                       {selectedSubmission.score !== null ? 'Calificada' : 'Pendiente'}
                     </Badge>
                   </div>
                 </CardHeader>
+
                 <CardContent className="space-y-6">
                   {/* Submission Content */}
                   <div>
@@ -493,31 +568,48 @@ const AssignmentReview = () => {
                     </div>
                   </div>
 
-                  {/* File Attachments */}
+                  {/* File Attachments (multi) */}
                   {selectedSubmission.student_files && selectedSubmission.student_files.length > 0 && (
                     <div>
                       <Label className="text-base font-semibold">Archivos adjuntos del estudiante</Label>
+
                       <div className="mt-2 space-y-2">
                         {selectedSubmission.student_files.map((file: any, index: number) => {
                           // Normalizar datos - soportar tanto camelCase como snake_case
                           const filePath = file.file_path || file.filePath;
                           const fileName = file.file_name || file.fileName;
                           const fileSize = file.file_size || file.fileSize;
-                          
+                          const mimeType = file.mime_type || file.mimeType;
+
                           return (
                             <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
                               <FileText className="w-5 h-5 text-muted-foreground" />
+
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{fileName}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {fileSize ? (fileSize / 1024).toFixed(2) : '0.00'} KB
-                                </p>
+                                <p className="text-xs text-muted-foreground">{formatKB(fileSize)}</p>
                               </div>
+
+                              {/* ✅ NUEVO: Ver (preview) */}
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleDownloadFile(filePath, fileName)}
+                                onClick={() =>
+                                  canPreview(mimeType, fileName)
+                                    ? handlePreviewFile({
+                                        filePath,
+                                        fileName,
+                                        mimeType,
+                                        fileSize
+                                      })
+                                    : toast.message('Este tipo de archivo no se puede previsualizar. Usa Descargar.')
+                                }
                               >
+                                <Eye className="w-4 h-4 mr-1" />
+                                Ver
+                              </Button>
+
+                              <Button variant="outline" size="sm" onClick={() => handleDownloadFile(filePath, fileName)}>
                                 <Download className="w-4 h-4 mr-1" />
                                 Descargar
                               </Button>
@@ -529,29 +621,50 @@ const AssignmentReview = () => {
                   )}
 
                   {/* Fallback para entregas antiguas con un solo archivo */}
-                  {(!selectedSubmission.student_files || selectedSubmission.student_files.length === 0) && 
-                   selectedSubmission.file_path && selectedSubmission.file_name && (
-                    <div>
-                      <Label className="text-base font-semibold">Archivo adjunto</Label>
-                      <div className="mt-2 flex items-center gap-3 p-3 border rounded-lg">
-                        <FileText className="w-5 h-5 text-muted-foreground" />
-                        <span className="text-sm flex-1">{selectedSubmission.file_name}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadFile(selectedSubmission.file_path!, selectedSubmission.file_name!)}
-                        >
-                          <Download className="w-4 h-4 mr-1" />
-                          Descargar
-                        </Button>
+                  {(!selectedSubmission.student_files || selectedSubmission.student_files.length === 0) &&
+                    selectedSubmission.file_path &&
+                    selectedSubmission.file_name && (
+                      <div>
+                        <Label className="text-base font-semibold">Archivo adjunto</Label>
+                        <div className="mt-2 flex items-center gap-3 p-3 border rounded-lg">
+                          <FileText className="w-5 h-5 text-muted-foreground" />
+                          <span className="text-sm flex-1 truncate">{selectedSubmission.file_name}</span>
+
+                          {/* ✅ NUEVO: Ver (preview) */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              canPreview(selectedSubmission.mime_type, selectedSubmission.file_name)
+                                ? handlePreviewFile({
+                                    filePath: selectedSubmission.file_path!,
+                                    fileName: selectedSubmission.file_name!,
+                                    mimeType: selectedSubmission.mime_type,
+                                    fileSize: selectedSubmission.file_size
+                                  })
+                                : toast.message('Este tipo de archivo no se puede previsualizar. Usa Descargar.')
+                            }
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Ver
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadFile(selectedSubmission.file_path!, selectedSubmission.file_name!)}
+                          >
+                            <Download className="w-4 h-4 mr-1" />
+                            Descargar
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* Grading Section */}
                   <div className="space-y-4 border-t pt-6">
                     <Label className="text-base font-semibold">Calificación</Label>
-                    
+
                     <div>
                       <Label htmlFor="score">Calificación</Label>
                       <Select value={score} onValueChange={setScore}>
@@ -585,6 +698,7 @@ const AssignmentReview = () => {
                       <p className="text-xs text-muted-foreground mt-1 mb-2">
                         Máximo 5MB por archivo. Para archivos grandes, sube a Google Drive y comparte el enlace en los comentarios.
                       </p>
+
                       <div className="mt-2 space-y-2">
                         {/* Mostrar archivos existentes guardados */}
                         {selectedSubmission.feedback_files && selectedSubmission.feedback_files.length > 0 && (
@@ -594,23 +708,18 @@ const AssignmentReview = () => {
                               const filePath = file.file_path || file.filePath;
                               const fileName = file.file_name || file.fileName;
                               const fileSize = file.file_size || file.fileSize;
-                              
+
                               return (
-                                <div key={`existing-${index}`} className="flex items-center gap-2 p-2 border rounded-lg bg-green-50 dark:bg-green-950/20">
+                                <div
+                                  key={`existing-${index}`}
+                                  className="flex items-center gap-2 p-2 border rounded-lg bg-green-50 dark:bg-green-950/20"
+                                >
                                   <FileText className="w-4 h-4 text-green-600 dark:text-green-400" />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{fileName}</p>
-                                    {fileSize && (
-                                      <p className="text-xs text-muted-foreground">
-                                        {(fileSize / 1024).toFixed(2)} KB
-                                      </p>
-                                    )}
+                                    {fileSize && <p className="text-xs text-muted-foreground">{formatKB(fileSize)}</p>}
                                   </div>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDownloadFile(filePath, fileName)}
-                                  >
+                                  <Button variant="outline" size="sm" onClick={() => handleDownloadFile(filePath, fileName)}>
                                     <Download className="w-4 h-4" />
                                   </Button>
                                 </div>
@@ -618,31 +727,30 @@ const AssignmentReview = () => {
                             })}
                           </div>
                         )}
-                        
+
                         {/* Upload para nuevos archivos */}
                         <div>
                           <p className="text-xs font-medium text-muted-foreground mb-2">Agregar nuevos archivos:</p>
                           <FileUpload
-                            onFileSelect={(files) => setFeedbackFiles(prev => [...prev, ...files])}
+                            onFileSelect={(files) => setFeedbackFiles((prev) => [...prev, ...files])}
                             accept="*/*"
                             multiple
                             maxSize={5}
                           />
                         </div>
-                        
+
                         {/* Mostrar nuevos archivos que se van a subir */}
                         {feedbackFiles.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-xs font-medium text-muted-foreground">Nuevos archivos a subir:</p>
                             {feedbackFiles.map((file, index) => (
-                              <div key={`new-${index}`} className="flex items-center gap-2 p-2 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                              <div
+                                key={`new-${index}`}
+                                className="flex items-center gap-2 p-2 border rounded-lg bg-blue-50 dark:bg-blue-950/20"
+                              >
                                 <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                 <span className="text-sm flex-1 truncate">{file.name}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeFeedbackFile(index)}
-                                >
+                                <Button variant="ghost" size="sm" onClick={() => removeFeedbackFile(index)}>
                                   <X className="w-4 h-4" />
                                 </Button>
                               </div>
@@ -654,7 +762,8 @@ const AssignmentReview = () => {
 
                     {selectedSubmission.graded_at && (
                       <p className="text-xs text-muted-foreground">
-                        Última calificación: {format(new Date(selectedSubmission.graded_at), "d 'de' MMMM, yyyy HH:mm", { locale: es })}
+                        Última calificación:{' '}
+                        {format(new Date(selectedSubmission.graded_at), "d 'de' MMMM, yyyy HH:mm", { locale: es })}
                       </p>
                     )}
 
@@ -672,18 +781,94 @@ const AssignmentReview = () => {
               <Card className="bg-gradient-card shadow-card border-0">
                 <CardContent className="p-12 text-center">
                   <User className="w-16 h-16 mx-auto text-muted-foreground mb-4 opacity-50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    Selecciona una entrega
-                  </h3>
-                  <p className="text-muted-foreground">
-                    Selecciona un estudiante de la lista para ver su entrega y calificarla
-                  </p>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Selecciona una entrega</h3>
+                  <p className="text-muted-foreground">Selecciona un estudiante de la lista para ver su entrega y calificarla</p>
                 </CardContent>
               </Card>
             )}
           </div>
         </div>
       </div>
+
+      {/* ✅ MODAL DE PREVISUALIZACIÓN (FASE 1) */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between gap-3">
+              <span className="truncate">
+                Vista previa: {previewFile?.fileName || 'Archivo'}
+              </span>
+
+              {previewFile?.filePath && previewFile?.fileName && (
+                <div className="flex gap-2">
+                  {/* “Abrir/Descargar” por si quiere el visor del navegador */}
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownloadFile(previewFile.filePath, previewFile.fileName)}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Descargar
+                  </Button>
+                </div>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="w-full">
+            {previewLoading && (
+              <div className="py-10 text-center text-muted-foreground">
+                Cargando vista previa...
+              </div>
+            )}
+
+            {!previewLoading && previewUrl && previewFile && (
+              <div className="w-full">
+                {/* PDF */}
+                {canPreview(previewFile.mimeType || null, previewFile.fileName) &&
+                ((previewFile.mimeType || '').toLowerCase().includes('pdf') ||
+                  previewFile.fileName.toLowerCase().endsWith('.pdf')) ? (
+
+                  selectedSubmission ? (
+                    <PdfAnnotator
+                      pdfUrl={previewUrl}
+                      fileName={previewFile.fileName}
+                      mimeType={previewFile.mimeType}
+                      submissionId={selectedSubmission.id}
+                      onSaved={() => fetchAssignmentData()}
+                      onClose={() => setPreviewOpen(false)}
+                    />
+                  ) : (
+                    <div className="py-10 text-center text-muted-foreground">
+                      Selecciona una entrega antes de anotar.
+                    </div>
+                  )
+
+                ) : null}
+                
+                {/* IMAGEN */}
+                {canPreview(previewFile.mimeType || null, previewFile.fileName) &&
+                ((previewFile.mimeType || '').toLowerCase().startsWith('image/') ||
+                  previewFile.fileName.toLowerCase().match(/\.(png|jpg|jpeg|webp|gif)$/)) ? (
+                  <div className="w-full flex justify-center">
+                    <img
+                      src={previewUrl}
+                      alt={previewFile.fileName}
+                      className="max-h-[70vh] w-auto rounded border"
+                    />
+                  </div>
+                ) : null}
+
+                {/* Si no es PDF/imagen */}
+                {!canPreview(previewFile.mimeType || null, previewFile.fileName) ? (
+                  <div className="py-10 text-center text-muted-foreground">
+                    Este tipo de archivo no se puede previsualizar. Usa “Descargar”.
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Assignment Dialog */}
       {assignment && (
@@ -704,8 +889,7 @@ const AssignmentReview = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Esto eliminará permanentemente la tarea
-              y todas las entregas de los estudiantes.
+              Esta acción no se puede deshacer. Esto eliminará permanentemente la tarea y todas las entregas de los estudiantes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
