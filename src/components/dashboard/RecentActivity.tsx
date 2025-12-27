@@ -1,61 +1,202 @@
-import { CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CheckCircle, Clock, AlertCircle, FileText, ClipboardList, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { format, formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 
-const activities = [
-  {
-    id: 1,
-    title: "Tarea de Matemáticas entregada",
-    subject: "Álgebra II",
-    time: "Hace 2 horas",
-    status: "completed",
-    icon: CheckCircle,
-  },
-  {
-    id: 2,
-    title: "Nueva clase de Historia",
-    subject: "Historia Mundial",
-    time: "Hace 4 horas", 
-    status: "new",
-    icon: Clock,
-  },
-  {
-    id: 3,
-    title: "Examen de Química próximo",
-    subject: "Química Orgánica",
-    time: "Mañana 10:00 AM",
-    status: "pending",
-    icon: AlertCircle,
-  },
-  {
-    id: 4,
-    title: "Proyecto de Inglés calificado",
-    subject: "English Literature",
-    time: "Hace 1 día",
-    status: "completed",
-    icon: CheckCircle,
-  },
-];
+interface Activity {
+  id: string;
+  title: string;
+  subject: string;
+  time: string;
+  status: 'completed' | 'pending' | 'new' | 'graded';
+  icon: any;
+  type: 'assignment' | 'exam' | 'grade';
+}
+
+const ITEMS_PER_PAGE = 8;
 
 export function RecentActivity() {
+  const { profile } = useAuth();
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalActivities, setTotalActivities] = useState(0);
+
+  useEffect(() => {
+    if (profile?.id) {
+      fetchRecentActivity();
+    }
+  }, [profile, currentPage]);
+
+  const fetchRecentActivity = async () => {
+    try {
+      setLoading(true);
+      const activities: Activity[] = [];
+
+      // Get enrolled courses
+      const { data: enrollments } = await supabase
+        .from('course_enrollments')
+        .select('course_id, courses!inner(name)')
+        .eq('student_id', profile!.id);
+
+      const courseIds = enrollments?.map(e => e.course_id) || [];
+
+      if (courseIds.length === 0) {
+        setActivities([]);
+        setTotalActivities(0);
+        return;
+      }
+
+      // Get recent assignment submissions (completed)
+      const { data: submissions } = await supabase
+        .from('assignment_submissions')
+        .select(`
+          id,
+          submitted_at,
+          score,
+          assignments!inner(
+            title,
+            courses!inner(name)
+          )
+        `)
+        .eq('student_id', profile!.id)
+        .order('submitted_at', { ascending: false })
+        .limit(5);
+
+      submissions?.forEach((sub: any) => {
+        activities.push({
+          id: `sub-${sub.id}`,
+          title: sub.score !== null 
+            ? `Tarea calificada: ${sub.assignments.title}`
+            : `Tarea entregada: ${sub.assignments.title}`,
+          subject: sub.assignments.courses.name,
+          time: formatDistanceToNow(new Date(sub.submitted_at), { addSuffix: true, locale: es }),
+          status: sub.score !== null ? 'graded' : 'completed',
+          icon: sub.score !== null ? CheckCircle : FileText,
+          type: 'assignment'
+        });
+      });
+
+      // Get upcoming assignments (pending)
+      const { data: upcomingAssignments } = await supabase
+        .from('assignments')
+        .select(`
+          id,
+          title,
+          due_date,
+          courses!inner(name)
+        `)
+        .in('course_id', courseIds)
+        .eq('is_published', true)
+        .gt('due_date', new Date().toISOString())
+        .order('due_date', { ascending: true })
+        .limit(3);
+
+      // Check which ones are not submitted
+      const assignmentIds = upcomingAssignments?.map(a => a.id) || [];
+      const { data: existingSubmissions } = await supabase
+        .from('assignment_submissions')
+        .select('assignment_id')
+        .eq('student_id', profile!.id)
+        .in('assignment_id', assignmentIds);
+
+      const submittedSet = new Set(existingSubmissions?.map(s => s.assignment_id) || []);
+
+      upcomingAssignments?.forEach((assignment: any) => {
+        if (!submittedSet.has(assignment.id)) {
+          const dueDate = new Date(assignment.due_date);
+          const isUrgent = (dueDate.getTime() - Date.now()) < 24 * 60 * 60 * 1000; // Less than 24 hours
+
+          activities.push({
+            id: `assign-${assignment.id}`,
+            title: `Tarea pendiente: ${assignment.title}`,
+            subject: assignment.courses.name,
+            time: format(dueDate, "d 'de' MMMM, HH:mm", { locale: es }),
+            status: isUrgent ? 'pending' : 'new',
+            icon: AlertCircle,
+            type: 'assignment'
+          });
+        }
+      });
+
+      // Get upcoming exams
+      const { data: upcomingExams } = await supabase
+        .from('exams')
+        .select(`
+          id,
+          title,
+          start_time,
+          courses!inner(name)
+        `)
+        .in('course_id', courseIds)
+        .eq('is_published', true)
+        .gt('start_time', new Date().toISOString())
+        .order('start_time', { ascending: true })
+        .limit(3);
+
+      upcomingExams?.forEach((exam: any) => {
+        const examDate = new Date(exam.start_time);
+        activities.push({
+          id: `exam-${exam.id}`,
+          title: `Examen próximo: ${exam.title}`,
+          subject: exam.courses.name,
+          time: format(examDate, "d 'de' MMMM, HH:mm", { locale: es }),
+          status: 'new',
+          icon: ClipboardList,
+          type: 'exam'
+        });
+      });
+
+      // Sort by most recent/urgent
+      activities.sort((a, b) => {
+        if (a.status === 'pending' && b.status !== 'pending') return -1;
+        if (b.status === 'pending' && a.status !== 'pending') return 1;
+        return 0;
+      });
+
+      setTotalActivities(activities.length);
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const paginatedActivities = activities.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+      setActivities(paginatedActivities);
+    } catch (error) {
+      console.error('Error fetching recent activity:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalPages = Math.ceil(totalActivities / ITEMS_PER_PAGE);
+
   const getStatusConfig = (status: string) => {
     switch (status) {
       case "completed":
         return { 
           variant: "secondary" as const, 
           label: "Completado",
-          iconColor: "text-secondary"
+          iconColor: "text-green-500"
+        };
+      case "graded":
+        return { 
+          variant: "default" as const, 
+          label: "Calificado",
+          iconColor: "text-blue-500"
         };
       case "pending":
         return { 
           variant: "destructive" as const, 
-          label: "Pendiente",
+          label: "Urgente",
           iconColor: "text-destructive"
         };
       case "new":
         return { 
-          variant: "default" as const, 
-          label: "Nuevo",
+          variant: "outline" as const, 
+          label: "Próximo",
           iconColor: "text-accent"
         };
       default:
@@ -66,6 +207,43 @@ export function RecentActivity() {
         };
     }
   };
+
+  if (loading) {
+    return (
+      <Card className="bg-gradient-card shadow-card border-0">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-foreground">
+            Actividad Reciente
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (activities.length === 0) {
+    return (
+      <Card className="bg-gradient-card shadow-card border-0">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-foreground">
+            Actividad Reciente
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p>No hay actividad reciente</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="bg-gradient-card shadow-card border-0">
@@ -103,6 +281,36 @@ export function RecentActivity() {
             );
           })}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/30">
+            <p className="text-sm text-muted-foreground">
+              {totalActivities} actividades
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || loading}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground px-2 py-1">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages || loading}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

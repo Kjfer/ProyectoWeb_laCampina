@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, Clock, User, AlertCircle, FileText, ClipboardList } from "lucide-react";
+import { BookOpen, Clock, User, AlertCircle, FileText, ClipboardList, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,88 +27,164 @@ interface Course {
   upcoming_exams?: number;
 }
 
+const ITEMS_PER_PAGE = 6;
+
 export function StudentCourses() {
   const { profile } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCourses, setTotalCourses] = useState(0);
 
   useEffect(() => {
     if (profile?.id) {
       fetchCourses();
     }
-  }, [profile]);
+  }, [profile, currentPage]);
 
   const fetchCourses = async () => {
     try {
       setLoading(true);
 
-      // Get enrolled courses
+      console.log('Fetching courses for student:', profile!.id);
+
+      // Get total count first
+      const { count: totalCount, error: countError } = await supabase
+        .from('course_enrollments')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', profile!.id);
+
+      console.log('Total enrollments count:', totalCount);
+      if (countError) {
+        console.error('Count error:', countError);
+      }
+
+      setTotalCourses(totalCount || 0);
+
+      if (!totalCount || totalCount === 0) {
+        console.log('No enrollments found for this student');
+        setCourses([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get paginated enrolled courses - simplified query
       const { data: enrollments, error: enrollError } = await supabase
         .from('course_enrollments')
-        .select(`
-          course_id,
-          courses (
-            id,
-            name,
-            code,
-            schedule,
-            profiles!courses_teacher_id_fkey (
-              first_name,
-              last_name
-            )
-          )
-        `)
-        .eq('student_id', profile!.id);
+        .select('course_id')
+        .eq('student_id', profile!.id)
+        .range((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE - 1)
+        .order('enrolled_at', { ascending: false });
+
+      console.log('Enrollments data:', enrollments);
+      console.log('Enrollments error:', enrollError);
 
       if (enrollError) throw enrollError;
 
-      // Get pending assignments and upcoming exams for each course
-      const coursesWithData = await Promise.all(
-        (enrollments || []).map(async (enrollment: any) => {
-          const course = enrollment.courses;
-          if (!course) return null;
+      if (!enrollments || enrollments.length === 0) {
+        console.log('No enrollments in this page');
+        setCourses([]);
+        setLoading(false);
+        return;
+      }
 
-          // Count pending assignments (due in future, not submitted)
-          const { count: assignmentsCount } = await supabase
-            .from('assignments')
-            .select('*', { count: 'exact', head: true })
-            .eq('course_id', course.id)
-            .eq('is_published', true)
-            .gt('due_date', new Date().toISOString())
-            .not('id', 'in', 
-              supabase
-                .from('assignment_submissions')
-                .select('assignment_id')
-                .eq('student_id', profile!.id)
-            );
+      // Get course IDs
+      const courseIds = enrollments.map(e => e.course_id);
+      console.log('Course IDs:', courseIds);
 
-          // Count upcoming exams (start time in future)
-          const { count: examsCount } = await supabase
-            .from('exams')
-            .select('*', { count: 'exact', head: true })
-            .eq('course_id', course.id)
-            .eq('is_published', true)
-            .gt('start_time', new Date().toISOString());
+      // Fetch course details separately
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('courses')
+        .select(`
+          id,
+          name,
+          code,
+          schedule,
+          teacher_id
+        `)
+        .in('id', courseIds);
 
-          return {
-            id: course.id,
-            name: course.name,
-            code: course.code,
-            schedule: course.schedule,
-            teacher: course.profiles,
-            pending_assignments: assignmentsCount || 0,
-            upcoming_exams: examsCount || 0,
-          };
-        })
-      );
+      console.log('Courses data:', coursesData);
+      if (coursesError) {
+        console.error('Courses error:', coursesError);
+        throw coursesError;
+      }
 
-      setCourses(coursesWithData.filter(Boolean) as Course[]);
+      // Fetch teachers separately
+      const teacherIds = coursesData?.map(c => c.teacher_id).filter(Boolean) || [];
+      const { data: teachers } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', teacherIds);
+
+      console.log('Teachers data:', teachers);
+
+      const teachersMap = new Map(teachers?.map(t => [t.id, t]) || []);
+
+
+      // Single query for submitted assignments
+      const { data: submissions } = await supabase
+        .from('assignment_submissions')
+        .select('assignment_id')
+        .eq('student_id', profile!.id);
+
+      const submittedIds = new Set(submissions?.map(s => s.assignment_id) || []);
+
+      // Single query for all pending assignments across all courses
+      const { data: allAssignments } = await supabase
+        .from('assignments')
+        .select('id, course_id')
+        .in('course_id', courseIds)
+        .eq('is_published', true)
+        .gt('due_date', new Date().toISOString());
+
+      // Single query for all upcoming exams across all courses
+      const { data: allExams } = await supabase
+        .from('exams')
+        .select('id, course_id')
+        .in('course_id', courseIds)
+        .eq('is_published', true)
+        .gt('start_time', new Date().toISOString());
+
+      // Group by course_id
+      const assignmentsByCourse = new Map<string, number>();
+      const examsByCourse = new Map<string, number>();
+
+      allAssignments?.forEach(assignment => {
+        if (!submittedIds.has(assignment.id)) {
+          const current = assignmentsByCourse.get(assignment.course_id) || 0;
+          assignmentsByCourse.set(assignment.course_id, current + 1);
+        }
+      });
+
+      allExams?.forEach(exam => {
+        const current = examsByCourse.get(exam.course_id) || 0;
+        examsByCourse.set(exam.course_id, current + 1);
+      });
+
+      // Map to courses
+      const coursesWithData = coursesData?.map((course: any) => {
+        return {
+          id: course.id,
+          name: course.name,
+          code: course.code,
+          schedule: course.schedule,
+          teacher: teachersMap.get(course.teacher_id),
+          pending_assignments: assignmentsByCourse.get(course.id) || 0,
+          upcoming_exams: examsByCourse.get(course.id) || 0,
+        };
+      }) || [];
+
+      console.log('Final courses with data:', coursesWithData);
+      setCourses(coursesWithData as Course[]);
     } catch (error) {
       console.error('Error fetching courses:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const totalPages = Math.ceil(totalCourses / ITEMS_PER_PAGE);
 
   const formatSchedule = (course: Course) => {
     if (!course.schedule || course.schedule.length === 0) {
@@ -234,6 +310,35 @@ export function StudentCourses() {
             </div>
           ))}
         </div>
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/30">
+            <p className="text-sm text-muted-foreground">
+              Página {currentPage} de {totalPages} ({totalCourses} cursos total)
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || loading}
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Anterior
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages || loading}
+              >
+                Siguiente
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
