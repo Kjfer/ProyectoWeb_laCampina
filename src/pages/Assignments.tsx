@@ -12,6 +12,8 @@ import { format, isAfter, isBefore, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CreateAssignmentDialog } from '@/components/assignments/CreateAssignmentDialog';
+import { EditAssignmentDialog } from '@/components/assignments/EditAssignmentDialog';
 
 interface Assignment {
   id: string;
@@ -41,6 +43,8 @@ const Assignments = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [courseFilter, setCourseFilter] = useState<string>('all');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAssignments();
@@ -217,13 +221,31 @@ const Assignments = () => {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">Tareas</h1>
-          {profile?.role === 'teacher' && (
-            <Button className="bg-gradient-primary shadow-glow">
+          {(profile?.role === 'teacher' || profile?.role === 'tutor') && (
+            <Button 
+              className="bg-gradient-primary shadow-glow"
+              onClick={() => setIsCreateDialogOpen(true)}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Crear Tarea
             </Button>
           )}
         </div>
+
+        {/* Create Assignment Dialog */}
+        <CreateAssignmentDialog
+          open={isCreateDialogOpen}
+          onOpenChange={setIsCreateDialogOpen}
+          onSuccess={fetchAssignments}
+        />
+
+        {/* Edit Assignment Dialog */}
+        <EditAssignmentDialog
+          assignmentId={editingAssignmentId}
+          open={editingAssignmentId !== null}
+          onOpenChange={(open) => !open && setEditingAssignmentId(null)}
+          onSuccess={fetchAssignments}
+        />
 
         {/* Search and Filters */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -355,9 +377,9 @@ const Assignments = () => {
                       </div>
                     )}
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button 
-                        className="flex-1" 
+                        className="flex-1 min-w-[120px]" 
                         variant="outline"
                         asChild
                       >
@@ -366,9 +388,18 @@ const Assignments = () => {
                         </Link>
                       </Button>
                       
-                      {profile?.role === 'teacher' || profile?.role === 'admin' ? (
+                      {(profile?.role === 'teacher' || profile?.role === 'admin' || profile?.role === 'tutor') && (
                         <Button 
-                          className="bg-gradient-primary shadow-glow"
+                          variant="outline"
+                          onClick={() => setEditingAssignmentId(assignment.id)}
+                        >
+                          Editar
+                        </Button>
+                      )}
+                      
+                      {profile?.role === 'teacher' || profile?.role === 'admin' || profile?.role === 'tutor' ? (
+                        <Button 
+                          className="bg-gradient-primary shadow-glow flex-1 min-w-[140px]"
                           asChild
                         >
                           <Link to={`/assignments/${assignment.id}/review`}>

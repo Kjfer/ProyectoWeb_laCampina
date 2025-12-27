@@ -68,19 +68,28 @@ export function StudentCourses() {
           const course = enrollment.courses;
           if (!course) return null;
 
+          // First, get submitted assignment IDs for this student
+          const { data: submissions } = await supabase
+            .from('assignment_submissions')
+            .select('assignment_id')
+            .eq('student_id', profile!.id);
+
+          const submittedIds = submissions?.map(s => s.assignment_id) || [];
+
           // Count pending assignments (due in future, not submitted)
-          const { count: assignmentsCount } = await supabase
+          let assignmentsQuery = supabase
             .from('assignments')
             .select('*', { count: 'exact', head: true })
             .eq('course_id', course.id)
             .eq('is_published', true)
-            .gt('due_date', new Date().toISOString())
-            .not('id', 'in', 
-              supabase
-                .from('assignment_submissions')
-                .select('assignment_id')
-                .eq('student_id', profile!.id)
-            );
+            .gt('due_date', new Date().toISOString());
+
+          // Only add the not.in filter if there are submitted assignments
+          if (submittedIds.length > 0) {
+            assignmentsQuery = assignmentsQuery.not('id', 'in', `(${submittedIds.join(',')})`);
+          }
+
+          const { count: assignmentsCount } = await assignmentsQuery;
 
           // Count upcoming exams (start time in future)
           const { count: examsCount } = await supabase
