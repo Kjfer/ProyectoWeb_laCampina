@@ -342,66 +342,17 @@ export default function PdfAnnotator({
       const teacherFileName = `annotated_${Date.now()}_${safeOriginal}`;
       const teacherPath = `feedback/${teacherFileName}`;
 
-      console.log("🔍 DEBUG INFO:");
-      console.log("  - Bucket:", storageBucket);
-      console.log("  - Path:", teacherPath);
-      console.log("  - File size:", blob.size, "bytes");
-
-      // 🆕 NUEVA PRUEBA: Intentar listar archivos primero
-      console.log("📋 Probando listar archivos del bucket...");
-      const { data: listData, error: listError } = await supabase.storage
-        .from(storageBucket)
-        .list('', { limit: 1 });
-      
-      console.log("  - List result:", listData);
-      console.log("  - List error:", listError);
-
-      // 🆕 NUEVA PRUEBA: Verificar sesión y token
-      const { data: session } = await supabase.auth.getSession();
-      console.log("  - Session exists:", !!session.session);
-      console.log("  - Access token (primeros 50 chars):", session.session?.access_token?.substring(0, 50));
-
-      // 🧪 PRUEBA: Subir archivo pequeño primero
-      console.log("🧪 Prueba: subiendo archivo de prueba pequeño...");
-      const testBlob = new Blob(['test'], { type: 'text/plain' });
-      const testPath = `feedback/test_${Date.now()}.txt`;
-
-      const { data: testData, error: testError } = await supabase.storage
-        .from(storageBucket)
-        .upload(testPath, testBlob, {
-          contentType: 'text/plain',
-          upsert: true,
-        });
-
-      console.log("  - Test upload data:", testData);
-      console.log("  - Test upload error:", testError);
-
-      if (testError) {
-        console.error("❌ Incluso el archivo de prueba falló:", testError);
-      } else {
-        console.log("✅ Archivo de prueba subido exitosamente!");
-      }
-      
       // 6) Subir a Storage
-      console.log("📤 Intentando subir...");
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from(storageBucket)
         .upload(teacherPath, blob, {
           contentType: "application/pdf",
           upsert: true,
         });
 
-      console.log("📥 Respuesta de upload:");
-      console.log("  - Data:", uploadData);
-      console.log("  - Error:", uploadError);
+      if (uploadError) throw uploadError;
 
-      if (uploadError) {
-        console.error("❌ Upload error completo:", JSON.stringify(uploadError, null, 2));
-        throw uploadError;
-      }
-
-      // 7) Guardar en BD
+      // 7) Guardar en Base de Datos
       const { data: subRow, error: subErr } = await supabase
         .from("assignment_submissions")
         .select("feedback_files")
@@ -437,11 +388,10 @@ export default function PdfAnnotator({
       if (onSaved) onSaved();
       
     } catch (err: any) {
-      console.error("💥 Save PDF error:", err);
-      toast.error(`No se pudo guardar: ${err?.message || err}`, { id: "savepdf" });
+      toast.error(`No se pudo guardar: ${err?.message || "Error desconocido"}`, { id: "savepdf" });
     }
   };
-  
+    
   
 
   if (loading) {
