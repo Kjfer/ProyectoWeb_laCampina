@@ -223,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setActiveRole = (role: UserRole) => {
     setActiveRoleState(role);
     localStorage.setItem('activeRole', role);
-    // Reload to update navigation and permissions
+    
     window.location.reload();
   };
 
