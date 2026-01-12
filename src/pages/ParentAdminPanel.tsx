@@ -20,7 +20,7 @@ const ParentAdminPanel = () => {
     return `¡Bienvenido, ${name}!`;
   };
   const getSubtitle = () => {
-    return 'Portal de Padres - IE La Campiña';
+    return 'Portal de Padres - Peri Institute';
   };
   const [children, setChildren] = useState<any[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(false);
@@ -76,7 +76,7 @@ const ParentAdminPanel = () => {
           <div className="absolute inset-0 opacity-20">
             <img 
               src={heroImage} 
-              alt="Educación virtual IE La Campiña" 
+              alt="Educación virtual Peri Institute" 
               className="w-full h-full object-cover"
             />
           </div>

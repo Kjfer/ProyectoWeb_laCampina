@@ -46,7 +46,7 @@ export function AppSidebar() {
             </div>
             {!collapsed && (
               <div>
-                <h2 className="font-semibold text-foreground text-sm">IE La Campiña</h2>
+                <h2 className="font-semibold text-foreground text-sm">Peri Institute</h2>
                 <p className="text-xs text-muted-foreground">Aula Virtual</p>
               </div>
             )}

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Calendar } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { Plus, Calendar } from 'lucide-react'; // Quitamos Layers porque ya no se usa
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CourseWeeklySection } from './CourseWeeklySection';
 import { SectionForm } from './SectionForm';
 
+// --- Interfaces ---
 interface WeeklyResource {
   id: string;
   title: string;
@@ -22,6 +22,7 @@ interface WeeklyResource {
 
 interface WeeklySection {
   id: string;
+  module_id: string;
   week_number: number;
   title: string;
   description?: string;
@@ -32,82 +33,77 @@ interface WeeklySection {
   resources?: WeeklyResource[];
 }
 
+interface CourseModule {
+  id: string;
+  title: string;
+  description: string;
+  position: number;
+  sections: WeeklySection[];
+}
+
 interface WeeklyContentManagerProps {
   courseId: string;
   canEdit: boolean;
 }
 
 export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManagerProps) {
-  const [sections, setSections] = useState<WeeklySection[]>([]);
+  const [modules, setModules] = useState<CourseModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSectionForm, setShowSectionForm] = useState(false);
 
   useEffect(() => {
-    fetchSections();
+    fetchModulesAndContent();
   }, [courseId]);
 
-  const fetchSections = async () => {
+  const fetchModulesAndContent = async () => {
     try {
       setLoading(true);
 
-      console.log('📚 Fetching weekly sections for course:', courseId, 'canEdit:', canEdit);
-
-      // Fetch sections with their resources
-      const { data: sectionsData, error: sectionsError } = await supabase
-        .from('course_weekly_sections')
+      const { data: modulesData, error } = await supabase
+        .from('course_modules')
         .select(`
-          *,
-          resources:course_weekly_resources(*)
+          id,
+          title,
+          description,
+          position,
+          sections:course_weekly_sections(
+            *,
+            resources:course_weekly_resources(*)
+          )
         `)
         .eq('course_id', courseId)
-        .order('week_number', { ascending: true });
+        .order('position', { ascending: true });
 
-      if (sectionsError) throw sectionsError;
+      if (error) throw error;
 
-      console.log('📊 Raw sections data:', sectionsData);
+      const processedModules = modulesData.map((mod: any) => ({
+        ...mod,
+        sections: (mod.sections || [])
+          .sort((a: any, b: any) => a.position - b.position)
+          .map((section: any) => ({
+            ...section,
+            resources: (section.resources || []).sort((a: any, b: any) => a.position - b.position)
+          }))
+          .filter((section: any) => canEdit || section.is_published)
+      }));
 
-      // Sort resources by position within each section
-      const sectionsWithSortedResources = sectionsData?.map(section => ({
-        ...section,
-        resources: section.resources?.sort((a: any, b: any) => a.position - b.position) || []
-      })) || [];
+      setModules(processedModules);
 
-      console.log('📝 Sections with sorted resources:', sectionsWithSortedResources);
-
-      // Filter to show only published sections for students
-      const filteredSections = canEdit 
-        ? sectionsWithSortedResources 
-        : sectionsWithSortedResources.filter(section => section.is_published);
-
-      console.log('✅ Filtered sections (canEdit=' + canEdit + '):', filteredSections);
-
-      setSections(filteredSections as WeeklySection[]);
     } catch (error) {
-      console.error('Error fetching sections:', error);
-      toast.error('Error al cargar las secciones semanales');
+      console.error('Error:', error);
+      toast.error('Error al cargar el contenido');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSectionUpdate = (updatedSection: WeeklySection) => {
-    setSections(prev => prev.map(section => 
-      section.id === updatedSection.id ? updatedSection : section
-    ));
-    fetchSections(); // Refresh to get updated resources
-  };
-
   if (loading) {
     return (
       <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardContent className="p-6">
-              <div className="space-y-3">
-                <div className="h-4 bg-muted rounded w-1/4"></div>
-                <div className="h-3 bg-muted rounded w-1/2"></div>
-              </div>
-            </CardContent>
+        <div className="animate-pulse h-10 bg-muted rounded w-1/3 mb-4"></div>
+        {[1, 2].map((i) => (
+          <Card key={i} className="animate-pulse mb-4">
+            <CardContent className="p-6 h-32 bg-muted/20"></CardContent>
           </Card>
         ))}
       </div>
@@ -115,75 +111,68 @@ export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManager
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              <CardTitle>Contenido Semanal</CardTitle>
-            </div>
-            {canEdit && (
-              <Button
-                onClick={() => setShowSectionForm(true)}
-                className="bg-gradient-primary shadow-glow"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Semana
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-      </Card>
+    <div className="space-y-8">
+      {/* Header General */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <Calendar className="h-6 w-6" /> Contenido del Curso
+        </h2>
+        {canEdit && (
+          <Button onClick={() => setShowSectionForm(true)} className="bg-blue-600 text-white shadow-sm">
+            <Plus className="h-4 w-4 mr-2" /> Agregar Clase Manual
+          </Button>
+        )}
+      </div>
 
-      {/* Weekly Sections */}
-      {sections.length > 0 ? (
-        <div className="space-y-4">
-          {sections.map((section) => (
-            <CourseWeeklySection
-              key={section.id}
-              section={section}
-              courseId={courseId}
-              canEdit={canEdit}
-              onUpdateSection={handleSectionUpdate}
-            />
-          ))}
-        </div>
+      {modules.length > 0 ? (
+        modules.map((module) => (
+          <div key={module.id} className="space-y-4">
+            
+            {/* --- CAMBIO AQUÍ: ---
+               Eliminamos el div que mostraba el Título del Módulo ("Contenido Principal").
+               Ahora renderizamos las secciones directamente.
+            */}
+
+            {/* LISTA DE CLASES */}
+            <div className="space-y-3">
+              {module.sections.length > 0 ? (
+                module.sections.map((section) => (
+                  <CourseWeeklySection
+                    key={section.id}
+                    section={section}
+                    courseId={courseId}
+                    canEdit={canEdit}
+                    onUpdateSection={() => fetchModulesAndContent()}
+                  />
+                ))
+              ) : (
+                // Mensaje sutil si el módulo existe pero está vacío
+                canEdit && <p className="text-sm text-gray-400 italic p-2 border border-dashed rounded text-center">Sin clases generadas en este bloque.</p>
+              )}
+            </div>
+          </div>
+        ))
       ) : (
+        // Estado vacío total
         <Card>
           <CardContent className="p-8 text-center">
             <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-4 opacity-50" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              No hay contenido semanal
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              {canEdit 
-                ? 'Organiza tu curso por semanas para facilitar el aprendizaje de los estudiantes.'
-                : 'El profesor aún no ha organizado el contenido por semanas.'
-              }
+            <h3 className="text-lg font-semibold mb-2">Aún no hay clases</h3>
+            <p className="text-muted-foreground">
+              {canEdit ? 'Configura las fechas en la edición del curso o agrega una clase manual.' : 'El profesor aún no ha publicado contenido.'}
             </p>
-            {canEdit && (
-              <Button
-                onClick={() => setShowSectionForm(true)}
-                className="bg-gradient-primary shadow-glow"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Crear Primera Semana
-              </Button>
-            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Section Form Modal */}
+      {/* Modal para crear clases manuales */}
       {showSectionForm && (
         <SectionForm
           courseId={courseId}
           onClose={() => setShowSectionForm(false)}
           onSuccess={() => {
             setShowSectionForm(false);
-            fetchSections();
+            fetchModulesAndContent();
           }}
         />
       )}

@@ -26,6 +26,9 @@ interface Course {
   academic_year: string;
   is_active: boolean;
   created_at: string;
+  start_time?: string;
+  end_time?: string;
+  schedule?: string[];
   teacher?: {
     id: string;
     first_name: string;
@@ -276,13 +279,42 @@ export default function CourseDetail() {
               )}
               
               <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Horario</p>
+                  <div className="font-medium flex flex-col leading-tight">
+                    {/* 1. Los Días */}
+                    <span className="text-sm">
+                      {Array.isArray(course.schedule) && course.schedule.length > 0
+                        ? course.schedule.map((d: string) => 
+                            ({
+                              'Monday': 'Lun', 'Tuesday': 'Mar', 'Wednesday': 'Mié', 
+                              'Thursday': 'Jue', 'Friday': 'Vie', 'Saturday': 'Sáb', 'Sunday': 'Dom'
+                            }[d] || d.slice(0,3))
+                          ).join(', ')
+                        : 'Días por definir'}
+                    </span>
+                    
+                    {/* 2. La Hora */}
+                    {(course.start_time || course.end_time) && (
+                      <span className="text-xs text-blue-600 font-bold">
+                        {course.start_time?.slice(0,5)} - {course.end_time?.slice(0,5)} hrs
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Año Académico</p>
                   <p className="font-medium">{course.academic_year}</p>
                 </div>
               </div>
-              
+
+              {/* ----------------------------------- */}
+
             </div>
           </CardContent>
         </Card>

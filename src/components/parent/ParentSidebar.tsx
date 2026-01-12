@@ -41,7 +41,7 @@ const ParentSidebar = () => {
               <GraduationCap className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="font-semibold text-foreground text-sm">IE La Campiña</h2>
+              <h2 className="font-semibold text-foreground text-sm">Peri Institute</h2>
               <p className="text-xs text-muted-foreground">Aula Virtual</p>
             </div>
           </div>

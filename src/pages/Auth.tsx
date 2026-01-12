@@ -120,7 +120,7 @@ const Auth = () => {
           <div className="flex items-center justify-center gap-2 mb-2">
             <GraduationCap className="w-8 h-8 text-primary" />
             <CardTitle className="text-2xl font-bold text-foreground">
-              IE La Campiña
+              Peri Institute
             </CardTitle>
           </div>
           <p className="text-muted-foreground">Aula Virtual</p>
@@ -146,7 +146,7 @@ const Auth = () => {
                   <Input
                     id="login-email"
                     type="email"
-                    placeholder="estudiante@ielacampina.edu.co"
+                    placeholder="estudiante@periinstitute.edu.co"
                     value={loginData.email}
                     onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
                     required
@@ -202,7 +202,7 @@ const Auth = () => {
                   <Input
                     id="signup-email"
                     type="email"
-                    placeholder="estudiante@ielacampina.edu.co"
+                    placeholder="estudiante@periinstitute.edu.co"
                     value={signupData.email}
                     onChange={(e) => setSignupData(prev => ({ ...prev, email: e.target.value }))}
                     required

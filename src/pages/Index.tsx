@@ -156,7 +156,7 @@ const Index = () => {
   };
 
   const getSubtitle = () => {
-    return 'Plataforma Educativa - IE La Campiña';
+    return 'Plataforma Educativa - Peri Institute';
   };
 
   // Redirigir a dashboards específicos según el rol
@@ -185,7 +185,7 @@ const Index = () => {
           <div className="absolute inset-0 opacity-20">
             <img 
               src={heroImage} 
-              alt="Educación virtual IE La Campiña" 
+              alt="Educación virtual Peri Institute" 
               className="w-full h-full object-cover"
             />
           </div>
