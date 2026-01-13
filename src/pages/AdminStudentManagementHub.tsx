@@ -110,7 +110,7 @@ const AdminStudentManagementHub = () => {
     birth_date: '',
     country: 'Perú',
     education_level: '',
-    courseId: ''
+    courseId: 'none'
   });
 
   if (profile?.role !== 'admin') {
@@ -298,7 +298,7 @@ const AdminStudentManagementHub = () => {
               country: formData.country,
               educationLevel: formData.education_level
             }],
-            courseId: formData.courseId || undefined
+            courseId: formData.courseId !== 'none' ? formData.courseId : undefined
           })
         }
       );
@@ -327,7 +327,7 @@ const AdminStudentManagementHub = () => {
         birth_date: '',
         country: 'Perú',
         education_level: '',
-        courseId: ''
+        courseId: 'none'
       });
       fetchStudents();
     } catch (error: any) {
@@ -594,12 +594,12 @@ const AdminStudentManagementHub = () => {
 
                         <div>
                           <Label htmlFor="courseId">Curso (Opcional)</Label>
-                          <Select value={formData.courseId || ''} onValueChange={(value) => setFormData({ ...formData, courseId: value })}>
+                          <Select value={formData.courseId} onValueChange={(value) => setFormData({ ...formData, courseId: value })}>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccionar curso para matricular" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">Sin curso</SelectItem>
+                              <SelectItem value="none">Sin curso</SelectItem>
                               {courses.map((course) => (
                                 <SelectItem key={course.id} value={course.id}>
                                   {course?.name || 'Sin nombre'} ({course?.code || 'Sin código'})
