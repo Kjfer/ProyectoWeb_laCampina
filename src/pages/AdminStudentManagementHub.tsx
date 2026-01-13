@@ -297,9 +297,10 @@ const AdminStudentManagementHub = () => {
       }
 
       // Obtener el token de la sesión actual
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data } = await supabase.auth.getSession();
+      const session = data?.session;
       
-      if (!session?.access_token) {
+      if (!session || !session.access_token) {
         throw new Error('No hay sesión activa');
       }
 
