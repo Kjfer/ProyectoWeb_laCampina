@@ -25,6 +25,7 @@ interface StudentData {
   paternal_surname: string;
   maternal_surname: string;
   first_name: string;
+  email: string;
   gender: string;
   birth_date: string;
 }
@@ -74,6 +75,7 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
         'APELLIDO PATERNO': 'García',
         'APELLIDO MATERNO': 'López',
         'NOMBRES': 'Juan Carlos',
+        'EMAIL': 'juan.garcia@correo.com',
         'SEXO': 'M',
         'FECHA DE NACIMIENTO': '2010-05-15'
       }
@@ -131,9 +133,10 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
         paternal_surname: String(row['APELLIDO PATERNO'] || '').trim(),
         maternal_surname: String(row['APELLIDO MATERNO'] || '').trim(),
         first_name: String(row['NOMBRES'] || '').trim(),
+        email: String(row['EMAIL'] || '').trim(),
         gender: String(row['SEXO'] || '').trim().toUpperCase(),
         birth_date: row['FECHA DE NACIMIENTO'] ? formatExcelDate(row['FECHA DE NACIMIENTO']) : '',
-      })).filter(student => student.document_number && student.student_code && student.first_name);
+      })).filter(student => student.document_number && student.student_code && student.first_name && student.email);
 
       if (students.length === 0) {
         toast({
@@ -317,9 +320,18 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
                     <li>APELLIDO PATERNO</li>
                     <li>APELLIDO MATERNO</li>
                     <li>NOMBRES</li>
+                    <li>EMAIL (correo del estudiante)</li>
                     <li>SEXO (M/F)</li>
                     <li>FECHA DE NACIMIENTO (YYYY-MM-DD)</li>
                   </ul>
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      ℹ️ Credenciales de acceso
+                    </p>
+                    <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                      El EMAIL será usado para iniciar sesión y el NÚMERO DE DOCUMENTO será la contraseña inicial.
+                    </p>
+                  </div>
                   <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
                     <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                       ℹ️ Estudiantes duplicados

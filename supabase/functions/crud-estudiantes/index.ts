@@ -99,10 +99,20 @@ serve(async (req: Request) => {
 
         for (const studentData of students) {
           try {
-            const email = `${studentData.student_code}@estudiante.edu.pe`;
+            // Usar el email proporcionado en los datos del estudiante
+            const email = studentData.email;
             const password = studentData.document_number || 'Temporal123';
             
-            console.log(`📝 Procesando: ${studentData.student_code} - ${studentData.first_name}`);
+            if (!email) {
+              console.error(`❌ Email no proporcionado para: ${studentData.student_code}`);
+              results.errors.push({ 
+                student_code: studentData.student_code, 
+                error: 'Email es requerido' 
+              });
+              continue;
+            }
+            
+            console.log(`📝 Procesando: ${studentData.student_code} - ${studentData.first_name} (${email})`);
 
             // Paso 1: Verificar si existe el perfil (primero por DNI, luego por código)
             let existingProfile = null;

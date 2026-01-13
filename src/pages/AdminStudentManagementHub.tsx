@@ -268,9 +268,20 @@ const AdminStudentManagementHub = () => {
     setCreating(true);
 
     try {
-      // Generar email y password
-      const email = `${formData.student_code}@lacampina.edu.pe`;
-      const password = formData.document_number || `Temp${formData.student_code}`;
+      // Validar que tenga email y DNI
+      if (!formData.email || !formData.document_number) {
+        toast({
+          title: "Error",
+          description: "Email y DNI son requeridos",
+          variant: "destructive",
+        });
+        setCreating(false);
+        return;
+      }
+
+      // Usar el email ingresado y el DNI como contraseña
+      const email = formData.email;
+      const password = formData.document_number;
 
       // Llamar a la función edge para crear el estudiante
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -498,14 +509,29 @@ const AdminStudentManagementHub = () => {
                             />
                           </div>
                           <div>
-                            <Label htmlFor="document_number">DNI *</Label>
+                            <Label htmlFor="email">Correo Electrónico *</Label>
                             <Input
-                              id="document_number"
-                              value={formData.document_number}
-                              onChange={(e) => setFormData({ ...formData, document_number: e.target.value })}
+                              id="email"
+                              type="email"
+                              value={formData.email}
+                              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                              placeholder="estudiante@correo.com"
                               required
                             />
                           </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="document_number">DNI *</Label>
+                          <Input
+                            id="document_number"
+                            value={formData.document_number}
+                            onChange={(e) => setFormData({ ...formData, document_number: e.target.value })}
+                            required
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            El DNI se usará como contraseña inicial del estudiante
+                          </p>
                         </div>
 
                         <div className="grid grid-cols-3 gap-4">
@@ -614,9 +640,12 @@ const AdminStudentManagementHub = () => {
                         </div>
 
                         <div className="bg-muted p-3 rounded-lg text-sm">
-                          <p className="font-medium mb-1">Credenciales generadas:</p>
-                          <p>Email: {formData.student_code ? `${formData.student_code}@lacampina.edu.pe` : '---'}</p>
-                          <p>Contraseña: {formData.document_number || `Temp${formData.student_code || '---'}`}</p>
+                          <p className="font-medium mb-1">Credenciales de acceso:</p>
+                          <p>Email: {formData.email || '(ingresa un email)'}</p>
+                          <p>Contraseña: {formData.document_number || '(se usará el DNI)'}</p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            El estudiante podrá iniciar sesión con estas credenciales
+                          </p>
                         </div>
 
                         <div className="flex justify-end gap-2">
