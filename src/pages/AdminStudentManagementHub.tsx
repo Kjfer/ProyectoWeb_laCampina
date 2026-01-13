@@ -296,13 +296,23 @@ const AdminStudentManagementHub = () => {
         return;
       }
 
+      // Obtener el token de la sesión actual
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No hay sesión activa');
+      }
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      console.log('Enviando solicitud con token:', session.access_token.substring(0, 20) + '...');
 
       const response = await fetch(`${supabaseUrl}/functions/v1/crud-estudiantes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
           'apikey': supabaseAnonKey,
         },
         body: JSON.stringify({
