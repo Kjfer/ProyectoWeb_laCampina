@@ -97,7 +97,23 @@ serve(async (req: Request) => {
           errors: []
         };
 
-        for (const studentData of students) {
+        // Normalizar los datos: convertir de camelCase a snake_case si es necesario
+        const normalizedStudents = students.map((student: any) => ({
+          first_name: student.first_name || student.firstName,
+          paternal_surname: student.paternal_surname || student.paternalSurname,
+          maternal_surname: student.maternal_surname || student.maternalSurname,
+          document_type: student.document_type || student.documentType || 'DNI',
+          document_number: student.document_number || student.documentNumber,
+          student_code: student.student_code || student.studentCode,
+          email: student.email,
+          gender: student.gender,
+          birth_date: student.birth_date || student.birthDate,
+          phone: student.phone,
+          country: student.country,
+          education_level: student.education_level || student.educationLevel,
+        }));
+
+        for (const studentData of normalizedStudents) {
           try {
             // Usar el email proporcionado en los datos del estudiante
             const email = studentData.email;
