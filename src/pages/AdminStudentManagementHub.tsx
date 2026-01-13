@@ -284,40 +284,40 @@ const AdminStudentManagementHub = () => {
       const password = formData.document_number;
 
       // Llamar a la función edge para crear el estudiante
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/crud-estudiantes`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-          },
-          body: JSON.stringify({
-            action: 'create',
-            students: [{
-              firstName: formData.first_name,
-              paternalSurname: formData.paternal_surname,
-              maternalSurname: formData.maternal_surname,
-              documentNumber: formData.document_number,
-              studentCode: formData.student_code,
-              email: email,
-              password: password,
-              gender: formData.gender,
-              birthDate: formData.birth_date,
-              phone: formData.phone,
-              country: formData.country,
-              educationLevel: formData.education_level
-            }],
-            courseId: formData.courseId !== 'none' ? formData.courseId : undefined
-          })
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Error",
+          description: "No hay sesión activa",
+          variant: "destructive",
+        });
+        setCreating(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('crud-estudiantes', {
+        body: {
+          students: [{
+            firstName: formData.first_name,
+            paternalSurname: formData.paternal_surname,
+            maternalSurname: formData.maternal_surname,
+            documentNumber: formData.document_number,
+            studentCode: formData.student_code,
+            email: email,
+            password: password,
+            gender: formData.gender,
+            birthDate: formData.birth_date,
+            phone: formData.phone,
+            country: formData.country,
+            educationLevel: formData.education_level
+          }],
+          courseId: formData.courseId !== 'none' ? formData.courseId : undefined
         }
-      );
+      });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Error al crear estudiante');
+      if (error) {
+        throw new Error(error.message || 'Error al crear estudiante');
       }
 
       toast({
