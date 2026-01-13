@@ -296,8 +296,17 @@ const AdminStudentManagementHub = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('crud-estudiantes', {
-        body: {
+      // Obtener la URL del proyecto de Supabase
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/crud-estudiantes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
           students: [{
             firstName: formData.first_name,
             paternalSurname: formData.paternal_surname,
@@ -313,12 +322,16 @@ const AdminStudentManagementHub = () => {
             educationLevel: formData.education_level
           }],
           courseId: formData.courseId !== 'none' ? formData.courseId : undefined
-        }
+        })
       });
 
-      if (error) {
-        throw new Error(error.message || 'Error al crear estudiante');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error response:', errorData);
+        throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
       }
+
+      const data = await response.json();
 
       toast({
         title: "Éxito",
