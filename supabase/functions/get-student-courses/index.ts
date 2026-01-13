@@ -54,7 +54,7 @@ serve(async (req: Request) => {
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('id, role')
-      .eq('user_id', user.id)
+      .eq('id', user.id)
       .single()
 
     if (profileError || !profile) {
@@ -88,12 +88,6 @@ serve(async (req: Request) => {
               first_name,
               last_name,
               email
-            ),
-            classroom:virtual_classrooms!courses_classroom_id_fkey (
-              id,
-              name,
-              grade,
-              education_level
             )
           )
         `)
@@ -134,12 +128,6 @@ serve(async (req: Request) => {
             last_name,
             email
           ),
-          classroom:virtual_classrooms!courses_classroom_id_fkey (
-            id,
-            name,
-            grade,
-            education_level
-          ),
           enrollments:course_enrollments (count)
         `)
         .eq('teacher_id', profile.id)
@@ -160,12 +148,6 @@ serve(async (req: Request) => {
               first_name,
               last_name,
               email
-            ),
-            classroom:virtual_classrooms!courses_classroom_id_fkey (
-              id,
-              name,
-              grade,
-              education_level
             ),
             enrollments:course_enrollments (count)
           )
@@ -208,12 +190,6 @@ serve(async (req: Request) => {
             last_name,
             email
           ),
-          classroom:virtual_classrooms!courses_classroom_id_fkey (
-            id,
-            name,
-            grade,
-            education_level
-          ),
           enrollments:course_enrollments (count)
         `)
         .eq('is_active', true)
@@ -233,43 +209,8 @@ serve(async (req: Request) => {
 
       coursesData = data || []
     } else if (profile.role === 'tutor') {
-      // For tutors: get courses from their assigned classroom
-      const { data, error } = await supabaseClient
-        .from('virtual_classrooms')
-        .select(`
-          courses (
-            *,
-            teacher:profiles!courses_teacher_id_fkey (
-              id,
-              first_name,
-              last_name,
-              email
-            ),
-            classroom:virtual_classrooms!courses_classroom_id_fkey (
-              id,
-              name,
-              grade,
-              education_level
-            ),
-            enrollments:course_enrollments (count)
-          )
-        `)
-        .eq('tutor_id', profile.id)
-
-      if (error) {
-        console.error('❌ Error obteniendo cursos del tutor:', error)
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'Error al obtener cursos del tutor',
-            details: error.message 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-        )
-      }
-
-      // Flatten the structure since we get an array of classrooms, each with an array of courses
-      coursesData = data?.flatMap(classroom => classroom.courses) || []
+      // For tutors: return empty array since virtual classrooms were removed
+      coursesData = []
       
     } else {
       return new Response(
