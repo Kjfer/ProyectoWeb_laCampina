@@ -594,7 +594,7 @@ const AdminStudentManagementHub = () => {
 
                         <div>
                           <Label htmlFor="courseId">Curso (Opcional)</Label>
-                          <Select value={formData.courseId} onValueChange={(value) => setFormData({ ...formData, courseId: value })}>
+                          <Select value={formData.courseId || ''} onValueChange={(value) => setFormData({ ...formData, courseId: value })}>
                             <SelectTrigger>
                               <SelectValue placeholder="Seleccionar curso para matricular" />
                             </SelectTrigger>
@@ -602,8 +602,8 @@ const AdminStudentManagementHub = () => {
                               <SelectItem value="">Sin curso</SelectItem>
                               {courses.map((course) => (
                                 <SelectItem key={course.id} value={course.id}>
-                                  {course.name} ({course.code})
-                                  {course.grade && course.section && ` - ${course.grade}${course.section}`}
+                                  {course?.name || 'Sin nombre'} ({course?.code || 'Sin código'})
+                                  {course?.grade && course?.section && ` - ${course.grade}${course.section}`}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -649,7 +649,7 @@ const AdminStudentManagementHub = () => {
                     <Label>Tipo de Búsqueda</Label>
                     <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Selecciona tipo de búsqueda" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="code">Por Código de Estudiante</SelectItem>
@@ -664,13 +664,13 @@ const AdminStudentManagementHub = () => {
                       <Label>Curso</Label>
                       <Select value={filterCourse} onValueChange={setFilterCourse}>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Selecciona un curso" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Todos los cursos</SelectItem>
                           {courses.map((course) => (
                             <SelectItem key={course.id} value={course.id}>
-                              {course.name} ({course.code})
+                              {course?.name || 'Sin nombre'} ({course?.code || 'Sin código'})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -698,7 +698,7 @@ const AdminStudentManagementHub = () => {
                   </div>
                   <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
                     <SelectTrigger className="w-[200px]">
-                      <SelectValue />
+                      <SelectValue placeholder="Estado" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
@@ -767,7 +767,7 @@ const AdminStudentManagementHub = () => {
               </CardHeader>
               <CardContent>
                 <Select
-                  value={selectedCourseEnroll?.id}
+                  value={selectedCourseEnroll?.id || ''}
                   onValueChange={(value) => {
                     const course = courses.find(c => c.id === value);
                     setSelectedCourseEnroll(course || null);
@@ -780,8 +780,8 @@ const AdminStudentManagementHub = () => {
                   <SelectContent>
                     {courses.map((course) => (
                       <SelectItem key={course.id} value={course.id}>
-                        {course.name} ({course.code})
-                        {course.grade && course.section && ` - ${course.grade}${course.section}`}
+                        {course?.name || 'Sin nombre'} ({course?.code || 'Sin código'})
+                        {course?.grade && course?.section && ` - ${course.grade}${course.section}`}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -906,7 +906,7 @@ const AdminStudentManagementHub = () => {
                             Matricular {selectedStudentsEnroll.size} estudiante{selectedStudentsEnroll.size !== 1 ? 's' : ''}
                           </h3>
                           <p className="text-sm text-muted-foreground">
-                            En el curso: {selectedCourseEnroll.name} ({selectedCourseEnroll.code})
+                            En el curso: {selectedCourseEnroll?.name || 'Sin nombre'} ({selectedCourseEnroll?.code || 'Sin código'})
                           </p>
                         </div>
                         <Button onClick={handleEnrollStudents} disabled={enrolling} size="lg">
