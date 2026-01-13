@@ -304,20 +304,11 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
             </div>
           ) : (
             <>
-              <CardTitle className="flex items-center gap-2">
-          <Upload className="h-5 w-5" />
-          Importación Masiva de Estudiantes
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Aula Virtual: {classroom.name} - {classroom.grade}{classroom.section}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {importStatus === 'idle' && (
-          <>
-            <div className="bg-muted/50 p-4 rounded-lg space-y-3">
-              <div className="flex justify-between items-start">
-                <div className="text-sm text-muted-foreground">
+              {importStatus === 'idle' && (
+                <>
+                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="text-sm text-muted-foreground">
                   <strong className="text-foreground">Formato requerido:</strong>
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li>TIPO DE DOCUMENTO (DNI, CE, etc.)</li>
