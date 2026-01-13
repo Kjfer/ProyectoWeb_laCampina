@@ -32,6 +32,7 @@ import Calendar from "./pages/Calendar";
 import NotFound from "./pages/NotFound";
 import AdminBulkStudentImport from "./pages/AdminBulkStudentImport";
 import AdminEnrollExistingStudents from "./pages/AdminEnrollExistingStudents";
+import AdminStudentManagementHub from "./pages/AdminStudentManagementHub";
 import AssignmentDetail from "./pages/AssignmentDetail";
 import StudentDetailView from "./pages/StudentDetailView";
 import TeacherDetailView from "./pages/TeacherDetailView";
@@ -150,6 +151,11 @@ const App = () => (
             <Route path="/teacher/:teacherId" element={
               <ProtectedRoute>
                 <TeacherDetailView />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/students" element={
+              <ProtectedRoute>
+                <AdminStudentManagementHub />
               </ProtectedRoute>
             } />
             <Route path="/admin/bulk-import" element={
