@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Upload, CheckCircle2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Loader2, Upload, CheckCircle2, BookOpen } from 'lucide-react';
 
 interface Course {
   id: string;
@@ -28,17 +30,24 @@ interface StudentData {
 }
 
 interface BulkStudentImportProps {
-  classroom: Course;
-  onImportComplete: () => void;
+  classroom?: Course;
+  courses?: Course[];
+  onImportComplete?: () => void;
+  onSuccess?: () => void;
 }
 
-export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentImportProps) {
+export function BulkStudentImport({ classroom, courses, onImportComplete, onSuccess }: BulkStudentImportProps): JSX.Element {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [studentsToImport, setStudentsToImport] = useState<StudentData[]>([]);
   const [importStatus, setImportStatus] = useState<'idle' | 'preview' | 'importing' | 'completed'>('idle');
   const [importLogs, setImportLogs] = useState<string[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const logsEndRef = useRef<HTMLDivElement>(null);
+
+  // Determinar el curso activo (ya sea el prop classroom o el seleccionado)
+  const activeCourse = classroom || (courses && selectedCourseId ? courses.find(c => c.id === selectedCourseId) : null);
+  const showCourseSelector = !classroom && courses && courses.length > 0;
 
   // Auto-scroll to latest log
   useEffect(() => {
@@ -165,20 +174,29 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
   };
 
   const handleImport = async () => {
+    if (!activeCourse) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar un curso",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setImportStatus('importing');
     clearLogs();
     
     try {
       addLog(`🚀 Iniciando importación de ${studentsToImport.length} estudiantes`);
-      addLog(`📚 Curso: ${classroom.name} (${classroom.code})`);
+      addLog(`📚 Curso: ${activeCourse.name} (${activeCourse.code})`);
       addLog(`⏳ Procesando estudiantes en el servidor...`);
 
       const { data, error } = await supabase.functions.invoke('crud-estudiantes', {
         body: {
           students: studentsToImport,
-          courseId: classroom.id,
-          courseName: classroom.name,
-          courseCode: classroom.code,
+          courseId: activeCourse.id,
+          courseName: activeCourse.name,
+          courseCode: activeCourse.code,
         },
       });
 
@@ -222,7 +240,8 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
       setImportStatus('completed');
       setTimeout(() => {
         setStudentsToImport([]);
-        onImportComplete();
+        if (onImportComplete) onImportComplete();
+        if (onSuccess) onSuccess();
       }, 3000);
     } catch (error) {
       console.error('Error importing students:', error);
@@ -237,9 +256,55 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <div className="space-y-4">
+      {showCourseSelector && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              Seleccionar Curso Destino
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Label htmlFor="course-select">Curso</Label>
+            <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+              <SelectTrigger id="course-select">
+                <SelectValue placeholder="Selecciona un curso para importar estudiantes" />
+              </SelectTrigger>
+              <SelectContent>
+                {courses?.map((course) => (
+                  <SelectItem key={course.id} value={course.id}>
+                    {course.name} ({course.code})
+                    {course.grade && course.section && ` - ${course.grade}${course.section}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Importación Masiva de Estudiantes
+          </CardTitle>
+          {activeCourse && (
+            <p className="text-sm text-muted-foreground">
+              Curso: {activeCourse.name} ({activeCourse.code})
+              {activeCourse.grade && activeCourse.section && ` - ${activeCourse.grade}${activeCourse.section}`}
+            </p>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!activeCourse ? (
+            <div className="text-center py-8 text-muted-foreground">
+              Por favor, selecciona un curso antes de importar estudiantes
+            </div>
+          ) : (
+            <>
+              <CardTitle className="flex items-center gap-2">
           <Upload className="h-5 w-5" />
           Importación Masiva de Estudiantes
         </CardTitle>
@@ -389,7 +454,10 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

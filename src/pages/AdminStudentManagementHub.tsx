@@ -273,8 +273,9 @@ const AdminStudentManagementHub = () => {
       const password = formData.document_number || `Temp${formData.student_code}`;
 
       // Llamar a la función edge para crear el estudiante
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/crud-estudiantes`,
+        `${supabaseUrl}/functions/v1/crud-estudiantes`,
         {
           method: 'POST',
           headers: {
