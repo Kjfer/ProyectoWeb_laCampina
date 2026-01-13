@@ -296,14 +296,6 @@ const AdminStudentManagementHub = () => {
         return;
       }
 
-      // Obtener el token de sesión del usuario actual
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      
-      if (!accessToken) {
-        throw new Error('No se pudo obtener el token de autenticación');
-      }
-
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -311,7 +303,6 @@ const AdminStudentManagementHub = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
           'apikey': supabaseAnonKey,
         },
         body: JSON.stringify({
