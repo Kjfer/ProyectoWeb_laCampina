@@ -31,6 +31,7 @@ import DirectivoDashboard from "./pages/DirectivoDashboard";
 import Calendar from "./pages/Calendar";
 import NotFound from "./pages/NotFound";
 import AdminBulkStudentImport from "./pages/AdminBulkStudentImport";
+import AdminEnrollExistingStudents from "./pages/AdminEnrollExistingStudents";
 import AssignmentDetail from "./pages/AssignmentDetail";
 import StudentDetailView from "./pages/StudentDetailView";
 import TeacherDetailView from "./pages/TeacherDetailView";
@@ -154,6 +155,11 @@ const App = () => (
             <Route path="/admin/bulk-import" element={
               <ProtectedRoute>
                 <AdminBulkStudentImport />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/enroll-existing" element={
+              <ProtectedRoute>
+                <AdminEnrollExistingStudents />
               </ProtectedRoute>
             } />
             <Route path="/admin/courses" element={
