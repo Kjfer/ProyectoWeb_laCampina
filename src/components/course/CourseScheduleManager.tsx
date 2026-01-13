@@ -60,30 +60,20 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
       return;
     }
 
-    // Verificar si es tutor del aula virtual del curso
+    // Verificar si es tutor del curso
     if (profile.role === 'tutor' || profile.roles?.includes('tutor')) {
       try {
-        const { data: courseData, error } = await supabase
-          .from('courses')
-          .select('classroom_id')
-          .eq('id', courseId)
+        const { data: teacherData, error } = await supabase
+          .from('course_teachers')
+          .select('is_tutor')
+          .eq('course_id', courseId)
+          .eq('teacher_id', profile.id)
+          .eq('is_tutor', true)
           .single();
 
-        if (error) throw error;
-
-        if (courseData?.classroom_id) {
-          const { data: classroomData, error: classroomError } = await supabase
-            .from('virtual_classrooms')
-            .select('tutor_id')
-            .eq('id', courseData.classroom_id)
-            .single();
-
-          if (classroomError) throw classroomError;
-
-          if (classroomData?.tutor_id === profile.id) {
-            setCanEdit(true);
-            return;
-          }
+        if (!error && teacherData) {
+          setCanEdit(true);
+          return;
         }
       } catch (error) {
         console.error('Error checking tutor permissions:', error);

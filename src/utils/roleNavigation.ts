@@ -117,14 +117,6 @@ export const navigationItems: NavItem[] = [
     roles: ['directivo', 'admin']
   },
   
-  // Aulas Virtuales
-  {
-    title: 'Aulas Virtuales',
-    url: '/virtual-classrooms',
-    icon: School,
-    roles: ['admin', 'teacher', 'student']
-  },
-  
   // Cursos
   {
     title: 'Mis Cursos',
@@ -203,12 +195,6 @@ export const adminNavigationItems: NavItem[] = [
     title: 'Gestión de Usuarios',
     url: '/admin/users',
     icon: UserCog,
-    roles: ['admin']
-  },
-  {
-    title: 'Aulas Virtuales',
-    url: '/admin/classrooms',
-    icon: School,
     roles: ['admin']
   },
   {

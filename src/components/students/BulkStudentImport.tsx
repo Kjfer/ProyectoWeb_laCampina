@@ -7,13 +7,13 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Upload, CheckCircle2 } from 'lucide-react';
 
-interface VirtualClassroom {
+interface Course {
   id: string;
   name: string;
-  grade: string;
-  section: string;
-  academic_year: string;
-  education_level: string;
+  code: string;
+  grade?: string;
+  section?: string;
+  academic_year?: string;
 }
 
 interface StudentData {
@@ -28,7 +28,7 @@ interface StudentData {
 }
 
 interface BulkStudentImportProps {
-  classroom: VirtualClassroom;
+  classroom: Course;
   onImportComplete: () => void;
 }
 

@@ -4,33 +4,31 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { BulkStudentImport } from '@/components/students/BulkStudentImport';
-import { Loader2, School, Users } from 'lucide-react';
+import { Loader2, BookOpen, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
-interface VirtualClassroom {
+interface Course {
   id: string;
   name: string;
-  grade: string;
-  section: string;
-  academic_year: string;
-  education_level: string;
+  code: string;
+  grade?: string;
+  section?: string;
+  academic_year?: string;
   is_active: boolean;
-  teacher_id: string;
   profiles?: {
     first_name: string;
     last_name: string;
   };
-  courses?: { count: number }[];
   enrollments?: { count: number }[];
 }
 
 const AdminBulkStudentImport = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
-  const [classrooms, setClassrooms] = useState<VirtualClassroom[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedClassroom, setSelectedClassroom] = useState<VirtualClassroom | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
   if (profile?.role !== 'admin') {
     return (
@@ -52,58 +50,55 @@ const AdminBulkStudentImport = () => {
   }
 
   useEffect(() => {
-    fetchClassrooms();
+    fetchCourses();
   }, []);
 
-  const fetchClassrooms = async () => {
+  const fetchCourses = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('virtual_classrooms')
+        .from('courses')
         .select(`
           *,
-          profiles!virtual_classrooms_teacher_id_fkey (first_name, last_name),
-          courses (count)
+          course_teachers!inner(
+            teacher_id,
+            profiles!course_teachers_teacher_id_fkey(first_name, last_name)
+          )
         `)
         .eq('is_active', true)
         .order('academic_year', { ascending: false })
-        .order('grade', { ascending: true });
+        .order('name', { ascending: true });
 
       if (error) {
-        console.error('Error fetching classrooms:', error);
+        console.error('Error fetching courses:', error);
         toast({
           title: "Error",
-          description: "No se pudieron cargar las aulas virtuales",
+          description: "No se pudieron cargar los cursos",
           variant: "destructive",
         });
       } else {
-        // Fetch unique student counts separately
-        const classroomsWithEnrollments = await Promise.all(
-          (data || []).map(async (classroom) => {
-            const { data: courses } = await supabase
-              .from('courses')
-              .select('id')
-              .eq('classroom_id', classroom.id);
+        // Fetch enrollment counts
+        const coursesWithEnrollments = await Promise.all(
+          (data || []).map(async (course) => {
+            const { data: enrollments } = await supabase
+              .from('course_enrollments')
+              .select('student_id')
+              .eq('course_id', course.id);
             
-            const courseIds = courses?.map(c => c.id) || [];
+            const uniqueStudents = new Set(enrollments?.map(e => e.student_id) || []);
             
-            if (courseIds.length > 0) {
-              const { data: enrollments } = await supabase
-                .from('course_enrollments')
-                .select('student_id')
-                .in('course_id', courseIds);
-              
-              // Count unique students
-              const uniqueStudents = new Set(enrollments?.map(e => e.student_id) || []);
-              
-              return { ...classroom, enrollments: [{ count: uniqueStudents.size }] };
-            }
+            // Get teacher info from course_teachers
+            const teacherInfo = (course.course_teachers as any)?.[0]?.profiles;
             
-            return { ...classroom, enrollments: [{ count: 0 }] };
+            return { 
+              ...course, 
+              enrollments: [{ count: uniqueStudents.size }],
+              profiles: teacherInfo
+            };
           })
         );
         
-        setClassrooms(classroomsWithEnrollments as VirtualClassroom[]);
+        setCourses(coursesWithEnrollments as Course[]);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -117,12 +112,8 @@ const AdminBulkStudentImport = () => {
     }
   };
 
-  const getEnrollmentCount = (classroom: VirtualClassroom): number => {
-    return classroom.enrollments?.[0]?.count || 0;
-  };
-
-  const getCourseCount = (classroom: VirtualClassroom): number => {
-    return classroom.courses?.[0]?.count || 0;
+  const getEnrollmentCount = (course: Course): number => {
+    return course.enrollments?.[0]?.count || 0;
   };
 
   if (loading) {
@@ -141,59 +132,59 @@ const AdminBulkStudentImport = () => {
       <div>
         <h1 className="text-3xl font-bold mb-2">Importación Masiva de Estudiantes</h1>
         <p className="text-muted-foreground">
-          Selecciona un aula virtual y carga el archivo Excel con los datos de los estudiantes
+          Selecciona un curso y carga el archivo Excel con los datos de los estudiantes
         </p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {classrooms.map((classroom) => (
+        {courses.map((course) => (
           <Card
-            key={classroom.id}
+            key={course.id}
             className={`cursor-pointer transition-all hover:shadow-lg ${
-              selectedClassroom?.id === classroom.id
+              selectedCourse?.id === course.id
                 ? 'ring-2 ring-primary shadow-lg'
                 : ''
             }`}
-            onClick={() => setSelectedClassroom(classroom)}
+            onClick={() => setSelectedCourse(course)}
           >
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <School className="h-5 w-5" />
-                  {classroom.name}
+                  <BookOpen className="h-5 w-5" />
+                  {course.name}
                 </div>
-                <Badge variant={classroom.is_active ? 'default' : 'secondary'}>
-                  {classroom.is_active ? 'Activa' : 'Inactiva'}
+                <Badge variant={course.is_active ? 'default' : 'secondary'}>
+                  {course.is_active ? 'Activo' : 'Inactivo'}
                 </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Grado:</span>
-                <span className="font-medium">{classroom.grade}{classroom.section}</span>
+                <span className="text-muted-foreground">Código:</span>
+                <span className="font-medium">{course.code}</span>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Nivel:</span>
-                <span className="font-medium capitalize">{classroom.education_level}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Año:</span>
-                <span className="font-medium">{classroom.academic_year}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Cursos:</span>
-                <span className="font-medium">{getCourseCount(classroom)}</span>
-              </div>
+              {course.grade && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Grado:</span>
+                  <span className="font-medium">{course.grade}{course.section}</span>
+                </div>
+              )}
+              {course.academic_year && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Año:</span>
+                  <span className="font-medium">{course.academic_year}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
                   <Users className="h-3 w-3 inline mr-1" />
                   Estudiantes:
                 </span>
-                <span className="font-medium">{getEnrollmentCount(classroom)}</span>
+                <span className="font-medium">{getEnrollmentCount(course)}</span>
               </div>
-              {classroom.profiles && (
+              {course.profiles && (
                 <div className="text-xs text-muted-foreground pt-2 border-t">
-                  Tutor: {classroom.profiles.first_name} {classroom.profiles.last_name}
+                  Profesor: {course.profiles.first_name} {course.profiles.last_name}
                 </div>
               )}
             </CardContent>
@@ -201,22 +192,22 @@ const AdminBulkStudentImport = () => {
         ))}
       </div>
 
-      {classrooms.length === 0 && (
+      {courses.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
-            <School className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
-              No hay aulas virtuales activas disponibles
+              No hay cursos activos disponibles
             </p>
           </CardContent>
         </Card>
       )}
 
-      {selectedClassroom && (
+      {selectedCourse && (
         <div className="mt-8">
           <BulkStudentImport
-            classroom={selectedClassroom}
-            onImportComplete={fetchClassrooms}
+            classroom={selectedCourse}
+            onImportComplete={fetchCourses}
           />
         </div>
       )}

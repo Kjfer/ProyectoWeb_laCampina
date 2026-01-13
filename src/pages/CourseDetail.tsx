@@ -93,11 +93,6 @@ export default function CourseDetail() {
             first_name,
             last_name,
             email
-          ),
-          classroom:virtual_classrooms!courses_classroom_id_fkey(
-            name,
-            grade,
-            education_level
           )
         `)
         .eq('id', id)

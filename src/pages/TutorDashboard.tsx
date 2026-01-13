@@ -37,13 +37,13 @@ const convertLetterGrade = (score: string): number => {
   return letterGrades[score.toUpperCase()] || 0;
 };
 
-interface VirtualClassroom {
+interface Course {
   id: string;
   name: string;
-  grade: string;
-  section: string;
-  education_level: string;
-  academic_year: string;
+  code: string;
+  grade?: string;
+  section?: string;
+  academic_year?: string;
 }
 
 interface Student {
@@ -99,8 +99,8 @@ interface CourseData {
 export default function TutorDashboard() {
   const { profile, activeRole, user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [classrooms, setClassrooms] = useState<VirtualClassroom[]>([]);
-  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  const [tutorCourses, setTutorCourses] = useState<Course[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [gradeData, setGradeData] = useState<GradeRecord[]>([]);
@@ -142,37 +142,56 @@ export default function TutorDashboard() {
 
       setLoading(true);
 
-      // Fetch ALL assigned classrooms
-      console.log('📡 Consultando TODAS las aulas virtuales asignadas para tutor_id:', profile.id);
-      const { data: classroomsData, error: classroomsError } = await supabase
-        .from('virtual_classrooms')
-        .select('*')
-        .eq('tutor_id', profile.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+      // Fetch courses where user is tutor - check course_teachers table
+      console.log('📡 Consultando cursos donde el usuario es tutor:', profile.id);
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('course_teachers')
+        .select(`
+          course_id,
+          courses!inner(
+            id,
+            name,
+            code,
+            grade,
+            section,
+            academic_year
+          )
+        `)
+        .eq('teacher_id', profile.id)
+        .eq('is_tutor', true);
 
-      console.log('📦 Respuesta de classrooms:', { classroomsData, classroomsError });
+      console.log('📦 Respuesta de cursos:', { coursesData, coursesError });
 
-      if (classroomsError) {
-        throw classroomsError;
+      if (coursesError) {
+        throw coursesError;
       }
       
-      if (!classroomsData || classroomsData.length === 0) {
-        console.warn('⚠️ No se encontraron aulas activas asignadas al tutor');
-        toast.error('No tienes aulas virtuales activas asignadas');
+      if (!coursesData || coursesData.length === 0) {
+        console.warn('⚠️ No se encontraron cursos asignados como tutor');
+        toast.error('No tienes cursos asignados como tutor');
         setLoading(false);
         return;
       }
 
-      console.log(`✅ ${classroomsData.length} aulas encontradas:`, classroomsData);
-      setClassrooms(classroomsData);
+      // Extract courses from the join
+      const courses = coursesData.map(item => ({
+        id: (item.courses as any).id,
+        name: (item.courses as any).name,
+        code: (item.courses as any).code,
+        grade: (item.courses as any).grade,
+        section: (item.courses as any).section,
+        academic_year: (item.courses as any).academic_year
+      }));
+
+      console.log(`✅ ${courses.length} cursos encontrados:`, courses);
+      setTutorCourses(courses);
       
-      // Select the first classroom by default
-      const firstClassroomId = classroomsData[0].id;
-      setSelectedClassroomId(firstClassroomId);
+      // Select the first course by default
+      const firstCourseId = courses[0].id;
+      setSelectedCourseId(firstCourseId);
       
-      // Load data for the first classroom
-      await loadClassroomData(firstClassroomId);
+      // Load data for the first course
+      await loadCourseData(firstCourseId, courses.map(c => c.id));
 
     } catch (error) {
       console.error('❌ === ERROR EN fetchTutorData ===');
@@ -185,251 +204,188 @@ export default function TutorDashboard() {
     }
   };
 
-  const loadClassroomData = async (classroomId: string) => {
+  const loadCourseData = async (courseId: string, allCourseIds: string[]) => {
     try {
-      console.log('🏫 === CARGANDO DATOS DEL AULA ===');
-      console.log('🆔 Classroom ID:', classroomId);
+      console.log('📚 === CARGANDO DATOS DEL CURSO ===');
+      console.log('🆔 Course ID:', courseId);
 
-      // Fetch courses in classroom
-      console.log('📡 Consultando cursos del aula:', classroomId);
-      const { data: coursesData, error: coursesError } = await supabase
-        .from('courses')
-        .select('id, name, code')
-        .eq('classroom_id', classroomId);
+      // Set courses for schedule management
+      const coursesForSchedule = tutorCourses.length > 0 ? tutorCourses : allCourseIds.map(id => ({ id, name: '', code: '' }));
+      setCourses(coursesForSchedule);
 
-      console.log('📦 Respuesta de cursos:', { coursesData, coursesError });
+      // Fetch students enrolled in ALL tutor courses (not just selected one)
+      console.log('📡 Consultando estudiantes matriculados en todos los cursos del tutor...');
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('course_enrollments')
+        .select('student_id, profiles!inner(*)')
+        .in('course_id', allCourseIds);
 
-      if (coursesError) throw coursesError;
+      console.log('📦 Respuesta de estudiantes:', { studentsData, studentsError });
 
-      console.log('📚 Courses found:', coursesData?.length || 0, coursesData);
+      if (studentsError) throw studentsError;
 
-      setCourses(coursesData || []);
-      const courseIds = coursesData.map(c => c.id);
+      // Remove duplicates
+      const uniqueStudents = Array.from(
+        new Map(studentsData.map(item => [item.student_id, item.profiles])).values()
+      ) as Student[];
 
-      console.log('🔑 Course IDs:', courseIds);
+      console.log('👥 Total estudiantes únicos encontrados:', uniqueStudents.length);
+      setStudents(uniqueStudents);
 
-      if (courseIds.length > 0) {
-        // Fetch students
-        console.log('📡 Consultando estudiantes matriculados en los cursos...');
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('course_enrollments')
-          .select('student_id, profiles!inner(*)')
-          .in('course_id', courseIds);
+      // Fetch attendance data
+      const studentIds = uniqueStudents.map(s => s.id);
+      
+      const { data: attendanceRaw, error: attendanceError } = await supabase
+        .from('attendance')
+        .select('student_id, status, date, recorded_at')
+        .in('student_id', studentIds)
+        .in('course_id', allCourseIds)
+        .order('date', { ascending: false });
 
-        console.log('📦 Respuesta de estudiantes:', { studentsData, studentsError });
+      if (attendanceError) throw attendanceError;
 
-        if (studentsError) throw studentsError;
+      // Process attendance data
+      const attendanceMap = new Map<string, AttendanceRecord>();
+      studentIds.forEach(studentId => {
+        attendanceMap.set(studentId, {
+          student_id: studentId,
+          present: 0,
+          absent: 0,
+          late: 0,
+          justified: 0,
+          total: 0,
+          attendance_rate: 0,
+          last_attendance_date: undefined,
+          last_recorded_at: undefined
+        });
+      });
 
-        // Remove duplicates
-        const uniqueStudents = Array.from(
-          new Map(studentsData.map(item => [item.student_id, item.profiles])).values()
-        ) as Student[];
-
-        console.log('👥 Total estudiantes únicos encontrados:', uniqueStudents.length);
-        console.log('📋 Lista de estudiantes:', uniqueStudents.map(s => ({
-          id: s.id,
-          nombre: `${s.first_name} ${s.paternal_surname}`,
-          codigo: s.student_code
-        })));
-
-        setStudents(uniqueStudents);
-
-        // Fetch attendance data - improved with classroom attendance and date info
-        const studentIds = uniqueStudents.map(s => s.id);
+      attendanceRaw?.forEach(record => {
+        const current = attendanceMap.get(record.student_id)!;
         
-        // Fetch from both course-level and classroom-level attendance
-        const { data: attendanceRaw, error: attendanceError } = await supabase
-          .from('attendance')
-          .select('student_id, status, date, recorded_at')
-          .in('student_id', studentIds)
-          .or(`course_id.in.(${courseIds.join(',')}),classroom_id.eq.${classroomId}`)
-          .order('date', { ascending: false });
+        if (!current.last_attendance_date) {
+          current.last_attendance_date = record.date;
+          current.last_recorded_at = record.recorded_at;
+        }
+        
+        current.total++;
+        if (record.status === 'present') current.present++;
+        else if (record.status === 'absent') current.absent++;
+        else if (record.status === 'late') current.late++;
+        else if (record.status === 'justified') current.justified++;
+      });
 
-        if (attendanceError) throw attendanceError;
+      attendanceMap.forEach((record) => {
+        if (record.total > 0) {
+          record.attendance_rate = ((record.present + record.late) / record.total) * 100;
+        }
+      });
 
-        // Process attendance data with enhanced info
-        const attendanceMap = new Map<string, AttendanceRecord>();
-        studentIds.forEach(studentId => {
-          attendanceMap.set(studentId, {
-            student_id: studentId,
-            present: 0,
-            absent: 0,
-            late: 0,
-            justified: 0,
-            total: 0,
-            attendance_rate: 0,
-            last_attendance_date: undefined,
-            last_recorded_at: undefined
-          });
-        });
+      setAttendanceData(Array.from(attendanceMap.values()));
 
-        attendanceRaw?.forEach(record => {
-          const current = attendanceMap.get(record.student_id)!;
-          
-          // Set last attendance date and time
-          if (!current.last_attendance_date) {
-            current.last_attendance_date = record.date;
-            current.last_recorded_at = record.recorded_at;
-          }
-          
-          current.total++;
-          if (record.status === 'present') current.present++;
-          else if (record.status === 'absent') current.absent++;
-          else if (record.status === 'late') current.late++;
-          else if (record.status === 'justified') current.justified++;
-        });
-
-        attendanceMap.forEach((record) => {
-          if (record.total > 0) {
-            record.attendance_rate = ((record.present + record.late) / record.total) * 100;
-          }
-        });
-
-        setAttendanceData(Array.from(attendanceMap.values()));
-
-        // Fetch grades data - Get ALL grades for students, not just classroom courses
-        console.log('📡 Consultando calificaciones de estudiantes...');
-        const { data: submissionsData, error: submissionsError } = await supabase
-          .from('assignment_submissions')
-          .select(`
-            student_id, 
-            score, 
-            assignment_id, 
-            assignments!inner(
-              course_id,
-              courses!inner(
-                id,
-                name,
-                code
-              )
+      // Fetch grades data
+      console.log('📡 Consultando calificaciones de estudiantes...');
+      const { data: submissionsData, error: submissionsError } = await supabase
+        .from('assignment_submissions')
+        .select(`
+          student_id, 
+          score, 
+          assignment_id, 
+          assignments!inner(
+            course_id,
+            courses!inner(
+              id,
+              name,
+              code
             )
-          `)
-          .in('student_id', studentIds)
-          .not('score', 'is', null);
+          )
+        `)
+        .in('student_id', studentIds)
+        .not('score', 'is', null);
 
-        console.log('📦 Respuesta de calificaciones:', { submissionsData, submissionsError });
+      if (submissionsError) throw submissionsError;
 
-        if (submissionsError) throw submissionsError;
+      const allSubmissions = submissionsData || [];
 
-        console.log('📊 Total submissions found:', submissionsData?.length || 0);
-        console.log('📝 Sample submission:', submissionsData?.[0]);
-        console.log('📋 All submissions:', submissionsData?.map(s => ({
-          student_id: s.student_id,
-          course_id: (s.assignments as any).courses.id,
-          course_name: (s.assignments as any).courses.name,
-          score: s.score
-        })));
-        console.log('👥 Student IDs:', studentIds);
+      // Process grades data with course breakdown
+      const gradeMap = new Map<string, GradeRecord>();
+      studentIds.forEach(studentId => {
+        gradeMap.set(studentId, {
+          student_id: studentId,
+          ad_count: 0,
+          a_count: 0,
+          b_count: 0,
+          c_count: 0,
+          total_graded: 0,
+          average_score: 0,
+          course_grades: []
+        });
+      });
 
-        // NO FILTER - Show all grades from all courses the students are enrolled in
-        const allSubmissions = submissionsData || [];
+      const studentCourseGrades = new Map<string, Map<string, { total: number; count: number; course_name: string; course_code: string }>>();
 
-        console.log('✅ Total submissions to show:', allSubmissions.length);
+      allSubmissions.forEach(sub => {
+        const current = gradeMap.get(sub.student_id)!;
+        current.total_graded++;
+        const score = convertLetterGrade(sub.score);
 
-        // Process grades data with course breakdown
-        const gradeMap = new Map<string, GradeRecord>();
-        studentIds.forEach(studentId => {
-          gradeMap.set(studentId, {
-            student_id: studentId,
-            ad_count: 0,
-            a_count: 0,
-            b_count: 0,
-            c_count: 0,
-            total_graded: 0,
-            average_score: 0,
-            course_grades: []
+        if (score >= 18) current.ad_count++;
+        else if (score >= 14) current.a_count++;
+        else if (score >= 11) current.b_count++;
+        else current.c_count++;
+
+        if (!studentCourseGrades.has(sub.student_id)) {
+          studentCourseGrades.set(sub.student_id, new Map());
+        }
+        const courseGradesMap = studentCourseGrades.get(sub.student_id)!;
+        const subCourseId = (sub.assignments as any).courses.id;
+        
+        if (!courseGradesMap.has(subCourseId)) {
+          courseGradesMap.set(subCourseId, {
+            total: 0,
+            count: 0,
+            course_name: (sub.assignments as any).courses.name,
+            course_code: (sub.assignments as any).courses.code
           });
-        });
+        }
+        
+        const courseData = courseGradesMap.get(subCourseId)!;
+        courseData.total += score;
+        courseData.count++;
+      });
 
-        // Track course grades per student
-        const studentCourseGrades = new Map<string, Map<string, { total: number; count: number; course_name: string; course_code: string }>>();
+      gradeMap.forEach((record, studentId) => {
+        if (record.total_graded > 0) {
+          const studentSubmissions = allSubmissions.filter(s => s.student_id === record.student_id);
+          const sum = studentSubmissions.reduce((acc, s) => acc + convertLetterGrade(s.score), 0);
+          record.average_score = sum / record.total_graded;
 
-        allSubmissions.forEach(sub => {
-          const current = gradeMap.get(sub.student_id)!;
-          current.total_graded++;
-          const score = convertLetterGrade(sub.score);
-
-          if (score >= 18) current.ad_count++;
-          else if (score >= 14) current.a_count++;
-          else if (score >= 11) current.b_count++;
-          else current.c_count++;
-
-          // Track by course
-          if (!studentCourseGrades.has(sub.student_id)) {
-            studentCourseGrades.set(sub.student_id, new Map());
+          const courseGradesMap = studentCourseGrades.get(record.student_id);
+          if (courseGradesMap) {
+            record.course_grades = Array.from(courseGradesMap.entries()).map(([cId, data]) => ({
+              course_id: cId,
+              course_name: data.course_name,
+              course_code: data.course_code,
+              average: data.total / data.count,
+              count: data.count
+            }));
           }
-          const courseGradesMap = studentCourseGrades.get(sub.student_id)!;
-          const courseId = (sub.assignments as any).courses.id;
-          
-          if (!courseGradesMap.has(courseId)) {
-            courseGradesMap.set(courseId, {
-              total: 0,
-              count: 0,
-              course_name: (sub.assignments as any).courses.name,
-              course_code: (sub.assignments as any).courses.code
-            });
-          }
-          
-          const courseData = courseGradesMap.get(courseId)!;
-          courseData.total += score;
-          courseData.count++;
-        });
+        }
+      });
 
-        gradeMap.forEach((record, studentId) => {
-          if (record.total_graded > 0) {
-            const studentSubmissions = allSubmissions.filter(s => s.student_id === record.student_id);
-            const sum = studentSubmissions.reduce((acc, s) => acc + convertLetterGrade(s.score), 0);
-            record.average_score = sum / record.total_graded;
-
-            // Add course breakdown
-            const courseGradesMap = studentCourseGrades.get(record.student_id);
-            if (courseGradesMap) {
-              record.course_grades = Array.from(courseGradesMap.entries()).map(([courseId, data]) => ({
-                course_id: courseId,
-                course_name: data.course_name,
-                course_code: data.course_code,
-                average: data.total / data.count,
-                count: data.count
-              }));
-              console.log(`📚 Student ${studentId} course grades:`, record.course_grades);
-            } else {
-              console.log(`⚠️ No course grades map for student ${studentId}`);
-            }
-          }
-        });
-
-        const finalGradeData = Array.from(gradeMap.values());
-        console.log('📊 === RESUMEN DE CALIFICACIONES ===');
-        console.log('✅ Total estudiantes con datos:', finalGradeData.length);
-        console.log('📋 Detalle de calificaciones por estudiante:');
-        finalGradeData.forEach(grade => {
-          const student = uniqueStudents.find(s => s.id === grade.student_id);
-          console.log(`  👤 ${student?.first_name} ${student?.paternal_surname}:`, {
-            total_calificadas: grade.total_graded,
-            promedio: grade.average_score.toFixed(2),
-            AD: grade.ad_count,
-            A: grade.a_count,
-            B: grade.b_count,
-            C: grade.c_count,
-            cursos_con_notas: grade.course_grades?.length || 0
-          });
-        });
-        console.log('=====================================');
-        setGradeData(finalGradeData);
-      }
+      setGradeData(Array.from(gradeMap.values()));
 
     } catch (error) {
-      console.error('❌ === ERROR EN loadClassroomData ===');
+      console.error('❌ === ERROR EN loadCourseData ===');
       console.error('Error completo:', error);
-      console.error('=====================================');
-      toast.error('Error al cargar los datos del aula');
+      toast.error('Error al cargar los datos del curso');
     }
   };
 
-  const handleClassroomChange = async (classroomId: string) => {
-    setSelectedClassroomId(classroomId);
+  const handleCourseChange = async (courseId: string) => {
+    setSelectedCourseId(courseId);
     setLoading(true);
-    await loadClassroomData(classroomId);
+    await loadCourseData(courseId, tutorCourses.map(c => c.id));
     setLoading(false);
   };
 
@@ -487,15 +443,15 @@ export default function TutorDashboard() {
     );
   }
 
-  const selectedClassroom = classrooms.find(c => c.id === selectedClassroomId);
+  const selectedCourse = tutorCourses.find(c => c.id === selectedCourseId);
 
-  if (!selectedClassroom && !loading && classrooms.length === 0) {
+  if (!selectedCourse && !loading && tutorCourses.length === 0) {
     return (
       <DashboardLayout>
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            No tienes un aula virtual asignada. Contacta al administrador para que te asigne un aula.
+            No tienes cursos asignados como tutor. Contacta al administrador para que te asigne un curso.
           </AlertDescription>
         </Alert>
       </DashboardLayout>
@@ -587,14 +543,14 @@ export default function TutorDashboard() {
     );
   }
 
-  if (!selectedClassroom && !loading && classrooms.length > 0) {
+  if (!selectedCourse && !loading && tutorCourses.length > 0) {
     return (
       <DashboardLayout>
         <div className="space-y-6">
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Selecciona un aula virtual para ver los datos.
+              Selecciona un curso para ver los datos.
             </AlertDescription>
           </Alert>
         </div>
@@ -608,24 +564,25 @@ export default function TutorDashboard() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Dashboard de Tutoría</h1>
-            {selectedClassroom && (
+            {selectedCourse && (
               <p className="text-muted-foreground">
-                {selectedClassroom.name} - {selectedClassroom.grade} {selectedClassroom.section} ({selectedClassroom.education_level})
+                {selectedCourse.name} ({selectedCourse.code})
+                {selectedCourse.grade && selectedCourse.section && ` - ${selectedCourse.grade} ${selectedCourse.section}`}
               </p>
             )}
           </div>
           
-          {classrooms.length > 1 && (
+          {tutorCourses.length > 1 && (
             <div className="flex items-center gap-3">
-              <Building2 className="h-5 w-5 text-muted-foreground" />
-              <Select value={selectedClassroomId || undefined} onValueChange={handleClassroomChange}>
+              <BookOpen className="h-5 w-5 text-muted-foreground" />
+              <Select value={selectedCourseId || undefined} onValueChange={handleCourseChange}>
                 <SelectTrigger className="w-[280px] bg-background z-50">
-                  <SelectValue placeholder="Selecciona un aula" />
+                  <SelectValue placeholder="Selecciona un curso" />
                 </SelectTrigger>
                 <SelectContent className="bg-background z-50">
-                  {classrooms.map((classroom) => (
-                    <SelectItem key={classroom.id} value={classroom.id}>
-                      {classroom.name} - {classroom.grade} {classroom.section}
+                  {tutorCourses.map((course) => (
+                    <SelectItem key={course.id} value={course.id}>
+                      {course.name} ({course.code})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -640,14 +597,14 @@ export default function TutorDashboard() {
             title="Total Estudiantes"
             value={students.length}
             icon={Users}
-            description="En el aula virtual"
+            description="En tus cursos de tutoría"
           />
           
           <StatCard
             title="Asistencia Promedio"
             value={`${overallAttendanceRate.toFixed(1)}%`}
             icon={Calendar}
-            description="Del aula virtual"
+            description="De tus estudiantes"
             trend={overallAttendanceRate >= 85 ? 'up' : overallAttendanceRate >= 75 ? 'neutral' : 'down'}
             trendValue={overallAttendanceRate >= 85 ? 'Excelente' : overallAttendanceRate >= 75 ? 'Buena' : 'Requiere atención'}
           />
@@ -667,7 +624,7 @@ export default function TutorDashboard() {
             icon={Target}
             description="Con +90% asistencia y +14 promedio"
             trend={studentsWithGoodPerformance > students.length * 0.5 ? 'up' : 'neutral'}
-            trendValue={`${((studentsWithGoodPerformance / students.length) * 100).toFixed(0)}% del aula`}
+            trendValue={`${students.length > 0 ? ((studentsWithGoodPerformance / students.length) * 100).toFixed(0) : 0}% del grupo`}
           />
         </div>
 
@@ -988,18 +945,18 @@ export default function TutorDashboard() {
               <CardHeader>
                 <CardTitle>Gestión de Horarios de Cursos</CardTitle>
                 <CardDescription>
-                  Administra los horarios de los cursos de tu aula virtual
+                  Administra los horarios de tus cursos de tutoría
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {courses.length === 0 ? (
+                  {tutorCourses.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
-                      No hay cursos asignados a esta aula virtual
+                      No hay cursos asignados como tutor
                     </div>
                   ) : (
                     <div className="grid gap-3">
-                      {courses.map(course => (
+                      {tutorCourses.map(course => (
                         <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg">
                           <div>
                             <p className="font-medium">{course.name}</p>
@@ -1026,7 +983,7 @@ export default function TutorDashboard() {
           student={selectedStudent}
           open={!!selectedStudent}
           onOpenChange={(open) => !open && setSelectedStudent(null)}
-          classroomId={selectedClassroom?.id || ''}
+          classroomId={selectedCourseId || ''}
         />
 
         {/* Schedule Edit Dialog */}

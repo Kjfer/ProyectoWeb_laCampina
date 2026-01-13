@@ -47,7 +47,7 @@ export function AppSidebar() {
             {!collapsed && (
               <div>
                 <h2 className="font-semibold text-foreground text-sm">Peri Institute</h2>
-                <p className="text-xs text-muted-foreground">Aula Virtual</p>
+                <p className="text-xs text-muted-foreground">Sistema Educativo</p>
               </div>
             )}
           </div>
