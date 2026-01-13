@@ -21,11 +21,16 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Get the Supabase client
+    // Get the Supabase client con service role para operaciones admin
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? '',
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ''
     )
+
+    // Log para debugging
+    console.log('📨 Request recibido:', req.method);
+    console.log('📨 Headers:', Object.fromEntries(req.headers.entries()));
+
 
     // Handle GET requests - Obtener estudiantes
     if (req.method === 'GET') {
