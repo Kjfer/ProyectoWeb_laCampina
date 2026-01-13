@@ -56,15 +56,10 @@ const AdminBulkStudentImport = () => {
   const fetchCourses = async () => {
     setLoading(true);
     try {
+      console.log('Fetching courses...');
       const { data, error } = await supabase
         .from('courses')
-        .select(`
-          *,
-          course_teachers!inner(
-            teacher_id,
-            profiles!course_teachers_teacher_id_fkey(first_name, last_name)
-          )
-        `)
+        .select('*')
         .eq('is_active', true)
         .order('academic_year', { ascending: false })
         .order('name', { ascending: true });
@@ -76,30 +71,40 @@ const AdminBulkStudentImport = () => {
           description: "No se pudieron cargar los cursos",
           variant: "destructive",
         });
-      } else {
-        // Fetch enrollment counts
-        const coursesWithEnrollments = await Promise.all(
-          (data || []).map(async (course) => {
-            const { data: enrollments } = await supabase
-              .from('course_enrollments')
-              .select('student_id')
-              .eq('course_id', course.id);
-            
-            const uniqueStudents = new Set(enrollments?.map(e => e.student_id) || []);
-            
-            // Get teacher info from course_teachers
-            const teacherInfo = (course.course_teachers as any)?.[0]?.profiles;
-            
-            return { 
-              ...course, 
-              enrollments: [{ count: uniqueStudents.size }],
-              profiles: teacherInfo
-            };
-          })
-        );
-        
-        setCourses(coursesWithEnrollments as Course[]);
+        return;
       }
+      
+      console.log('Courses fetched:', data);
+      
+      // Fetch enrollment counts and teacher info
+      const coursesWithEnrollments = await Promise.all(
+        (data || []).map(async (course) => {
+          // Get enrollment count
+          const { data: enrollments } = await supabase
+            .from('course_enrollments')
+            .select('student_id')
+            .eq('course_id', course.id);
+          
+          const uniqueStudents = new Set(enrollments?.map(e => e.student_id) || []);
+          
+          // Get teacher info
+          const { data: teachers } = await supabase
+            .from('course_teachers')
+            .select('profiles!course_teachers_teacher_id_fkey(first_name, last_name)')
+            .eq('course_id', course.id)
+            .limit(1)
+            .single();
+          
+          return { 
+            ...course, 
+            enrollments: [{ count: uniqueStudents.size }],
+            profiles: (teachers as any)?.profiles
+          };
+        })
+      );
+      
+      console.log('Courses with enrollments:', coursesWithEnrollments);
+      setCourses(coursesWithEnrollments as Course[]);
     } catch (error) {
       console.error('Error:', error);
       toast({

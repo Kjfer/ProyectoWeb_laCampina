@@ -170,24 +170,15 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
     
     try {
       addLog(`🚀 Iniciando importación de ${studentsToImport.length} estudiantes`);
-      addLog(`📚 Aula Virtual: ${classroom.name} - ${classroom.grade}${classroom.section}`);
-      
-      const { data: courseData, error: courseError } = await supabase
-        .from('courses')
-        .select('id')
-        .eq('classroom_id', classroom.id);
-
-      if (courseError) throw courseError;
-
-      const courseIds = courseData?.map(c => c.id) || [];
-      addLog(`📖 Cursos encontrados: ${courseIds.length}`);
+      addLog(`📚 Curso: ${classroom.name} (${classroom.code})`);
       addLog(`⏳ Procesando estudiantes en el servidor...`);
 
       const { data, error } = await supabase.functions.invoke('crud-estudiantes', {
         body: {
           students: studentsToImport,
-          classroomId: classroom.id,
-          courseIds: courseIds,
+          courseId: classroom.id,
+          courseName: classroom.name,
+          courseCode: classroom.code,
         },
       });
 
@@ -204,7 +195,7 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
       addLog(`✅ Procesamiento completado`);
       addLog(`📊 Resultados:`);
       addLog(`   • ${summary.new} estudiantes nuevos creados`);
-      addLog(`   • ${summary.existing} estudiantes existentes asociados`);
+      addLog(`   • ${summary.existing} estudiantes existentes matriculados`);
       if (summary.errors > 0) {
         addLog(`   ⚠️ ${summary.errors} errores encontrados`);
       }
@@ -212,11 +203,11 @@ export function BulkStudentImport({ classroom, onImportComplete }: BulkStudentIm
 
       let description = '';
       if (summary.new > 0 && summary.existing > 0) {
-        description = `${summary.new} estudiantes nuevos creados, ${summary.existing} estudiantes existentes asociados al aula`;
+        description = `${summary.new} estudiantes nuevos creados, ${summary.existing} estudiantes existentes matriculados`;
       } else if (summary.new > 0) {
-        description = `${summary.new} estudiantes nuevos creados y asociados al aula`;
+        description = `${summary.new} estudiantes nuevos creados y matriculados al curso`;
       } else if (summary.existing > 0) {
-        description = `${summary.existing} estudiantes existentes asociados al aula`;
+        description = `${summary.existing} estudiantes existentes matriculados al curso`;
       }
 
       if (summary.errors > 0) {

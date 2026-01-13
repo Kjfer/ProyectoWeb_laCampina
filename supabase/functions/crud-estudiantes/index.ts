@@ -79,8 +79,18 @@ serve(async (req: Request) => {
 
       // Handle bulk import from Excel
       if (body.students && Array.isArray(body.students)) {
-        const { students, courseIds = [] } = body;
-        console.log(`📊 Importación masiva: ${students.length} estudiantes`);
+        const { students, courseId } = body;
+        console.log(`📊 Importación masiva: ${students.length} estudiantes al curso: ${courseId}`);
+
+        if (!courseId) {
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'courseId es requerido para la importación masiva'
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          );
+        }
 
         const results = {
           success: [],
@@ -133,7 +143,7 @@ serve(async (req: Request) => {
               console.log(`✏️ Estudiante existe, actualizando: ${studentData.student_code}`);
               profileId = existingProfile.id;
               
-              // Actualizar perfil con todos los datos del Excel
+              // Actualizar perfil con todos los datos del Excel + nuevas columnas
               const { error: updateError } = await supabase
                 .from('profiles')
                 .update({
@@ -146,6 +156,8 @@ serve(async (req: Request) => {
                   gender: studentData.gender,
                   birth_date: studentData.birth_date,
                   student_code: studentData.student_code,
+                  country: studentData.country || 'Perú',
+                  education_level: studentData.education_level,
                   is_active: true,
                 })
                 .eq('id', profileId);
@@ -201,6 +213,8 @@ serve(async (req: Request) => {
                         gender: studentData.gender,
                         birth_date: studentData.birth_date,
                         student_code: studentData.student_code,
+                        country: studentData.country || 'Perú',
+                        education_level: studentData.education_level,
                         is_active: true,
                       })
                       .eq('id', profileId);
@@ -264,6 +278,8 @@ serve(async (req: Request) => {
                       student_code: studentData.student_code,
                       email: email,
                       role: 'student',
+                      country: studentData.country || 'Perú',
+                      education_level: studentData.education_level,
                       is_active: true,
                     })
                     .eq('id', profileId);
@@ -289,43 +305,42 @@ serve(async (req: Request) => {
               }
             }
 
-            // Inscribir en cursos (evitando duplicados)
-            let enrollmentCount = 0;
-            if (courseIds.length > 0) {
-              console.log(`📚 Inscribiendo en ${courseIds.length} cursos...`);
+            // Inscribir en el curso (evitando duplicados)
+            let enrolled = false;
+            if (courseId) {
+              console.log(`📚 Inscribiendo en curso ${courseId}...`);
               
-              for (const courseId of courseIds) {
-                // Verificar si ya está inscrito
-                const { data: existingEnrollment } = await supabase
+              // Verificar si ya está inscrito
+              const { data: existingEnrollment } = await supabase
+                .from('course_enrollments')
+                .select('id')
+                .eq('student_id', profileId)
+                .eq('course_id', courseId)
+                .single();
+
+              if (!existingEnrollment) {
+                const { error: enrollError } = await supabase
                   .from('course_enrollments')
-                  .select('id')
-                  .eq('student_id', profileId)
-                  .eq('course_id', courseId)
-                  .single();
+                  .insert({
+                    student_id: profileId,
+                    course_id: courseId,
+                  });
 
-                if (!existingEnrollment) {
-                  const { error: enrollError } = await supabase
-                    .from('course_enrollments')
-                    .insert({
-                      student_id: profileId,
-                      course_id: courseId,
-                    });
-
-                  if (enrollError) {
-                    console.error(`⚠️ Error inscribiendo en curso ${courseId}:`, enrollError);
-                  } else {
-                    enrollmentCount++;
-                    console.log(`✅ Inscrito en curso ${courseId}`);
-                  }
+                if (enrollError) {
+                  console.error(`⚠️ Error inscribiendo en curso ${courseId}:`, enrollError);
                 } else {
-                  console.log(`ℹ️ Ya inscrito en curso ${courseId}`);
+                  enrolled = true;
+                  console.log(`✅ Inscrito en curso ${courseId}`);
                 }
+              } else {
+                console.log(`ℹ️ Ya inscrito en curso ${courseId}`);
+                enrolled = false; // Ya estaba inscrito
               }
             }
 
             const message = existingProfile 
-              ? `Actualizado y asociado (${enrollmentCount} cursos nuevos)` 
-              : `Creado y asociado (${enrollmentCount} cursos)`;
+              ? (enrolled ? 'Actualizado y matriculado' : 'Actualizado (ya matriculado)')
+              : (enrolled ? 'Creado y matriculado' : 'Creado');
             
             results.success.push({
               student_code: studentData.student_code,
