@@ -1,21 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
-import { Loader2, Check, BookOpen, Edit, Trash2, Users, Calendar, Clock, Package } from 'lucide-react';
+import { Loader2, Edit, Trash2, Calendar, Clock, Package, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { fetchAllTeachers } from '@/utils/teacherUtils';
-// NUEVO: Importamos Tabs y el Gestor de Programas
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminProgramManagement } from './AdminProgramManagement';
 
@@ -33,13 +30,13 @@ interface Course {
   description?: string;
   code: string;
   teacher_id: string;
-  program_id?: string; // NUEVO
+  program_id?: string;
   teacher?: Teacher;
   academic_year: string;
   start_date?: string;
   end_date?: string;
-  start_time?: string; // NUEVO
-  end_time?: string;   // NUEVO
+  start_time?: string;
+  end_time?: string;
   additional_teachers?: string[];
   is_active: boolean;
   schedule?: string | any;
@@ -52,12 +49,12 @@ interface CourseFormData {
   description: string;
   code: string;
   teacher_id: string;
-  program_id: string; // NUEVO
+  program_id: string;
   academic_year: string;
   start_date: string;
   end_date: string;
-  start_time: string; // NUEVO
-  end_time: string;   // NUEVO
+  start_time: string;
+  end_time: string;
   additional_teachers: string[];
 }
 
@@ -65,7 +62,7 @@ const AdminCourseManagement = () => {
   const { toast } = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [programs, setPrograms] = useState<any[]>([]); // NUEVO: Lista de Programas
+  const [programs, setPrograms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Modales
@@ -78,8 +75,11 @@ const AdminCourseManagement = () => {
   const [deletingCourse, setDeletingCourse] = useState<Course | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // NUEVO: Mensaje de ayuda fechas
+  // Mensaje de ayuda fechas
   const [durationMsg, setDurationMsg] = useState("");
+
+  // ESTADO NUEVO: Número de Módulo (para generar M1, M2, etc.)
+  const [moduleNumber, setModuleNumber] = useState(1);
 
   // Formulario Principal
   const [formData, setFormData] = useState<CourseFormData>({
@@ -109,7 +109,7 @@ const AdminCourseManagement = () => {
     { key: 'Sunday', label: 'Domingo' },
   ];
 
-  // Selección masiva y filtros (TU CÓDIGO ORIGINAL)
+  // Selección masiva y filtros
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBulkTeacherModal, setShowBulkTeacherModal] = useState(false);
   const [showBulkScheduleModal, setShowBulkScheduleModal] = useState(false);
@@ -118,19 +118,54 @@ const AdminCourseManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterYear, setFilterYear] = useState('all');
 
-  // Edición rápida (TU CÓDIGO ORIGINAL)
+  // Edición rápida
   const [quickEditMode, setQuickEditMode] = useState(false);
   const [quickEditChanges, setQuickEditChanges] = useState<{ [id: string]: Partial<Course> }>({});
-  
-  // Modal Horario Detallado (TU CÓDIGO ORIGINAL)
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleEditCourse, setScheduleEditCourse] = useState<Course | null>(null);
-  const [scheduleForm, setScheduleForm] = useState<any[]>([]);
-  const [inlineSaving, setInlineSaving] = useState<{ [id: string]: boolean }>({});
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  // --- AUTOMATIZACIÓN DE CÓDIGO (EL CEREBRO) ---
+  useEffect(() => {
+    // Solo ejecutamos si el modal de creación está abierto
+    if (!isCreateModalOpen) return;
+
+    // 1. Obtener Programa seleccionado
+    const selectedProgram = programs.find(p => p.id === formData.program_id);
+    const progCode = selectedProgram?.code || 'GEN'; // Si no hay, usa GEN
+
+    // 2. Obtener Mes de la Fecha de Inicio
+    let monthCode = 'ENE';
+    let yearCode = '2026';
+    
+    if (formData.start_date) {
+        // Truco: Agregamos T12:00:00 para evitar problemas de zona horaria que restan un día
+        const dateObj = new Date(formData.start_date + 'T12:00:00');
+        const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+        monthCode = months[dateObj.getMonth()];
+        yearCode = dateObj.getFullYear().toString();
+    }
+
+    // 3. Generar Código: PROG-M#-MES-AÑO
+    const autoCode = `${progCode}-M${moduleNumber}-${monthCode}-${yearCode}`;
+
+    // 4. Generar Nombre Sugerido (Opcional)
+    const autoName = selectedProgram ? `${selectedProgram.name} - Módulo ${moduleNumber}` : formData.name;
+
+    // Actualizamos el estado solo si cambió algo para evitar loops infinitos
+    setFormData(prev => {
+        if (prev.code === autoCode && prev.name === autoName) return prev;
+        return { 
+            ...prev, 
+            code: autoCode,
+            name: (prev.name === '' || prev.name.includes('Módulo')) ? autoName : prev.name, // Solo sobrescribe si está vacío o parece autogenerado
+            academic_year: yearCode
+        };
+    });
+
+  }, [formData.program_id, formData.start_date, moduleNumber, programs, isCreateModalOpen]);
+
 
   const fetchData = async () => {
     setLoading(true);
@@ -167,29 +202,63 @@ const AdminCourseManagement = () => {
     setTeachers(data);
   };
 
-  // NUEVO: Cargar Programas Padres
   const fetchPrograms = async () => {
     const { data } = await supabase.from('programs').select('*').eq('is_active', true);
     if (data) setPrograms(data);
   };
 
-  // --- Manejadores del Formulario ---
+  // --- MANEJADORES DE FECHAS (LÓGICA ACTUALIZADA) ---
 
-  // NUEVO: Lógica Inteligente de Fechas
+  // 1. Calculadora auxiliar
+  const calculateDurationMsg = (start: string, end: string) => {
+    if (!start || !end) return "";
+    const s = new Date(start);
+    const e = new Date(end);
+    
+    // Diferencia en días
+    const diffTime = e.getTime() - s.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return "⚠️ La fecha fin es anterior al inicio";
+
+    // Semanas (redondeado)
+    const exactWeeks = Math.round(diffDays / 7);
+    return `📅 Hay: ${exactWeeks} semanas (${diffDays} días)`;
+  };
+
+  // 2. Cuando cambia INICIO (Sugiere +28 días)
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newStart = e.target.value;
-    setFormData(prev => ({ ...prev, start_date: newStart }));
-
-    if (newStart) {
-        const startObj = new Date(newStart);
-        const endObj = new Date(startObj);
-        endObj.setDate(startObj.getDate() + 28); // +28 días por defecto
-        
-        const endStr = endObj.toISOString().split('T')[0];
-        setFormData(prev => ({ ...prev, start_date: newStart, end_date: endStr }));
-        setDurationMsg("📅 Duración calculada: 4 semanas");
+    
+    if (!newStart) {
+        setFormData(prev => ({ ...prev, start_date: '' }));
+        setDurationMsg("");
+        return;
     }
+
+    // Calculamos Fin Sugerido (4 semanas)
+    const startObj = new Date(newStart + 'T12:00:00');
+    const endObj = new Date(startObj);
+    endObj.setDate(startObj.getDate() + 28); 
+    const suggestedEnd = endObj.toISOString().split('T')[0];
+
+    setFormData(prev => ({ ...prev, start_date: newStart, end_date: suggestedEnd }));
+    setDurationMsg(calculateDurationMsg(newStart, suggestedEnd));
   };
+
+  // 3. Cuando cambia FIN (Recalcula duración real)
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEnd = e.target.value;
+    setFormData(prev => ({ ...prev, end_date: newEnd }));
+    
+    // Si ya hay inicio, recalculamos el mensaje
+    if (formData.start_date && newEnd) {
+        setDurationMsg(calculateDurationMsg(formData.start_date, newEnd));
+    }
+ };
+
+
+  // --- Otros Manejadores ---
 
   const handleInputChange = useCallback((field: keyof CourseFormData) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -215,11 +284,11 @@ const AdminCourseManagement = () => {
       academic_year: '2026', start_date: '', end_date: '', start_time: '', end_time: '',
       additional_teachers: [],
     });
+    setModuleNumber(1); // Resetear módulo a 1
     setSelectedDays([]);
     setDurationMsg("");
   }, []);
 
-  // --- Crear Curso (LÓGICA ACTUALIZADA) ---
   const handleCreateCourse = async () => {
     if (!formData.name || !formData.code || !formData.teacher_id || !formData.start_date || !formData.end_date) {
       toast({ title: "Campos requeridos", description: "Completa todos los campos obligatorios.", variant: "destructive" });
@@ -241,14 +310,14 @@ const AdminCourseManagement = () => {
             description: formData.description,
             code: formData.code,
             teacher_id: formData.teacher_id,
-            program_id: formData.program_id || null, // Conectamos con el padre
+            program_id: formData.program_id || null,
             academic_year: formData.academic_year,
             semester: '2026-I',
             start_date: formData.start_date,
             end_date: formData.end_date,
-            start_time: formData.start_time || null, // Guardamos horas
+            start_time: formData.start_time || null,
             end_time: formData.end_time || null,
-            number_of_modules: 1, // SIEMPRE 1 AHORA
+            number_of_modules: moduleNumber, // Guardamos el número de módulo
             schedule: selectedDays, 
             is_active: true,
             additional_teachers: formData.additional_teachers
@@ -270,10 +339,9 @@ const AdminCourseManagement = () => {
     }
   };
 
-  // --- Editar Curso (TU LÓGICA ORIGINAL + CAMPOS NUEVOS) ---
+  // --- Editar ---
   const openEditModal = (course: Course) => {
     setEditingCourse(course);
-    
     let currentDays: string[] = [];
     try {
       if (course.schedule) {
@@ -316,15 +384,14 @@ const AdminCourseManagement = () => {
           academic_year: formData.academic_year,
           start_date: formData.start_date,
           end_date: formData.end_date,
-          start_time: formData.start_time, // Nuevo
-          end_time: formData.end_time,     // Nuevo
+          start_time: formData.start_time,
+          end_time: formData.end_time,
           additional_teachers: formData.additional_teachers,
           schedule: selectedDays,
         })
         .eq('id', editingCourse.id);
 
       if (error) throw error;
-      
       toast({ title: "Actualizado", description: "Curso guardado correctamente." });
       setIsEditModalOpen(false);
       setEditingCourse(null);
@@ -336,7 +403,7 @@ const AdminCourseManagement = () => {
     }
   };
 
-  // --- Helpers y Acciones Secundarias (TU CÓDIGO ORIGINAL MANTENIDO) ---
+  // --- Helpers ---
   const openDeleteModal = (course: Course) => {
     setDeletingCourse(course);
     setIsDeleteModalOpen(true);
@@ -418,12 +485,10 @@ const AdminCourseManagement = () => {
     <DashboardLayout>
       <div className="container mx-auto px-4 py-8">
         
-        {/* Header (TU CÓDIGO ORIGINAL MEJORADO) */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-1">Gestión Académica</h1>
           <p className="text-gray-600">Administra el catálogo y las aperturas.</p>
           
-          {/* Tarjetas de Estadísticas (ORIGINALES) */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-4">
             <Card className="hover:shadow-lg transition-shadow">
                <div className="p-4"><div className="text-sm text-gray-600">Total Aperturas</div><div className="text-2xl font-bold">{courses.length}</div></div>
@@ -437,17 +502,14 @@ const AdminCourseManagement = () => {
           </div>
         </div>
 
-        {/* --- SISTEMA DE PESTAÑAS (NUEVO) --- */}
         <Tabs defaultValue="courses" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
                 <TabsTrigger value="courses">Ediciones (Cursos)</TabsTrigger>
                 <TabsTrigger value="programs">Catálogo (Programas)</TabsTrigger>
             </TabsList>
 
-            {/* PESTAÑA 1: TU VISTA ORIGINAL COMPLETA */}
             <TabsContent value="courses" className="space-y-6">
                 
-                {/* Botonera Acciones y Filtros */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                     <div className="flex-1">
                         <Input placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="max-w-sm"/>
@@ -463,7 +525,7 @@ const AdminCourseManagement = () => {
                         <Button 
                           className="bg-blue-600 hover:bg-blue-700 text-white" 
                           onClick={() => { 
-                            fetchPrograms(); // <--- AGREGAR ESTA LÍNEA (Recarga la lista al hacer clic)
+                            fetchPrograms();
                             resetForm(); 
                             setIsCreateModalOpen(true); 
                           }}>
@@ -478,7 +540,6 @@ const AdminCourseManagement = () => {
                     </div>
                 </div>
 
-                {/* Tabla Principal */}
                 <Card className="shadow-card border-0">
                   <CardContent>
                     <div className="overflow-x-auto relative">
@@ -502,7 +563,6 @@ const AdminCourseManagement = () => {
                               <TableCell>{quickEditMode ? <Input value={quickEditChanges[course.id]?.code ?? course.code} onChange={e => handleQuickEditChange(course.id, 'code', e.target.value)} /> : course.code}</TableCell>
                               <TableCell className="font-medium">
                                   {quickEditMode ? <Input value={quickEditChanges[course.id]?.name ?? course.name} onChange={e => handleQuickEditChange(course.id, 'name', e.target.value)} /> : course.name}
-                                  {/* Mostrar Padre */}
                                   {course.program_id && programs.find(p=>p.id===course.program_id) && !quickEditMode && (
                                       <div className="text-xs text-blue-600 flex items-center gap-1 mt-1">
                                           <Package className="w-3 h-3"/> {programs.find(p=>p.id===course.program_id)?.name}
@@ -537,49 +597,28 @@ const AdminCourseManagement = () => {
                 </Card>
             </TabsContent>
 
-            {/* PESTAÑA 2: PROGRAMAS (NUEVO) */}
             <TabsContent value="programs">
                 <AdminProgramManagement />
             </TabsContent>
         </Tabs>
 
-        {/* --- MODALES (TODOS CONSERVADOS Y MEJORADOS) --- */}
+        {/* --- MODALES --- */}
 
-        {/* 1. CREAR CURSO (NUEVO DISEÑO INTELIGENTE) */}
+        {/* 1. CREAR CURSO (MEJORADO CON AUTOMATIZACIÓN) */}
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Abrir Nueva Edición (Curso)</DialogTitle></DialogHeader>
             <div className="space-y-4 py-2">
-                {/* Paso 1: Padre */}
-                {/* 1. SELECCIÓN DE PROGRAMA PADRE + AÑO */}
+                
+                {/* SECCIÓN 1: DEFINICIÓN BASE */}
                 <div className="bg-gray-50 p-4 rounded border mb-4">
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="col-span-2 space-y-2">
+                    <div className="grid grid-cols-12 gap-4">
+                        {/* PROGRAMA */}
+                        <div className="col-span-8 space-y-2">
                             <Label>Programa Base (Molde)</Label>
                             <Select 
                                 value={formData.program_id} 
-                                onValueChange={(val) => {
-                                    const prog = programs.find(p => p.id === val);
-                                    const now = new Date();
-                                    const currentYear = now.getFullYear();
-                                    
-                                    // Diccionario de meses (Para el código)
-                                    const monthNames = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
-                                    const currentMonthCode = monthNames[now.getMonth()]; // Ej: ENE
-                                    
-                                    setFormData(prev => ({ 
-                                        ...prev, 
-                                        program_id: val,
-                                        // Nombre sugerido: Taller... - Módulo 1
-                                        name: prog ? `${prog.name} - Módulo 1` : prev.name,
-                                        
-                                        // CÓDIGO PERFECTO: P001-M1-ENE-2026
-                                        code: prog ? `${prog.code}-M1-${currentMonthCode}-${currentYear}` : prev.code,
-                                        
-                                        // Rellenamos también el año académico
-                                        academic_year: currentYear.toString()
-                                    }));
-                                }}
+                                onValueChange={(val) => setFormData(prev => ({ ...prev, program_id: val }))}
                             >
                                 <SelectTrigger><SelectValue placeholder="Seleccionar Programa..." /></SelectTrigger>
                                 <SelectContent>
@@ -588,31 +627,52 @@ const AdminCourseManagement = () => {
                             </Select>
                         </div>
                         
-                        {/* Campo Año Académico (Separado) */}
+                        {/* MÓDULO (NUEVO CAMPO) */}
+                        <div className="col-span-4 space-y-2">
+                            <Label>N° Módulo</Label>
+                            <Input 
+                                type="number" 
+                                min="1" 
+                                value={moduleNumber} 
+                                onChange={(e) => setModuleNumber(parseInt(e.target.value) || 1)} 
+                            />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-4">
                         <div className="space-y-2">
                             <Label>Año Académico</Label>
-                            <Input 
-                                value={formData.academic_year} 
-                                onChange={handleInputChange('academic_year')} 
-                                placeholder="2026"
-                            />
+                            <Input value={formData.academic_year} readOnly className="bg-gray-100" />
                         </div>
                     </div>
                 </div>
 
+                {/* SECCIÓN 2: IDENTIFICACIÓN (CON AUTO-CÓDIGO) */}
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Nombre Edición</Label><Input value={formData.name} onChange={handleInputChange('name')} /></div>
-                    <div className="space-y-2"><Label>Código</Label><Input value={formData.code} onChange={handleInputChange('code')} /></div>
+                    <div className="space-y-2">
+                        <Label>Nombre Edición</Label>
+                        <Input value={formData.name} onChange={handleInputChange('name')} />
+                    </div>
+                    <div className="space-y-2 relative">
+                        <Label className="flex justify-between">
+                            Código 
+                            <span className="text-xs text-blue-600 flex items-center gap-1"><Lock className="w-3 h-3"/> </span>
+                        </Label>
+                        <Input 
+                            value={formData.code} 
+                            readOnly 
+                            className="bg-gray-100 text-gray-600 cursor-not-allowed font-mono"
+                        />
+                    </div>
                 </div>
 
-                {/* Fechas Inteligentes */}
+                {/* SECCIÓN 3: TIEMPO */}
                 <div className="bg-blue-50 p-4 rounded border border-blue-100 space-y-3">
                     <h3 className="text-sm font-semibold text-blue-900 flex items-center gap-2"><Calendar className="h-4 w-4"/> Tiempo</h3>
                     <div className="grid grid-cols-2 gap-4">
                         <div><Label className="text-blue-900">Inicio</Label><Input type="date" value={formData.start_date} onChange={handleStartDateChange} className="bg-white"/></div>
-                        <div><Label className="text-blue-900">Fin</Label><Input type="date" value={formData.end_date} onChange={handleInputChange('end_date')} className="bg-white"/></div>
+                        <div><Label className="text-blue-900">Fin</Label><Input type="date" value={formData.end_date} onChange={handleEndDateChange} className="bg-white"/></div>
                     </div>
-                    {durationMsg && <p className="text-xs text-blue-700 font-medium">{durationMsg}</p>}
+                    {durationMsg && <p className="text-xs text-blue-700 font-medium animate-pulse">{durationMsg}</p>}
                     <div className="grid grid-cols-2 gap-4">
                         <div><Label className="text-blue-900">Hora Inicio</Label><Input type="time" value={formData.start_time} onChange={handleInputChange('start_time')} className="bg-white"/></div>
                         <div><Label className="text-blue-900">Hora Fin</Label><Input type="time" value={formData.end_time} onChange={handleInputChange('end_time')} className="bg-white"/></div>
@@ -642,7 +702,7 @@ const AdminCourseManagement = () => {
           </DialogContent>
         </Dialog>
 
-        {/* 2. EDITAR CURSO (TU MODAL ORIGINAL MANTENIDO + CAMPOS NUEVOS) */}
+        {/* 2. EDITAR CURSO */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader><DialogTitle>Editar Curso</DialogTitle></DialogHeader>
@@ -663,13 +723,13 @@ const AdminCourseManagement = () => {
           </DialogContent>
         </Dialog>
 
-        {/* 3. ELIMINAR (TU MODAL ORIGINAL) */}
+        {/* 3. ELIMINAR */}
         <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
              <DialogContent><DialogHeader><DialogTitle>Eliminar Curso</DialogTitle></DialogHeader><p>¿Estás seguro?</p>
              <DialogFooter><Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>Cancelar</Button><Button variant="destructive" onClick={handleDeleteCourse}>Eliminar</Button></DialogFooter></DialogContent>
         </Dialog>
 
-        {/* 4. ASIGNACIÓN MASIVA (TU MODAL ORIGINAL) */}
+        {/* 4. ASIGNACIÓN MASIVA */}
         <Dialog open={showBulkTeacherModal} onOpenChange={setShowBulkTeacherModal}>
            <DialogContent><DialogHeader><DialogTitle>Asignar Profesor Masivo</DialogTitle></DialogHeader>
            <Select value={bulkTeacherId} onValueChange={setBulkTeacherId}><SelectTrigger><SelectValue placeholder="Profesor"/></SelectTrigger><SelectContent>{teachers.map(t=><SelectItem key={t.id} value={t.id}>{t.first_name}</SelectItem>)}</SelectContent></Select>
