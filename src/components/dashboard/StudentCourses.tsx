@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 
 interface Course {
   id: string;
@@ -46,29 +44,21 @@ export function StudentCourses() {
     try {
       setLoading(true);
 
-      console.log('Fetching courses for student:', profile!.id);
-
       // Get total count first
       const { count: totalCount, error: countError } = await supabase
         .from('course_enrollments')
         .select('*', { count: 'exact', head: true })
         .eq('student_id', profile!.id);
 
-      console.log('Total enrollments count:', totalCount);
-      if (countError) {
-        console.error('Count error:', countError);
-      }
-
       setTotalCourses(totalCount || 0);
 
       if (!totalCount || totalCount === 0) {
-        console.log('No enrollments found for this student');
         setCourses([]);
         setLoading(false);
         return;
       }
 
-      // Get paginated enrolled courses - simplified query
+      // Get paginated enrolled courses
       const { data: enrollments, error: enrollError } = await supabase
         .from('course_enrollments')
         .select('course_id')
@@ -76,13 +66,9 @@ export function StudentCourses() {
         .range((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE - 1)
         .order('enrolled_at', { ascending: false });
 
-      console.log('Enrollments data:', enrollments);
-      console.log('Enrollments error:', enrollError);
-
       if (enrollError) throw enrollError;
 
       if (!enrollments || enrollments.length === 0) {
-        console.log('No enrollments in this page');
         setCourses([]);
         setLoading(false);
         return;
@@ -90,7 +76,6 @@ export function StudentCourses() {
 
       // Get course IDs
       const courseIds = enrollments.map(e => e.course_id);
-      console.log('Course IDs:', courseIds);
 
       // Fetch course details separately
       const { data: coursesData, error: coursesError } = await supabase
@@ -104,11 +89,7 @@ export function StudentCourses() {
         `)
         .in('id', courseIds);
 
-      console.log('Courses data:', coursesData);
-      if (coursesError) {
-        console.error('Courses error:', coursesError);
-        throw coursesError;
-      }
+      if (coursesError) throw coursesError;
 
       // Fetch teachers separately
       const teacherIds = coursesData?.map(c => c.teacher_id).filter(Boolean) || [];
@@ -117,10 +98,7 @@ export function StudentCourses() {
         .select('id, first_name, last_name')
         .in('id', teacherIds);
 
-      console.log('Teachers data:', teachers);
-
       const teachersMap = new Map(teachers?.map(t => [t.id, t]) || []);
-
 
       // Single query for submitted assignments
       const { data: submissions } = await supabase
@@ -175,7 +153,6 @@ export function StudentCourses() {
         };
       }) || [];
 
-      console.log('Final courses with data:', coursesWithData);
       setCourses(coursesWithData as Course[]);
     } catch (error) {
       console.error('Error fetching courses:', error);
@@ -186,27 +163,54 @@ export function StudentCourses() {
 
   const totalPages = Math.ceil(totalCourses / ITEMS_PER_PAGE);
 
+  // --- AQUÍ ESTÁ LA CORRECCIÓN CLAVE ---
+  // Esta función ahora es segura y no crashea si el horario está vacío o mal formado
   const formatSchedule = (course: Course) => {
-    if (!course.schedule || course.schedule.length === 0) {
+    // 1. Validaciones básicas de seguridad
+    if (!course.schedule || !Array.isArray(course.schedule) || course.schedule.length === 0) {
       return "Horario no definido";
     }
 
-    const daysMap: { [key: string]: string } = {
-      'Lunes': 'L',
-      'Martes': 'M',
-      'Miércoles': 'X',
-      'Jueves': 'J',
-      'Viernes': 'V',
-      'Sábado': 'S',
-      'Domingo': 'D'
-    };
+    try {
+      const daysMap: { [key: string]: string } = {
+        'Lunes': 'Lun', 'Monday': 'Lun',
+        'Martes': 'Mar', 'Tuesday': 'Mar',
+        'Miércoles': 'Mié', 'Wednesday': 'Mié',
+        'Jueves': 'Jue', 'Thursday': 'Jue',
+        'Viernes': 'Vie', 'Friday': 'Vie',
+        'Sábado': 'Sáb', 'Saturday': 'Sáb',
+        'Domingo': 'Dom', 'Sunday': 'Dom'
+      };
 
-    const scheduleSummary = course.schedule
-      .map(s => `${daysMap[s.day] || s.day.charAt(0)} ${s.start_time.slice(0, 5)}-${s.end_time.slice(0, 5)}`)
-      .join(', ');
+      const scheduleSummary = course.schedule
+        .map((s: any) => {
+           // Si el elemento es nulo, lo saltamos
+           if (!s) return null;
 
-    return scheduleSummary;
+           // Obtenemos el día de forma segura
+           const dayRaw = s.day || '';
+           
+           // Si es string válido, intentamos mapearlo o cortar las primeras 3 letras
+           // Si no es string (ej. undefined), ponemos '?'
+           const dayLabel = daysMap[dayRaw] || (typeof dayRaw === 'string' ? dayRaw.substring(0, 3) : '?');
+           
+           // Obtenemos las horas de forma segura
+           const start = s.start_time ? s.start_time.slice(0, 5) : '--:--';
+           const end = s.end_time ? s.end_time.slice(0, 5) : '--:--';
+
+           return `${dayLabel} ${start}-${end}`;
+        })
+        .filter(Boolean) // Eliminamos los nulos que hayan podido salir
+        .join(', ');
+
+      return scheduleSummary || "Horario sin detalle";
+
+    } catch (error) {
+      console.error("Error al formatear horario:", error);
+      return "Error en horario";
+    }
   };
+  // -------------------------------------
 
   if (loading) {
     return (
@@ -291,15 +295,15 @@ export function StudentCourses() {
                 </Link>
               </div>
 
-              {(course.pending_assignments > 0 || course.upcoming_exams > 0) && (
+              {(course.pending_assignments! > 0 || course.upcoming_exams! > 0) && (
                 <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/30">
-                  {course.pending_assignments > 0 && (
+                  {course.pending_assignments! > 0 && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <FileText className="w-3 h-3 text-accent" />
                       <span className="font-medium text-accent">{course.pending_assignments}</span> tareas pendientes
                     </div>
                   )}
-                  {course.upcoming_exams > 0 && (
+                  {course.upcoming_exams! > 0 && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <ClipboardList className="w-3 h-3 text-accent" />
                       <span className="font-medium text-accent">{course.upcoming_exams}</span> exámenes próximos

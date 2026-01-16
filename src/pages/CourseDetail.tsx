@@ -33,7 +33,7 @@ interface Course {
     id: string;
     first_name: string;
     last_name: string;
-    email: string;
+    // Quitamos email de aquí porque al estudiante no le llega
   };
   classroom?: {
     name: string;
@@ -46,7 +46,6 @@ interface Teacher {
   id: string;
   first_name: string;
   last_name: string;
-  email: string;
 }
 
 interface Student {
@@ -84,6 +83,7 @@ export default function CourseDetail() {
 
   const fetchCourse = async () => {
     try {
+      // CORRECCIÓN CLAVE: Quitamos 'email' de la petición del profesor
       const { data, error } = await supabase
         .from('courses')
         .select(`
@@ -91,8 +91,7 @@ export default function CourseDetail() {
           teacher:profiles!courses_teacher_id_fkey(
             id,
             first_name,
-            last_name,
-            email
+            last_name
           )
         `)
         .eq('id', id)
@@ -148,14 +147,14 @@ export default function CourseDetail() {
 
   const fetchAdditionalTeachers = async () => {
     try {
+      // CORRECCIÓN CLAVE: Quitamos 'email' aquí también
       const { data, error } = await supabase
         .from('course_teachers')
         .select(`
           teacher:profiles!course_teachers_teacher_id_fkey(
             id,
             first_name,
-            last_name,
-            email
+            last_name
           )
         `)
         .eq('course_id', id);
@@ -285,7 +284,7 @@ export default function CourseDetail() {
                             ({
                               'Monday': 'Lun', 'Tuesday': 'Mar', 'Wednesday': 'Mié', 
                               'Thursday': 'Jue', 'Friday': 'Vie', 'Saturday': 'Sáb', 'Sunday': 'Dom'
-                            }[d] || d.slice(0,3))
+                            }[d] || (typeof d === 'string' ? d.slice(0,3) : ''))
                           ).join(', ')
                         : 'Días por definir'}
                     </span>
@@ -308,13 +307,11 @@ export default function CourseDetail() {
                 </div>
               </div>
 
-              {/* ----------------------------------- */}
-
             </div>
           </CardContent>
         </Card>
 
-        {/* Tabs for Content, Attendance, Students, Exams and Schedule */}
+        {/* Tabs */}
         <Tabs defaultValue="content" className="space-y-4">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="content">Contenido</TabsTrigger>
@@ -347,7 +344,6 @@ export default function CourseDetail() {
           </TabsContent>
 
           <TabsContent value="attendance">
-            {/* Mostrar el registro completo y el manager a admin o cualquier docente del curso */}
             {profile?.role === 'admin' || 
              (profile?.role === 'teacher' && course.teacher && profile.id === course.teacher.id) ||
              (profile?.role === 'teacher' && additionalTeachers.some(t => t.id === profile.id)) ? (
@@ -356,7 +352,6 @@ export default function CourseDetail() {
                 <AttendanceRecords courseId={course.id} />
               </div>
             ) : profile?.role === 'student' ? (
-              // Los estudiantes ven su propio historial de este curso
               <StudentCourseAttendance courseId={course.id} />
             ) : (
               <div className="p-6">
