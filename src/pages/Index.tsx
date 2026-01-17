@@ -1,4 +1,3 @@
-// ...existing code...
 import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { StatsCard } from "@/components/dashboard/StatsCard";
@@ -8,6 +7,8 @@ import { StudentCourses } from "@/components/dashboard/StudentCourses";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Notifications } from "@/components/Notifications";
 import { AcademicCalendar } from "@/components/calendar/AcademicCalendar";
+// --- AQUÍ ESTÁ EL COMPONENTE NUEVO CON EL NOMBRE CORRECTO ---
+import AdeudosBanner from "@/components/dashboard/AdeudosBanner"; 
 import { BookOpen, FileText, GraduationCap, TrendingUp, User, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,9 +22,12 @@ interface DashboardStats {
   attendanceRate: number;
 }
 
-
 const Index = () => {
   const { profile } = useAuth();
+  
+  // Estado para guardar el código del estudiante (Ej: BIQ...)
+  const [studentCode, setStudentCode] = useState<string | null>(null);
+
   const [stats, setStats] = useState<DashboardStats>(() => {
     // Try to load cached stats
     const cached = sessionStorage.getItem('dashboardStats');
@@ -51,8 +55,29 @@ const Index = () => {
   useEffect(() => {
     if (profile?.id) {
       fetchDashboardStats();
+      fetchStudentCode(); // <--- Llamamos a la función para buscar el código
     }
   }, [profile]);
+
+  // --- FUNCIÓN NUEVA: BUSCAR CÓDIGO DE ESTUDIANTE ---
+  const fetchStudentCode = async () => {
+    try {
+      if (!profile?.id) return;
+      
+      // Buscamos en la tabla profiles el código escolar
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('student_code')
+        .eq('id', profile.id)
+        .single();
+
+      if (data && data.student_code) {
+        setStudentCode(data.student_code);
+      }
+    } catch (error) {
+      console.error("Error obteniendo código estudiante:", error);
+    }
+  };
 
   const fetchDashboardStats = async () => {
     try {
@@ -149,7 +174,7 @@ const Index = () => {
     }
   };
 
-  // Helpers para mensaje de bienvenida y subtítulo (dentro del componente para acceso a profile)
+  // Helpers para mensaje de bienvenida y subtítulo
   const getWelcomeMessage = () => {
     const name = profile ? profile.first_name : 'Usuario';
     return `¡Bienvenido, ${name}!`;
@@ -209,6 +234,12 @@ const Index = () => {
             </p>
           </div>
         </div>
+
+        {/* --- AQUÍ ESTÁ LA LÓGICA DE ADEUDOS --- */}
+        {/* Solo se muestra si tenemos el código y el usuario es estudiante */}
+        {studentCode && (!profile?.role || profile.role === 'student') && (
+           <AdeudosBanner studentCode={studentCode} />
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

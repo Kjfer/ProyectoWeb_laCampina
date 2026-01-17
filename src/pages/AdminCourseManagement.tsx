@@ -615,7 +615,7 @@ const AdminCourseManagement = () => {
                     <div className="grid grid-cols-12 gap-4">
                         {/* PROGRAMA */}
                         <div className="col-span-8 space-y-2">
-                            <Label>Programa Base (Molde)</Label>
+                            <Label>Catálogo </Label>
                             <Select 
                                 value={formData.program_id} 
                                 onValueChange={(val) => setFormData(prev => ({ ...prev, program_id: val }))}
