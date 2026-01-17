@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Users, BookOpen, FileText, Activity, GraduationCap, UserCheck } from 'lucide-react';
+import { Users, BookOpen, FileText, Activity, GraduationCap, UserCheck, ClipboardList } from 'lucide-react';
 import AdminCourseManagement from './AdminCourseManagement';
 import SimpleCourseManagement from './SimpleCourseManagement';
 import AdminStudentManagement from './AdminStudentManagement';
@@ -26,6 +27,7 @@ interface AdminStats {
 const AdminDashboard = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalStudents: 0,
@@ -288,7 +290,7 @@ const AdminDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Button variant="outline" className="h-20 flex-col">
                   <Users className="h-6 w-6 mb-2" />
                   Reporte de Usuarios
@@ -304,6 +306,14 @@ const AdminDashboard = () => {
                 <Button variant="outline" className="h-20 flex-col">
                   <Activity className="h-6 w-6 mb-2" />
                   Reporte de Actividad
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="h-20 flex-col"
+                  onClick={() => navigate('/admin/attendance-report')}
+                >
+                  <ClipboardList className="h-6 w-6 mb-2" />
+                  Reporte de Asistencia
                 </Button>
               </div>
             </CardContent>
