@@ -2,13 +2,15 @@
 
 ## Descripción
 
-Esta funcionalidad permite a los usuarios con rol **administrador** generar reportes de asistencia de estudiantes por curso y fecha específica, con la capacidad de exportar los datos en formato Excel.
+Esta funcionalidad permite a los usuarios con rol **administrador** generar reportes de asistencia de estudiantes por curso y clase específica (fecha), con la capacidad de exportar los datos en formato Excel.
 
 ## Características Implementadas
 
 ### 1. Generación de Reportes
 - **Filtro por Curso**: Seleccionar cualquier curso disponible en el sistema
-- **Filtro por Fecha**: Seleccionar una fecha específica para consultar la asistencia
+- **Filtro por Clase**: Seleccionar una clase específica (fecha) del curso
+  - Solo muestra clases que ya se realizaron (fechas pasadas o de hoy)
+  - Solo muestra clases que tienen registros de asistencia
 - **Visualización Completa**: Muestra todos los estudiantes matriculados en el curso seleccionado
 
 ### 2. Estadísticas en Tiempo Real
@@ -48,20 +50,28 @@ El archivo se nombra automáticamente como: `Asistencia_[CODIGO_CURSO]_[FECHA].x
    - Obtiene información del curso y estudiantes matriculados
    - Consulta registros de asistencia para la fecha especificada
    - Calcula estadísticas y genera el reporte
+   - **CORS configurado correctamente** para evitar errores de preflight
 
-2. **`src/pages/AdminAttendanceReport.tsx`**
+2. **`supabase/functions/get-course-class-dates/index.ts`**
+   - Edge function para obtener las fechas de clases disponibles
+   - Filtra solo fechas pasadas o de hoy
+   - Filtra solo fechas con registros de asistencia
+   - Retorna lista ordenada descendente (más recientes primero)
+
+3. **`src/pages/AdminAttendanceReport.tsx`**
    - Componente React principal de la funcionalidad
-   - Interfaz de usuario con selectores de curso y fecha
+   - Interfaz de usuario con selectores de curso y fecha de clase
+   - Carga dinámica de fechas disponibles al seleccionar curso
    - Visualización de estadísticas y tablas
    - Función de exportación a Excel
 
 ### Archivos Modificados
 
-3. **`src/App.tsx`**
+4. **`src/App.tsx`**
    - Agregada importación de `AdminAttendanceReport`
    - Nueva ruta: `/admin/attendance-report` (protegida para administradores)
 
-4. **`src/pages/AdminDashboard.tsx`**
+5. **`src/pages/AdminDashboard.tsx`**
    - Importado `useNavigate` de react-router-dom
    - Agregado ícono `ClipboardList` de lucide-react
    - Nuevo botón "Reporte de Asistencia" en la pestaña de Reportes
@@ -76,11 +86,16 @@ El archivo se nombra automáticamente como: `Asistencia_[CODIGO_CURSO]_[FECHA].x
    - Hacer clic en "Reporte de Asistencia"
 3. **Generar Reporte**:
    - Seleccionar un curso del dropdown
-   - Seleccionar una fecha usando el calendario
+   - El sistema carga automáticamente las fechas de clases disponibles
+   - Seleccionar una fecha de clase específica
    - Hacer clic en "Generar Reporte"
 4. **Exportar**:
    - Una vez generado el reporte, hacer clic en "Exportar a Excel"
    - El archivo se descargará automáticamente
+
+**Nota**: Solo se mostrarán clases que:
+- Ya se hayan realizado (fechas pasadas o de hoy)
+- Tengan registros de asistencia asociados
 
 ## Tecnologías Utilizadas
 
@@ -133,7 +148,20 @@ El archivo se nombra automáticamente como: `Asistencia_[CODIGO_CURSO]_[FECHA].x
 
 ## Notas Adicionales
 
-- Los estudiantes sin registro de asistencia para la fecha seleccionada aparecen con estado "Sin registrar"
+- LCorrecciones Implementadas
+
+### Fix de CORS
+- Corregido el manejo del preflight request (OPTIONS)
+- Ahora retorna status 200 con headers correctos
+- Evita el error "Response to preflight request doesn't pass access control check"
+
+### Filtrado Inteligente de Clases
+- Solo muestra clases que ya se realizaron (pasadas o de hoy)
+- Solo muestra clases con registros de asistencia
+- Carga dinámica de fechas al seleccionar curso
+- Mensaje informativo cuando no hay clases disponibles
+
+## os estudiantes sin registro de asistencia para la fecha seleccionada aparecen con estado "Sin registrar"
 - El reporte incluye solo estudiantes matriculados en el curso
 - La exportación a Excel utiliza formato de fechas español (dd/MM/yyyy)
 - Las estadísticas se calculan en tiempo real basándose en los datos de asistencia

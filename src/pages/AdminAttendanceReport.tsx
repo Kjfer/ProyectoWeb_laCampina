@@ -21,12 +21,10 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Download, FileSpreadsheet, Search, Calendar as CalendarIcon } from 'lucide-react';
+import { Download, FileSpreadsheet, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Course {
   id: string;
@@ -64,10 +62,12 @@ const AdminAttendanceReport = () => {
   const { toast } = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [report, setReport] = useState<AttendanceReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingCourses, setLoadingCourses] = useState(true);
+  const [loadingDates, setLoadingDates] = useState(false);
 
   useEffect(() => {
     fetchCourses();
@@ -94,19 +94,13 @@ const AdminAttendanceReport = () => {
     }
   };
 
-  const generateReport = async () => {
-    if (!selectedCourse || !selectedDate) {
-      toast({
-        title: 'Campos requeridos',
-        description: 'Por favor selecciona un curso y una fecha',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLoading(true);
+  const fetchClassDates = async (courseId: string) => {
+    setLoadingDates(true);
+    setAvailableDates([]);
+    setSelectedDate('');
+    setReport(null);
+    
     try {
-      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -115,7 +109,73 @@ const AdminAttendanceReport = () => {
 
       const SUPABASE_URL = "https://bnbtmubibnupttnnhijr.supabase.co";
       const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/get-attendance-report?course_id=${selectedCourse}&date=${formattedDate}`,
+        `${SUPABASE_URL}/functions/v1/get-course-class-dates?course_id=${courseId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error cargando fechas');
+      }
+
+      const data = await response.json();
+      setAvailableDates(data.dates || []);
+
+      if (data.dates && data.dates.length === 0) {
+        toast({
+          title: 'Sin clases disponibles',
+          description: 'Este curso no tiene clases con asistencia registrada',
+          variant: 'default',
+        });
+      }
+    } catch (error) {
+      console.error('Error cargando fechas:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudieron cargar las fechas de clase',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingDates(false);
+    }
+  };
+
+  const handleCourseChange = (courseId: string) => {
+    setSelectedCourse(courseId);
+    if (courseId) {
+      fetchClassDates(courseId);
+    } else {
+      setAvailableDates([]);
+      setSelectedDate('');
+      setReport(null);
+    }
+  };
+
+  const generateReport = async () => {
+    if (!selectedCourse || !selectedDate) {
+      toast({
+        title: 'Campos requeridos',
+        description: 'Por favor selecciona un curso y una fecha de clase',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const SUPABASE_URL = "https://bnbtmubibnupttnnhijr.supabase.co";
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/get-attendance-report?course_id=${selectedCourse}&date=${selectedDate}`,
         {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
@@ -262,7 +322,7 @@ const AdminAttendanceReport = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Reporte de Asistencia</h1>
           <p className="mt-2 text-gray-600">
-            Genera reportes de asistencia por curso y fecha, con exportación a Excel
+            Genera reportes de asistencia por curso y clase específica, con exportación a Excel
           </p>
         </div>
 
@@ -271,7 +331,7 @@ const AdminAttendanceReport = () => {
           <CardHeader>
             <CardTitle>Seleccionar Parámetros</CardTitle>
             <CardDescription>
-              Selecciona un curso y una fecha para generar el reporte
+              Selecciona un curso y una fecha de clase para generar el reporte
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -281,7 +341,7 @@ const AdminAttendanceReport = () => {
                 <label className="text-sm font-medium">Curso</label>
                 <Select 
                   value={selectedCourse} 
-                  onValueChange={setSelectedCourse}
+                  onValueChange={handleCourseChange}
                   disabled={loadingCourses}
                 >
                   <SelectTrigger>
@@ -297,33 +357,36 @@ const AdminAttendanceReport = () => {
                 </Select>
               </div>
 
-              {/* Selector de Fecha */}
+              {/* Selector de Fecha de Clase */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Fecha</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? (
-                        format(selectedDate, 'dd/MM/yyyy', { locale: es })
-                      ) : (
-                        <span>Seleccionar fecha</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      locale={es}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <label className="text-sm font-medium">Fecha de Clase</label>
+                <Select 
+                  value={selectedDate} 
+                  onValueChange={setSelectedDate}
+                  disabled={!selectedCourse || loadingDates || availableDates.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      loadingDates 
+                        ? "Cargando fechas..." 
+                        : availableDates.length === 0 && selectedCourse
+                        ? "Sin clases disponibles"
+                        : "Seleccionar fecha de clase..."
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDates.map((date) => (
+                      <SelectItem key={date} value={date}>
+                        {format(new Date(date + 'T00:00:00'), 'dd/MM/yyyy - EEEE', { locale: es })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedCourse && availableDates.length === 0 && !loadingDates && (
+                  <p className="text-xs text-gray-500">
+                    Solo se muestran clases pasadas con asistencia registrada
+                  </p>
+                )}
               </div>
 
               {/* Botón Generar */}
@@ -499,7 +562,7 @@ const AdminAttendanceReport = () => {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Download className="h-12 w-12 text-gray-400 mb-4" />
               <p className="text-gray-600 text-center">
-                Selecciona un curso y una fecha para generar el reporte de asistencia
+                Selecciona un curso y una fecha de clase para generar el reporte de asistencia
               </p>
             </CardContent>
           </Card>
