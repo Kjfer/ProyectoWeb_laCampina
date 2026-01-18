@@ -22,7 +22,11 @@ import {
   Filter,
   Mail,
   Phone,
-  Calendar
+  Calendar,
+  Lock,
+  Unlock,
+  DollarSign,
+  AlertCircle
 } from 'lucide-react';
 
 interface Student {
@@ -49,6 +53,9 @@ interface Enrollment {
   course_id: string;
   enrolled_at: string;
   course: Course;
+  payment_status?: 'pending' | 'verified' | 'blocked';
+  payment_verified_at?: string | null;
+  payment_notes?: string | null;
 }
 
 interface StudentFormData {
@@ -161,6 +168,79 @@ const AdminStudentManagement = () => {
             id,
             name,
             code
+          )
+        `)
+        .eq('student_id', studentId)
+        .order('enrolled_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching enrollments:', error);
+      } else {
+        setStudentEnrollments(data || []);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const handleToggleCourseAccess = async (enrollmentId: string, currentStatus: string, courseName: string) => {
+    const newStatus = currentStatus === 'verified' ? 'blocked' : 'verified';
+    const notes = prompt(
+      `Está a punto de ${newStatus === 'verified' ? 'habilitar' : 'bloquear'} el acceso al curso "${courseName}".\n\nIngrese una nota (opcional):`,
+      ''
+    );
+
+    if (notes === null) return; // User cancelled
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const SUPABASE_URL = "https://bnbtmubibnupttnnhijr.supabase.co";
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/toggle-course-access`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            enrollment_id: enrollmentId,
+            payment_status: newStatus,
+            notes: notes || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error actualizando acceso al curso');
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "Éxito",
+        description: result.message,
+      });
+
+      // Refresh enrollments
+      if (selectedStudent) {
+        fetchStudentEnrollments(selectedStudent.id);
+      }
+    } catch (error) {
+      console.error('Error toggling course access:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'No se pudo actualizar el acceso',
+        variant: "destructive",
+      });
+    }
+  };
           )
         `)
         .eq('student_id', studentId)
@@ -781,32 +861,92 @@ const AdminStudentManagement = () => {
                       <TableHead>Curso</TableHead>
                       <TableHead>Código</TableHead>
                       <TableHead>Fecha Inscripción</TableHead>
-                      <TableHead>Estado</TableHead>
+                      <TableHead>Estado de Pago</TableHead>
+                      <TableHead>Acceso</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {studentEnrollments.map((enrollment) => (
-                      <TableRow key={enrollment.id}>
-                        <TableCell className="font-medium">{enrollment.course.name}</TableCell>
-                        <TableCell>{enrollment.course.code}</TableCell>
-                        <TableCell>{new Date(enrollment.enrolled_at).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Badge variant="default">
-                            Activo
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleUnenrollStudent(enrollment.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {studentEnrollments.map((enrollment) => {
+                      const paymentStatus = enrollment.payment_status || 'pending';
+                      const isAccessGranted = paymentStatus === 'verified';
+                      
+                      return (
+                        <TableRow key={enrollment.id} className={paymentStatus === 'blocked' ? 'bg-red-50 dark:bg-red-950/20' : ''}>
+                          <TableCell className="font-medium">{enrollment.course.name}</TableCell>
+                          <TableCell>{enrollment.course.code}</TableCell>
+                          <TableCell>{new Date(enrollment.enrolled_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <Badge 
+                                variant={
+                                  paymentStatus === 'verified' ? 'default' : 
+                                  paymentStatus === 'blocked' ? 'destructive' : 
+                                  'secondary'
+                                }
+                                className="w-fit"
+                              >
+                                {paymentStatus === 'verified' && <DollarSign className="w-3 h-3 mr-1" />}
+                                {paymentStatus === 'blocked' && <AlertCircle className="w-3 h-3 mr-1" />}
+                                {paymentStatus === 'verified' ? 'Pago Verificado' : 
+                                 paymentStatus === 'blocked' ? 'Bloqueado' : 
+                                 'Pago Pendiente'}
+                              </Badge>
+                              {enrollment.payment_notes && (
+                                <span className="text-xs text-muted-foreground">
+                                  {enrollment.payment_notes}
+                                </span>
+                              )}
+                              {enrollment.payment_verified_at && (
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(enrollment.payment_verified_at).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={isAccessGranted ? 'default' : 'secondary'}
+                              className="w-fit"
+                            >
+                              {isAccessGranted ? (
+                                <><Unlock className="w-3 h-3 mr-1" /> Habilitado</>
+                              ) : (
+                                <><Lock className="w-3 h-3 mr-1" /> Bloqueado</>
+                              )}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant={isAccessGranted ? 'outline' : 'default'}
+                                size="sm"
+                                onClick={() => handleToggleCourseAccess(
+                                  enrollment.id, 
+                                  paymentStatus,
+                                  enrollment.course.name
+                                )}
+                                title={isAccessGranted ? 'Bloquear acceso' : 'Habilitar acceso'}
+                              >
+                                {isAccessGranted ? (
+                                  <><Lock className="w-4 h-4 mr-1" /> Bloquear</>
+                                ) : (
+                                  <><Unlock className="w-4 h-4 mr-1" /> Habilitar</>
+                                )}
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleUnenrollStudent(enrollment.id)}
+                                title="Dar de baja del curso"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               ) : (

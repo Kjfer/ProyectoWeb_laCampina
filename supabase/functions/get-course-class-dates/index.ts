@@ -7,10 +7,11 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Manejar preflight request
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { 
+    return new Response(null, { 
       headers: corsHeaders,
-      status: 200
+      status: 204
     });
   }
 
@@ -25,31 +26,58 @@ serve(async (req) => {
       }
     );
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) {
-      throw new Error('No autorizado');
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      console.error('❌ Error de autenticación:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'No autorizado' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
     }
 
-    const { data: profile } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('id, role')
       .eq('user_id', user.id)
       .single();
 
-    if (!profile) {
-      throw new Error('Perfil no encontrado');
+    if (profileError || !profile) {
+      console.error('❌ Error obteniendo perfil:', profileError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Perfil no encontrado' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        }
+      );
     }
 
     // Solo administradores pueden acceder
     if (profile.role !== 'admin') {
-      throw new Error('No tiene permisos');
+      console.error('❌ Usuario no es admin:', profile.role);
+      return new Response(
+        JSON.stringify({ error: 'No tiene permisos para acceder a este recurso' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        }
+      );
     }
 
     const url = new URL(req.url);
     const course_id = url.searchParams.get('course_id');
 
     if (!course_id) {
-      throw new Error('course_id es requerido');
+      return new Response(
+        JSON.stringify({ error: 'course_id es requerido' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
 
     console.log('📅 Obteniendo fechas de clases - Curso:', course_id);
@@ -63,7 +91,16 @@ serve(async (req) => {
       .lte('date', new Date().toISOString().split('T')[0]) // Solo fechas pasadas o de hoy
       .order('date', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error consultando asistencias:', error.message);
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
 
     // Obtener fechas únicas
     const uniqueDates = [...new Set(attendanceDates?.map(a => a.date) || [])];
@@ -80,11 +117,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Error obteniendo fechas:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 500,
       }
     );
   }

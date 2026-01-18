@@ -17,6 +17,7 @@ import { CourseScheduleManager } from '@/components/course/CourseScheduleManager
 import { ExamsList } from '@/components/course/ExamsList';
 import { CourseEditDialog } from '@/components/course/CourseEditDialog';
 import { CourseAssignmentsReview } from '@/components/course/CourseAssignmentsReview';
+import { CourseAccessGuard } from '@/components/course/CourseAccessGuard';
 
 interface Course {
   id: string;
@@ -112,6 +113,7 @@ export default function CourseDetail() {
         .from('course_enrollments')
         .select(`
           enrolled_at,
+          payment_status,
           student:profiles!course_enrollments_student_id_fkey(
             id,
             first_name,
@@ -191,18 +193,19 @@ export default function CourseDetail() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
-          </Button>
-        </div>
+      <CourseAccessGuard courseId={id!}>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver
+            </Button>
+          </div>
 
         {/* Course Info */}
         <Card>
@@ -435,7 +438,8 @@ export default function CourseDetail() {
             fetchAdditionalTeachers();
           }}
         />
-      </div>
+        </div>
+      </CourseAccessGuard>
     </DashboardLayout>
   );
 }
