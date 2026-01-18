@@ -55,9 +55,9 @@ serve(async (req) => {
       );
     }
 
-    // Solo administradores pueden acceder
-    if (profile.role !== 'admin') {
-      console.error('❌ Usuario no es admin:', profile.role);
+    // Solo administradores y profesores pueden acceder
+    if (profile.role !== 'admin' && profile.role !== 'teacher') {
+      console.error('❌ Usuario no tiene permisos:', profile.role);
       return new Response(
         JSON.stringify({ error: 'No tiene permisos para acceder a este recurso' }),
         {

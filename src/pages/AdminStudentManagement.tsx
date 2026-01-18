@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -82,6 +83,9 @@ const AdminStudentManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedCourseForEnrollment, setSelectedCourseForEnrollment] = useState('');
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
+  const [paymentNotes, setPaymentNotes] = useState('');
   const [formData, setFormData] = useState<StudentFormData>({
     first_name: '',
     last_name: '',
@@ -183,14 +187,14 @@ const AdminStudentManagement = () => {
     }
   };
 
-  const handleToggleCourseAccess = async (enrollmentId: string, currentStatus: string, courseName: string) => {
-    const newStatus = currentStatus === 'verified' ? 'blocked' : 'verified';
-    const notes = prompt(
-      `Está a punto de ${newStatus === 'verified' ? 'habilitar' : 'bloquear'} el acceso al curso "${courseName}".\n\nIngrese una nota (opcional):`,
-      ''
-    );
+  const openPaymentDialog = (enrollment: Enrollment) => {
+    setSelectedEnrollment(enrollment);
+    setPaymentNotes(enrollment.payment_notes || '');
+    setIsPaymentDialogOpen(true);
+  };
 
-    if (notes === null) return; // User cancelled
+  const handleToggleCourseAccess = async (newStatus: 'pending' | 'verified' | 'blocked') => {
+    if (!selectedEnrollment) return;
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -209,9 +213,9 @@ const AdminStudentManagement = () => {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            enrollment_id: enrollmentId,
+            enrollment_id: selectedEnrollment.id,
             payment_status: newStatus,
-            notes: notes || null,
+            notes: paymentNotes || null,
           }),
         }
       );
@@ -227,6 +231,10 @@ const AdminStudentManagement = () => {
         title: "Éxito",
         description: result.message,
       });
+
+      setIsPaymentDialogOpen(false);
+      setSelectedEnrollment(null);
+      setPaymentNotes('');
 
       // Refresh enrollments
       if (selectedStudent) {
@@ -905,20 +913,13 @@ const AdminStudentManagement = () => {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Button
-                                variant={isAccessGranted ? 'outline' : 'default'}
+                                variant="outline"
                                 size="sm"
-                                onClick={() => handleToggleCourseAccess(
-                                  enrollment.id, 
-                                  paymentStatus,
-                                  enrollment.course.name
-                                )}
-                                title={isAccessGranted ? 'Bloquear acceso' : 'Habilitar acceso'}
+                                onClick={() => openPaymentDialog(enrollment)}
+                                title="Gestionar pago y acceso"
                               >
-                                {isAccessGranted ? (
-                                  <><Lock className="w-4 h-4 mr-1" /> Bloquear</>
-                                ) : (
-                                  <><Unlock className="w-4 h-4 mr-1" /> Habilitar</>
-                                )}
+                                <DollarSign className="w-4 h-4 mr-1" />
+                                Gestionar Pago
                               </Button>
                               <Button
                                 variant="destructive"
@@ -943,6 +944,107 @@ const AdminStudentManagement = () => {
               )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Management Dialog */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gestionar Pago y Acceso al Curso</DialogTitle>
+          </DialogHeader>
+          {selectedEnrollment && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Curso:</span>
+                  <span className="text-sm text-muted-foreground">{selectedEnrollment.course.name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Estado Actual:</span>
+                  <Badge 
+                    variant={
+                      selectedEnrollment.payment_status === 'verified' ? 'default' : 
+                      selectedEnrollment.payment_status === 'blocked' ? 'destructive' : 
+                      'secondary'
+                    }
+                  >
+                    {selectedEnrollment.payment_status === 'verified' ? 'Pago Verificado' : 
+                     selectedEnrollment.payment_status === 'blocked' ? 'Bloqueado' : 
+                     'Pago Pendiente'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment-notes">Notas sobre el Pago</Label>
+                <Textarea
+                  id="payment-notes"
+                  value={paymentNotes}
+                  onChange={(e) => setPaymentNotes(e.target.value)}
+                  placeholder="Ej: Pago recibido el 15/01/2026 vía transferencia..."
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Estas notas serán visibles para otros administradores
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Actualizar Estado:</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  <Button
+                    variant={selectedEnrollment.payment_status === 'verified' ? 'default' : 'outline'}
+                    className="w-full justify-start"
+                    onClick={() => handleToggleCourseAccess('verified')}
+                  >
+                    <Unlock className="w-4 h-4 mr-2" />
+                    <div className="flex-1 text-left">
+                      <div className="font-medium">Verificar Pago</div>
+                      <div className="text-xs opacity-80">Habilitar acceso completo al curso</div>
+                    </div>
+                  </Button>
+                  
+                  <Button
+                    variant={selectedEnrollment.payment_status === 'pending' ? 'default' : 'outline'}
+                    className="w-full justify-start"
+                    onClick={() => handleToggleCourseAccess('pending')}
+                  >
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    <div className="flex-1 text-left">
+                      <div className="font-medium">Marcar como Pendiente</div>
+                      <div className="text-xs opacity-80">Pago en proceso de verificación</div>
+                    </div>
+                  </Button>
+                  
+                  <Button
+                    variant={selectedEnrollment.payment_status === 'blocked' ? 'destructive' : 'outline'}
+                    className="w-full justify-start"
+                    onClick={() => handleToggleCourseAccess('blocked')}
+                  >
+                    <Lock className="w-4 h-4 mr-2" />
+                    <div className="flex-1 text-left">
+                      <div className="font-medium">Bloquear por Impago</div>
+                      <div className="text-xs opacity-80">Restringir acceso al curso</div>
+                    </div>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsPaymentDialogOpen(false);
+                    setSelectedEnrollment(null);
+                    setPaymentNotes('');
+                  }}
+                >
+                  Cerrar
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
