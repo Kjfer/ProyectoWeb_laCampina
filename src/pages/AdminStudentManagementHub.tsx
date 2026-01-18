@@ -27,8 +27,13 @@ import {
   UserPlus,
   Loader2,
   CheckCircle2,
-  X
+  X,
+  DollarSign,
+  Lock,
+  Unlock,
+  AlertCircle
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
 interface Student {
   id: string;
@@ -57,6 +62,21 @@ interface Course {
   section?: string;
   academic_year?: string;
   is_active: boolean;
+}
+
+interface Enrollment {
+  id: string;
+  student_id: string;
+  course_id: string;
+  enrolled_at: string;
+  payment_status?: 'pending' | 'verified' | 'blocked';
+  payment_verified_at?: string | null;
+  payment_notes?: string | null;
+  course: {
+    id: string;
+    name: string;
+    code: string;
+  };
 }
 
 interface StudentFormData {
@@ -97,6 +117,14 @@ const AdminStudentManagementHub = () => {
   const [enrollSearchTerm, setEnrollSearchTerm] = useState('');
   const [showOnlyNotEnrolled, setShowOnlyNotEnrolled] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  
+  // States para gestión de matrículas y pagos
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [studentEnrollments, setStudentEnrollments] = useState<Enrollment[]>([]);
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
+  const [paymentNotes, setPaymentNotes] = useState('');
   
   const [formData, setFormData] = useState<StudentFormData>({
     first_name: '',
@@ -464,6 +492,130 @@ const AdminStudentManagementHub = () => {
     }
   };
 
+  // Funciones para gestión de matrículas y pagos
+  const openEnrollModal = (student: Student) => {
+    setSelectedStudent(student);
+    setIsEnrollModalOpen(true);
+    fetchStudentEnrollments(student.id);
+  };
+
+  const fetchStudentEnrollments = async (studentId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('course_enrollments')
+        .select(`
+          *,
+          course:courses (
+            id,
+            name,
+            code
+          )
+        `)
+        .eq('student_id', studentId)
+        .order('enrolled_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching enrollments:', error);
+      } else {
+        setStudentEnrollments(data || []);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  const openPaymentDialog = (enrollment: Enrollment) => {
+    setSelectedEnrollment(enrollment);
+    setPaymentNotes(enrollment.payment_notes || '');
+    setIsPaymentDialogOpen(true);
+  };
+
+  const handleToggleCourseAccess = async (newStatus: 'pending' | 'verified' | 'blocked') => {
+    if (!selectedEnrollment) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const SUPABASE_URL = "https://bnbtmubibnupttnnhijr.supabase.co";
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/toggle-course-access`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            enrollment_id: selectedEnrollment.id,
+            payment_status: newStatus,
+            notes: paymentNotes || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error actualizando acceso al curso');
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "Éxito",
+        description: result.message,
+      });
+
+      setIsPaymentDialogOpen(false);
+      setSelectedEnrollment(null);
+      setPaymentNotes('');
+
+      // Refresh enrollments
+      if (selectedStudent) {
+        fetchStudentEnrollments(selectedStudent.id);
+      }
+    } catch (error) {
+      console.error('Error toggling course access:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'No se pudo actualizar el acceso',
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUnenrollStudent = async (enrollmentId: string) => {
+    if (!confirm('¿Estás seguro de dar de baja al estudiante de este curso?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('course_enrollments')
+        .delete()
+        .eq('id', enrollmentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Éxito",
+        description: "Estudiante dado de baja del curso",
+      });
+
+      if (selectedStudent) {
+        fetchStudentEnrollments(selectedStudent.id);
+      }
+    } catch (error) {
+      console.error('Error unenrolling student:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo dar de baja al estudiante",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -771,12 +923,13 @@ const AdminStudentManagementHub = () => {
                         <TableHead>Género</TableHead>
                         <TableHead>País</TableHead>
                         <TableHead>Estado</TableHead>
+                        <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredStudents.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                             No se encontraron estudiantes
                           </TableCell>
                         </TableRow>
@@ -794,6 +947,17 @@ const AdminStudentManagementHub = () => {
                               <Badge variant={student.is_active ? 'default' : 'secondary'}>
                                 {student.is_active ? 'Activo' : 'Inactivo'}
                               </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openEnrollModal(student)}
+                                title="Ver matrículas y gestionar pagos"
+                              >
+                                <BookOpen className="w-4 h-4 mr-1" />
+                                Matrículas
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))
@@ -987,6 +1151,217 @@ const AdminStudentManagementHub = () => {
             <BulkStudentImport courses={courses} onSuccess={fetchStudents} />
           </TabsContent>
         </Tabs>
+
+        {/* Enrollment Management Modal */}
+        <Dialog open={isEnrollModalOpen} onOpenChange={setIsEnrollModalOpen}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                Matrículas - {selectedStudent?.first_name} {selectedStudent?.paternal_surname}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Cursos Matriculados ({studentEnrollments.length})</h3>
+                {studentEnrollments.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Curso</TableHead>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Fecha Inscripción</TableHead>
+                        <TableHead>Estado de Pago</TableHead>
+                        <TableHead>Acceso</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {studentEnrollments.map((enrollment) => {
+                        const paymentStatus = enrollment.payment_status || 'pending';
+                        const isAccessGranted = paymentStatus === 'verified';
+                        
+                        return (
+                          <TableRow key={enrollment.id} className={paymentStatus === 'blocked' ? 'bg-red-50 dark:bg-red-950/20' : ''}>
+                            <TableCell className="font-medium">{enrollment.course.name}</TableCell>
+                            <TableCell>{enrollment.course.code}</TableCell>
+                            <TableCell>{new Date(enrollment.enrolled_at).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <Badge 
+                                  variant={
+                                    paymentStatus === 'verified' ? 'default' : 
+                                    paymentStatus === 'blocked' ? 'destructive' : 
+                                    'secondary'
+                                  }
+                                  className="w-fit"
+                                >
+                                  {paymentStatus === 'verified' && <DollarSign className="w-3 h-3 mr-1" />}
+                                  {paymentStatus === 'blocked' && <AlertCircle className="w-3 h-3 mr-1" />}
+                                  {paymentStatus === 'verified' ? 'Pago Verificado' : 
+                                   paymentStatus === 'blocked' ? 'Bloqueado' : 
+                                   'Pago Pendiente'}
+                                </Badge>
+                                {enrollment.payment_notes && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {enrollment.payment_notes}
+                                  </span>
+                                )}
+                                {enrollment.payment_verified_at && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(enrollment.payment_verified_at).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={isAccessGranted ? 'default' : 'secondary'}
+                                className="w-fit"
+                              >
+                                {isAccessGranted ? (
+                                  <><Unlock className="w-3 h-3 mr-1" /> Habilitado</>
+                                ) : (
+                                  <><Lock className="w-3 h-3 mr-1" /> Bloqueado</>
+                                )}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openPaymentDialog(enrollment)}
+                                  title="Gestionar pago y acceso"
+                                >
+                                  <DollarSign className="w-4 h-4 mr-1" />
+                                  Gestionar Pago
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleUnenrollStudent(enrollment.id)}
+                                  title="Dar de baja del curso"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8">
+                    <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No hay inscripciones actualmente</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Payment Management Dialog */}
+        <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Gestionar Pago y Acceso al Curso</DialogTitle>
+            </DialogHeader>
+            {selectedEnrollment && (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Curso:</span>
+                    <span className="text-sm text-muted-foreground">{selectedEnrollment.course.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Estado Actual:</span>
+                    <Badge 
+                      variant={
+                        selectedEnrollment.payment_status === 'verified' ? 'default' : 
+                        selectedEnrollment.payment_status === 'blocked' ? 'destructive' : 
+                        'secondary'
+                      }
+                    >
+                      {selectedEnrollment.payment_status === 'verified' ? 'Pago Verificado' : 
+                       selectedEnrollment.payment_status === 'blocked' ? 'Bloqueado' : 
+                       'Pago Pendiente'}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payment-notes">Notas sobre el Pago</Label>
+                  <Textarea
+                    id="payment-notes"
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    placeholder="Ej: Pago recibido el 15/01/2026 vía transferencia..."
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Estas notas serán visibles para otros administradores
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Actualizar Estado:</Label>
+                  <div className="grid grid-cols-1 gap-2">
+                    <Button
+                      variant={selectedEnrollment.payment_status === 'verified' ? 'default' : 'outline'}
+                      className="w-full justify-start"
+                      onClick={() => handleToggleCourseAccess('verified')}
+                    >
+                      <Unlock className="w-4 h-4 mr-2" />
+                      <div className="flex-1 text-left">
+                        <div className="font-medium">Verificar Pago</div>
+                        <div className="text-xs opacity-80">Habilitar acceso completo al curso</div>
+                      </div>
+                    </Button>
+                    
+                    <Button
+                      variant={selectedEnrollment.payment_status === 'pending' ? 'default' : 'outline'}
+                      className="w-full justify-start"
+                      onClick={() => handleToggleCourseAccess('pending')}
+                    >
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      <div className="flex-1 text-left">
+                        <div className="font-medium">Marcar como Pendiente</div>
+                        <div className="text-xs opacity-80">Pago en proceso de verificación</div>
+                      </div>
+                    </Button>
+                    
+                    <Button
+                      variant={selectedEnrollment.payment_status === 'blocked' ? 'destructive' : 'outline'}
+                      className="w-full justify-start"
+                      onClick={() => handleToggleCourseAccess('blocked')}
+                    >
+                      <Lock className="w-4 h-4 mr-2" />
+                      <div className="flex-1 text-left">
+                        <div className="font-medium">Bloquear por Impago</div>
+                        <div className="text-xs opacity-80">Restringir acceso al curso</div>
+                      </div>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setIsPaymentDialogOpen(false);
+                      setSelectedEnrollment(null);
+                      setPaymentNotes('');
+                    }}
+                  >
+                    Cerrar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
