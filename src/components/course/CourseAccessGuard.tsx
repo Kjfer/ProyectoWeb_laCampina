@@ -57,7 +57,7 @@ export const CourseAccessGuard = ({ courseId, children }: CourseAccessGuardProps
           setHasAccess(false);
           setPaymentStatus(null);
         } else {
-          const status = data.payment_status || 'pending';
+          const status = (data.payment_status as string) || 'pending';
           setPaymentStatus(status);
           // Solo tiene acceso si el pago está verificado
           setHasAccess(status === 'verified');

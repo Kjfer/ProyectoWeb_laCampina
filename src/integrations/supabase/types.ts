@@ -319,18 +319,30 @@ export type Database = {
           enrolled_at: string | null
           id: string
           student_id: string | null
+          payment_status: string | null
+          payment_verified_by: string | null
+          payment_verified_at: string | null
+          payment_notes: string | null
         }
         Insert: {
           course_id?: string | null
           enrolled_at?: string | null
           id?: string
           student_id?: string | null
+          payment_status?: string | null
+          payment_verified_by?: string | null
+          payment_verified_at?: string | null
+          payment_notes?: string | null
         }
         Update: {
           course_id?: string | null
           enrolled_at?: string | null
           id?: string
           student_id?: string | null
+          payment_status?: string | null
+          payment_verified_by?: string | null
+          payment_verified_at?: string | null
+          payment_notes?: string | null
         }
         Relationships: [
           {
