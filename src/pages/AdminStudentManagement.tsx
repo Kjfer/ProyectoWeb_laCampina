@@ -241,20 +241,6 @@ const AdminStudentManagement = () => {
       });
     }
   };
-          )
-        `)
-        .eq('student_id', studentId)
-        .order('enrollment_date', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching enrollments:', error);
-      } else {
-        setStudentEnrollments(data || []);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
 
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
