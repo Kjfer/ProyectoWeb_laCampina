@@ -193,7 +193,7 @@ export const adminNavigationItems: NavItem[] = [
   },
   {
     title: 'Reportes',
-    url: '/admin/attendance-report',
+    url: '/admin/reports',
     icon: BarChart3,
     roles: ['admin']
   },

@@ -29,6 +29,7 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
       console.error('❌ Error de autenticación:', authError?.message);
+      console.error('❌ Authorization header:', req.headers.get('Authorization'));
       return new Response(
         JSON.stringify({ error: 'No autorizado' }),
         {
@@ -37,6 +38,8 @@ serve(async (req) => {
         }
       );
     }
+    
+    console.log('✓ Usuario autenticado:', user.id, user.email);
 
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
@@ -46,6 +49,7 @@ serve(async (req) => {
 
     if (profileError || !profile) {
       console.error('❌ Error obteniendo perfil:', profileError?.message);
+      console.error('❌ Error details:', profileError);
       return new Response(
         JSON.stringify({ error: 'Perfil no encontrado' }),
         {
@@ -54,6 +58,8 @@ serve(async (req) => {
         }
       );
     }
+    
+    console.log('✓ Perfil encontrado - ID:', profile.id, 'Role:', profile.role);
 
     // Solo administradores pueden gestionar acceso a cursos
     if (profile.role !== 'admin') {
@@ -90,7 +96,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('🔐 Actualizando acceso a curso - Enrollment:', enrollment_id, 'Estado:', payment_status);
+    console.log('🔐 Actualizando acceso a curso - Enrollment:', enrollment_id, 'Estado:', payment_status, 'User role:', profile.role);
 
     // Actualizar el estado de pago de la matrícula
     const { data: updatedEnrollment, error: updateError } = await supabaseClient
@@ -122,8 +128,11 @@ serve(async (req) => {
 
     if (updateError) {
       console.error('❌ Error actualizando matrícula:', updateError.message);
+      console.error('❌ Error code:', updateError.code);
+      console.error('❌ Error details:', updateError.details);
+      console.error('❌ Error hint:', updateError.hint);
       return new Response(
-        JSON.stringify({ error: updateError.message }),
+        JSON.stringify({ error: updateError.message, code: updateError.code, details: updateError.details }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,

@@ -10,6 +10,13 @@ Al intentar acceder al reporte de asistencia como administrador y seleccionar un
 
 Al intentar cambiar el estado de pago de un estudiante, aparecía un error 401 que impedía actualizar el estado.
 
+### 3. Error 401 Persistente Después de Aplicar Correcciones
+
+Si los errores 401 persisten después de aplicar la migración y redesplegar las funciones Edge, probablemente se debe a:
+- Usuario no tiene rol 'admin' correctamente configurado en la tabla profiles
+- Políticas RLS no aplicadas correctamente
+- Problema con la función `has_role()`
+
 ## Causas
 
 ### Problema 1: Políticas RLS faltantes en tabla `attendance`
@@ -79,6 +86,17 @@ const { data: updatedEnrollment, error: updateError } = await supabaseClient
   ...
 ```
 
+### Solución 3: Agregar logs detallados para diagnóstico
+
+Se mejoraron ambas funciones Edge con logs detallados que muestran:
+- Usuario autenticado (ID y email)
+- Perfil encontrado (ID y rol)
+- Detalles completos de errores RLS (código, detalles, hints)
+
+### Solución 4: Vista general de Reportes
+
+Se creó la página `AdminReports.tsx` que muestra todos los reportes disponibles en el sistema, no solo el de asistencia.
+
 ## Aplicar las Correcciones
 
 ### 1. Aplicar migración de base de datos
@@ -96,41 +114,102 @@ supabase db push
 2. Ve a la sección "SQL Editor"
 3. Copia y ejecuta el contenido de `supabase/migrations/20260120000000_add_admin_attendance_policy.sql`
 
-### 2. Redesplegar función Edge
+### 2. Redesplegar funciones Edge con logs mejorados
 
-Después de corregir el código, redesplegar la función:
+**Script automatizado:**
+```powershell
+.\redeploy-with-logs.ps1
+```
 
+**O manual:**
 ```bash
-cd c:\periIntranet\ProyectoWeb_laCampina
+npx supabase functions deploy get-course-class-dates
 npx supabase functions deploy toggle-course-access
 ```
 
-Si tienes problemas de autenticación, primero inicia sesión:
+### 3. Ejecutar diagnóstico SQL
 
-```bash
-npx supabase login
-```
+Si los errores persisten, ejecuta el script de diagnóstico:
+
+1. Abre `supabase/diagnostico-rls-401.sql`
+2. Ve a Supabase Dashboard → SQL Editor
+3. Reemplaza `gary.fernandez.r@uni.pe` con el email del usuario
+4. Ejecuta el script completo
+5. Revisa los resultados
 
 ## Verificación
 
 ### Verificar Reporte de Asistencia
 
 1. Inicia sesión como administrador
-2. Ve a la sección de **Reporte de Asistencia**
-3. Selecciona un curso
-4. Verifica que las fechas se carguen correctamente sin error 401
+2. Ve a **Reportes** en el sidebar
+3. Selecciona **Reporte de Asistencia**
+4. Selecciona un curso
+5. Verifica que las fechas se carguen correctamente sin error 401
 
 ### Verificar Gestión de Pagos
 
 1. Inicia sesión como administrador
-2. Ve al módulo de **Gestión de Estudiantes** o **Control de Acceso por Pagos**
+2. Ve al módulo de **Gestión de Estudiantes**
 3. Intenta cambiar el estado de pago de un estudiante
 4. Verifica que el cambio se realice correctamente sin error 401
 
-## Archivos Modificados
+### Revisar Logs en Supabase
 
-- **Nueva migración**: `supabase/migrations/20260120000000_add_admin_attendance_policy.sql`
-- **Función Edge corregida**: `supabase/functions/toggle-course-access/index.ts`
+1. Ve a Supabase Dashboard → Edge Functions → Logs
+2. Busca las funciones `get-course-class-dates` y `toggle-course-access`
+3. Revisa los logs detallados que ahora incluyen:
+   - ✓ Usuario autenticado: [user_id] [email]
+   - ✓ Perfil encontrado - ID: [profile_id] Role: [role]
+   - 📊 Consultando asistencias - course_id: [id] user_role: [role]
+   - ❌ Error details: [mensaje completo con código y detalles]
+
+## Archivos Creados/Modificados
+
+### Nuevos Archivos
+- **Migración**: `supabase/migrations/20260120000000_add_admin_attendance_policy.sql`
+- **Página de reportes**: `src/pages/AdminReports.tsx`
+- **Script diagnóstico**: `supabase/diagnostico-rls-401.sql`
+- **Script redeploy**: `redeploy-with-logs.ps1`
+
+### Archivos Modificados
+- **Función Edge**: `supabase/functions/toggle-course-access/index.ts`
+- **Función Edge**: `supabase/functions/get-course-class-dates/index.ts`
+- **Rutas**: `src/App.tsx`
+- **Navegación**: `src/utils/roleNavigation.ts`
+
+## Diagnóstico de Errores Persistentes
+
+Si después de aplicar todas las correcciones sigues viendo errores 401, verifica:
+
+### 1. Verificar Rol del Usuario
+```sql
+SELECT id, email, role 
+FROM profiles 
+WHERE email = 'gary.fernandez.r@uni.pe';
+```
+**Debe retornar**: `role = 'admin'`
+
+### 2. Verificar Políticas RLS Activas
+```sql
+SELECT policyname 
+FROM pg_policies 
+WHERE tablename = 'attendance' 
+  AND policyname ILIKE '%admin%';
+```
+**Debe retornar**: Las dos políticas creadas
+
+### 3. Probar Función has_role
+```sql
+SELECT public.has_role('admin'::user_role) as is_admin;
+```
+**Debe retornar**: `true`
+
+### 4. Ver Logs de Edge Functions
+```bash
+npx supabase functions logs get-course-class-dates --tail
+npx supabase functions logs toggle-course-access --tail
+```
 
 ## Notas Técnicas
 
@@ -153,29 +232,20 @@ CREATE POLICY "Admins can manage all enrollments" ON public.course_enrollments
 
 Esto permite a los administradores realizar cualquier operación (SELECT, INSERT, UPDATE, DELETE) sobre las matrículas.
 
-## Comandos de Diagnóstico
+## Comandos Útiles
 
-Si sigues teniendo problemas, puedes verificar:
-
-### 1. Verificar políticas RLS activas
-
-```sql
-SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual
-FROM pg_policies
-WHERE tablename IN ('attendance', 'course_enrollments')
-ORDER BY tablename, policyname;
+### Ver logs en tiempo real
+```bash
+npx supabase functions logs get-course-class-dates
+npx supabase functions logs toggle-course-access
 ```
 
-### 2. Verificar rol del usuario
-
-```sql
-SELECT p.id, p.user_id, p.role, p.email
-FROM profiles p
-WHERE p.email = 'gary.fernandez.r@uni.pe';
-```
-
-### 3. Verificar funciones Edge desplegadas
-
+### Listar funciones desplegadas
 ```bash
 npx supabase functions list
+```
+
+### Verificar estado de migraciones
+```bash
+npx supabase db diff
 ```

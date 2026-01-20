@@ -29,6 +29,7 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
       console.error('❌ Error de autenticación:', authError?.message);
+      console.error('❌ Authorization header:', req.headers.get('Authorization'));
       return new Response(
         JSON.stringify({ error: 'No autorizado' }),
         {
@@ -37,6 +38,8 @@ serve(async (req) => {
         }
       );
     }
+    
+    console.log('✓ Usuario autenticado:', user.id, user.email);
 
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
@@ -46,6 +49,7 @@ serve(async (req) => {
 
     if (profileError || !profile) {
       console.error('❌ Error obteniendo perfil:', profileError?.message);
+      console.error('❌ Error details:', profileError);
       return new Response(
         JSON.stringify({ error: 'Perfil no encontrado' }),
         {
@@ -54,6 +58,8 @@ serve(async (req) => {
         }
       );
     }
+    
+    console.log('✓ Perfil encontrado - ID:', profile.id, 'Role:', profile.role);
 
     // Solo administradores y profesores pueden acceder
     if (profile.role !== 'admin' && profile.role !== 'teacher') {
@@ -84,6 +90,7 @@ serve(async (req) => {
 
     // Obtener todas las fechas únicas donde hay registros de asistencia
     // que ya pasaron (son del pasado)
+    console.log('📊 Consultando asistencias - course_id:', course_id, 'user_role:', profile.role);
     const { data: attendanceDates, error } = await supabaseClient
       .from('attendance')
       .select('date')
@@ -93,8 +100,11 @@ serve(async (req) => {
 
     if (error) {
       console.error('❌ Error consultando asistencias:', error.message);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error details:', error.details);
+      console.error('❌ Error hint:', error.hint);
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: error.message, code: error.code, details: error.details }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,
