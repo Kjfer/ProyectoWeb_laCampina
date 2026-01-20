@@ -121,7 +121,7 @@ serve(async (req) => {
         ),
         course:course_id (
           id,
-          title
+          name
         )
       `)
       .single();

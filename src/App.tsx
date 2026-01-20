@@ -41,6 +41,7 @@ import CreateExam from "./pages/CreateExam";
 import GradingView from "./pages/GradingView";
 import AdminAttendanceReport from "./pages/AdminAttendanceReport";
 import AdminReports from "./pages/AdminReports";
+import AdminCertificates from "./pages/AdminCertificates";
 
 const queryClient = new QueryClient();
 
@@ -188,6 +189,11 @@ const App = () => (
             <Route path="/admin/reports" element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminReports />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/certificates" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminCertificates />
               </ProtectedRoute>
             } />
             <Route path="/admin/*" element={

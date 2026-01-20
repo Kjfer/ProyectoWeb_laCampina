@@ -13,7 +13,8 @@ import {
   Brain,
   HelpCircle,
   Settings,
-  Eye
+  Eye,
+  Award
 } from 'lucide-react';
 
 export type UserRole = 'admin' | 'teacher' | 'student' | 'parent' | 'tutor' | 'directivo';
@@ -195,6 +196,12 @@ export const adminNavigationItems: NavItem[] = [
     title: 'Reportes',
     url: '/admin/reports',
     icon: BarChart3,
+    roles: ['admin']
+  },
+  {
+    title: 'Certificados',
+    url: '/admin/certificates',
+    icon: Award,
     roles: ['admin']
   },
   {
