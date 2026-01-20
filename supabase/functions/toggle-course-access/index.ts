@@ -94,7 +94,7 @@ serve(async (req) => {
 
     // Actualizar el estado de pago de la matrícula
     const { data: updatedEnrollment, error: updateError } = await supabaseClient
-      .from('enrollments')
+      .from('course_enrollments')
       .update({
         payment_status,
         payment_verified_by: profile.id,
