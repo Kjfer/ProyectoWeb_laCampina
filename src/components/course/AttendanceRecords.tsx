@@ -38,28 +38,42 @@ export function AttendanceRecords({ courseId }: AttendanceRecordsProps) {
   const fetchAttendance = async () => {
     try {
       setLoading(true);
-      
+
+      // 1. Obtener la sesión actual explícitamente
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      // 2. Verificación de seguridad: Si no hay sesión, detenemos todo.
+      if (sessionError || !session) {
+        console.error('Error de sesión:', sessionError);
+        toast.error('Tu sesión ha expirado. Por favor, recarga la página o inicia sesión.');
+        return; // Salimos de la función para no hacer el fetch incorrecto
+      }
+
+      console.log("Token obtenido correctamente, haciendo fetch...");
+
       const response = await fetch(
         `https://bnbtmubibnupttnnhijr.supabase.co/functions/v1/get-course-attendance?course_id=${courseId}`,
         {
           headers: {
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            // Asegúrate que haya un espacio después de Bearer
+            Authorization: `Bearer ${session.access_token}`, 
           },
         }
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al cargar la asistencia');
+        // Si el error persiste aquí, es un problema de permisos en la Edge Function
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${response.status}: No autorizado`);
       }
 
       const data = await response.json();
 
       setRecords(data.records || []);
       setStats(data.stats || null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching attendance:', error);
-      toast.error('Error al cargar la asistencia');
+      toast.error(error.message || 'Error al cargar la asistencia');
     } finally {
       setLoading(false);
     }

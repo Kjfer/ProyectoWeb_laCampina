@@ -290,6 +290,7 @@ const AdminCourseManagement = () => {
   }, []);
 
   const handleCreateCourse = async () => {
+    // 1. Validaciones
     if (!formData.name || !formData.code || !formData.teacher_id || !formData.start_date || !formData.end_date) {
       toast({ title: "Campos requeridos", description: "Completa todos los campos obligatorios.", variant: "destructive" });
       return;
@@ -302,14 +303,15 @@ const AdminCourseManagement = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      // 2. INSERTAR EL CURSO y pedir que nos devuelva el ID (.select().single())
+      const { data: newCourse, error: courseError } = await supabase
         .from('courses')
         .insert([
           {
             name: formData.name,
             description: formData.description,
             code: formData.code,
-            teacher_id: formData.teacher_id,
+            teacher_id: formData.teacher_id, // Guarda en la tabla simple
             program_id: formData.program_id || null,
             academic_year: formData.academic_year,
             semester: '2026-I',
@@ -317,58 +319,104 @@ const AdminCourseManagement = () => {
             end_date: formData.end_date,
             start_time: formData.start_time || null,
             end_time: formData.end_time || null,
-            number_of_modules: moduleNumber, // Guardamos el número de módulo
+            number_of_modules: moduleNumber,
             schedule: selectedDays, 
             is_active: true,
             additional_teachers: formData.additional_teachers
           },
-        ]);
+        ])
+        .select() // IMPORTANTE: Pedimos los datos de vuelta
+        .single(); // Para tener el objeto y no un array
 
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "Curso creado", description: "Apertura creada correctamente." });
-        setIsCreateModalOpen(false);
-        resetForm();
-        fetchCourses();
+      if (courseError) throw courseError;
+
+      // 3. INSERTAR LA VINCULACIÓN EN course_teachers (La parte que faltaba)
+      if (newCourse) {
+         // Preparamos la lista de profes a insertar
+         const teacherRelations = [];
+         
+         // A) El profesor titular
+         teacherRelations.push({
+            course_id: newCourse.id,
+            teacher_id: formData.teacher_id,
+            is_primary: true
+         });
+
+         // B) Profesores adicionales (si los hay)
+         if (formData.additional_teachers && formData.additional_teachers.length > 0) {
+             formData.additional_teachers.forEach((tId: string) => {
+                 if (tId !== formData.teacher_id) { // Evitar duplicados
+                     teacherRelations.push({
+                        course_id: newCourse.id,
+                        teacher_id: tId,
+                        is_primary: false
+                     });
+                 }
+             });
+         }
+
+         // Insertamos todos de golpe
+         const { error: relationError } = await supabase
+            .from('course_teachers')
+            .insert(teacherRelations);
+         
+         if (relationError) {
+             console.error("Error vinculando profesores:", relationError);
+             toast({ title: "Advertencia", description: "Curso creado pero hubo error vinculando profesores.", variant: "warning" });
+         } else {
+             toast({ title: "Curso creado", description: "Apertura y profesores vinculados correctamente." });
+         }
       }
-    } catch (error) {
+
+      // 4. Limpieza final
+      setIsCreateModalOpen(false);
+      resetForm();
+      fetchCourses();
+
+    } catch (error: any) {
       console.error('Error:', error);
+      toast({ title: "Error", description: error.message || "Error al crear el curso", variant: "destructive" });
     } finally {
       setSaving(false);
     }
   };
 
-  // --- Editar ---
   const openEditModal = (course: Course) => {
-    setEditingCourse(course);
-    let currentDays: string[] = [];
-    try {
-      if (course.schedule) {
-        const parsed = typeof course.schedule === 'string' ? JSON.parse(course.schedule) : course.schedule;
-        if (Array.isArray(parsed)) {
-            if (typeof parsed[0] === 'string') currentDays = parsed;
-            else if (typeof parsed[0] === 'object') currentDays = parsed.map((d: any) => d.day);
-        }
-      }
-    } catch(e) {}
+    setEditingCourse(course);
+    
+    // 1. Recuperar los días del horario
+    let currentDays: string[] = [];
+    try {
+      if (course.schedule) {
+        const parsed = typeof course.schedule === 'string' ? JSON.parse(course.schedule) : course.schedule;
+        if (Array.isArray(parsed)) {
+            if (typeof parsed[0] === 'string') currentDays = parsed;
+            else if (typeof parsed[0] === 'object') currentDays = parsed.map((d: any) => d.day);
+        }
+      }
+    } catch(e) {}
 
-    setFormData({
-      name: course.name,
-      description: course.description || '',
-      code: course.code,
-      teacher_id: course.teacher_id,
-      program_id: course.program_id || '',
-      academic_year: course.academic_year,
-      start_date: course.start_date || '',
-      end_date: course.end_date || '',
-      start_time: course.start_time || '',
-      end_time: course.end_time || '',
-      additional_teachers: course.additional_teachers || [],
-    });
-    setSelectedDays(currentDays);
-    setIsEditModalOpen(true);
-  };
+    // 2. Recuperar el N° de Módulo (Usamos 'as any' porque no está en tu interfaz Course explícitamente)
+    const modNum = (course as any).number_of_modules || 1;
+    setModuleNumber(modNum);
+
+    // 3. Llenar el formulario con TODOS los datos
+    setFormData({
+      name: course.name,
+      description: course.description || '',
+      code: course.code,
+      teacher_id: course.teacher_id,
+      program_id: course.program_id || '',
+      academic_year: course.academic_year,
+      start_date: course.start_date || '',
+      end_date: course.end_date || '',
+      start_time: course.start_time || '',
+      end_time: course.end_time || '',
+      additional_teachers: course.additional_teachers || [],
+    });
+    setSelectedDays(currentDays);
+    setIsEditModalOpen(true);
+  };
 
   const handleEditCourse = async () => {
     if (!editingCourse) return;
@@ -702,27 +750,117 @@ const AdminCourseManagement = () => {
           </DialogContent>
         </Dialog>
 
-        {/* 2. EDITAR CURSO */}
+        {/* 2. EDITAR CURSO (DISEÑO MEJORADO: FOOTER FIJO) */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader><DialogTitle>Editar Curso</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-               <Input value={formData.name} onChange={handleInputChange('name')} placeholder="Nombre" />
-               <div className="grid grid-cols-2 gap-4">
-                   <Input type="date" value={formData.start_date} onChange={handleInputChange('start_date')} />
-                   <Input type="date" value={formData.end_date} onChange={handleInputChange('end_date')} />
-               </div>
-               <div className="grid grid-cols-2 gap-4">
-                   <Input type="time" value={formData.start_time} onChange={handleInputChange('start_time')} />
-                   <Input type="time" value={formData.end_time} onChange={handleInputChange('end_time')} />
-               </div>
-               <DialogFooter>
-                   <Button onClick={handleEditCourse} disabled={saving}>Guardar</Button>
-               </DialogFooter>
+          {/* Cambiamos overflow-y-auto por flex flex-col para controlar el scroll interno */}
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0">
+            
+            {/* CABECERA FIJA */}
+            <div className="p-6 pb-2">
+                <DialogHeader>
+                    <DialogTitle>Editar Curso: {editingCourse?.code}</DialogTitle>
+                </DialogHeader>
             </div>
+            
+            {/* CUERPO CON SCROLL (El formulario va aquí) */}
+            <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-4">
+                
+                {/* SECCIÓN 1: PROGRAMA Y MÓDULO */}
+                <div className="bg-gray-50 p-4 rounded border">
+                    <div className="grid grid-cols-12 gap-4">
+                        <div className="col-span-8 space-y-2">
+                            <Label>Catálogo</Label>
+                            <Select 
+                                value={formData.program_id} 
+                                onValueChange={(val) => setFormData(prev => ({ ...prev, program_id: val }))}
+                            >
+                                <SelectTrigger><SelectValue placeholder="Seleccionar Programa..." /></SelectTrigger>
+                                <SelectContent>
+                                    {programs.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="col-span-4 space-y-2">
+                            <Label>N° Módulo</Label>
+                            <Input 
+                                type="number" 
+                                min="1" 
+                                value={moduleNumber} 
+                                onChange={(e) => setModuleNumber(parseInt(e.target.value) || 1)} 
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* SECCIÓN 2: IDENTIFICACIÓN */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Nombre Edición</Label>
+                        <Input value={formData.name} onChange={handleInputChange('name')} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Código (No editable)</Label>
+                        <Input 
+                            value={formData.code} 
+                            readOnly 
+                            className="bg-gray-100 text-gray-500 font-mono cursor-not-allowed" 
+                        />
+                    </div>
+                </div>
+
+                {/* SECCIÓN 3: TIEMPO */}
+                <div className="bg-blue-50 p-4 rounded border border-blue-100 space-y-3">
+                    <h3 className="text-sm font-semibold text-blue-900 flex items-center gap-2"><Calendar className="h-4 w-4"/> Tiempo</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><Label className="text-blue-900">Inicio</Label><Input type="date" value={formData.start_date} onChange={handleStartDateChange} className="bg-white"/></div>
+                        <div><Label className="text-blue-900">Fin</Label><Input type="date" value={formData.end_date} onChange={handleEndDateChange} className="bg-white"/></div>
+                    </div>
+                    {durationMsg && <p className="text-xs text-blue-700 font-medium">{durationMsg}</p>}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><Label className="text-blue-900">Hora Inicio</Label><Input type="time" value={formData.start_time} onChange={handleInputChange('start_time')} className="bg-white"/></div>
+                        <div><Label className="text-blue-900">Hora Fin</Label><Input type="time" value={formData.end_time} onChange={handleInputChange('end_time')} className="bg-white"/></div>
+                    </div>
+                </div>
+
+                {/* SECCIÓN 4: PROFESOR Y DÍAS */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label>Profesor</Label>
+                        <Select value={formData.teacher_id} onValueChange={handleSelectChange('teacher_id')}>
+                            <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                            <SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.first_name} {t.last_name}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2"><Label>Días</Label>
+                        <div className="flex flex-wrap gap-1">
+                            {daysOfWeekList.map(day => (
+                                <Badge 
+                                    key={day.key} 
+                                    variant={selectedDays.includes(day.key) ? 'default' : 'outline'} 
+                                    className="cursor-pointer select-none hover:bg-blue-100" 
+                                    onClick={() => toggleDaySelection(day.key)}
+                                >
+                                    {day.label.slice(0,3)}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Espacio extra al final para que no se pegue */}
+                <div className="h-4"></div>
+            </div>
+
+            {/* FOOTER FIJO (Siempre visible al fondo) */}
+            <div className="p-6 pt-2 border-t bg-gray-50/50 rounded-b-lg">
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleEditCourse} disabled={saving} className="bg-blue-600 text-white">Guardar Cambios</Button>
+                </DialogFooter>
+            </div>
+
           </DialogContent>
         </Dialog>
-
+        
         {/* 3. ELIMINAR */}
         <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
              <DialogContent><DialogHeader><DialogTitle>Eliminar Curso</DialogTitle></DialogHeader><p>¿Estás seguro?</p>

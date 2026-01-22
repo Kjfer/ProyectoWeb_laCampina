@@ -35,11 +35,14 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
   const [attendance, setAttendance] = useState<Record<string, AttendanceRecord>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Estado para el horario procesado
   const [courseSchedule, setCourseSchedule] = useState<Array<{
     day: string;
     start_time: string;
     end_time: string;
   }> | null>(null);
+  
   const [isWithinSchedule, setIsWithinSchedule] = useState(false);
 
   useEffect(() => {
@@ -55,23 +58,37 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
 
   useEffect(() => {
     checkSchedule();
-    const interval = setInterval(checkSchedule, 60000); // Check every minute
+    const interval = setInterval(checkSchedule, 60000); // Revisar cada minuto
     return () => clearInterval(interval);
   }, [courseSchedule]);
 
+  // --- 1. FUNCIÓN CORREGIDA PARA OBTENER HORARIO ---
   const fetchCourseSchedule = async () => {
     try {
+      // Pedimos schedule (días) Y las horas de inicio/fin
       const { data, error } = await supabase
         .from('courses')
-        .select('schedule')
+        .select('schedule, start_time, end_time')
         .eq('id', courseId)
         .single();
 
       if (error) throw error;
       
-      // Parse schedule from Json type to our expected format
+      // Transformamos los datos al formato que necesitamos
       if (data?.schedule && Array.isArray(data.schedule)) {
-        setCourseSchedule(data.schedule as Array<{ day: string; start_time: string; end_time: string; }>);
+        const processedSchedule = data.schedule.map((dayItem: any) => {
+            // Si el schedule solo tiene el nombre del día (string), le pegamos las horas globales
+            if (typeof dayItem === 'string') {
+                return {
+                    day: dayItem, // Ej: "Wednesday"
+                    start_time: data.start_time, // Ej: "19:00:00"
+                    end_time: data.end_time
+                };
+            }
+            // Si ya fuera un objeto completo (formato antiguo/complejo), lo dejamos igual
+            return dayItem;
+        });
+        setCourseSchedule(processedSchedule);
       } else {
         setCourseSchedule(null);
       }
@@ -80,35 +97,47 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
     }
   };
 
+  // --- 2. FUNCIÓN CORREGIDA PARA VERIFICAR LA HORA ---
   const checkSchedule = () => {
-    if (!courseSchedule || courseSchedule.length === 0) return;
+    // Si no hay horario, asumimos que NO estamos en clase (o puedes cambiar a true si prefieres modo libre)
+    if (!courseSchedule || courseSchedule.length === 0) {
+        // Opción: setIsWithinSchedule(true) si quieres permitir siempre si no hay horario definido.
+        return;
+    }
 
     const now = new Date();
-    const currentDay = now.toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase();
-    const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
+    // Obtenemos día en español minúsculas: "miércoles"
+    const currentDayES = now.toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase();
+    const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
 
+    // Mapa exacto según lo que guarda AdminCourseManagement (Keys en Inglés Capitalizado)
     const dayMap: Record<string, string> = {
-      'lunes': 'monday',
-      'martes': 'tuesday',
-      'miércoles': 'wednesday',
-      'jueves': 'thursday',
-      'viernes': 'friday',
-      'sábado': 'saturday',
-      'domingo': 'sunday'
+      'lunes': 'Monday',
+      'martes': 'Tuesday',
+      'miércoles': 'Wednesday',
+      'jueves': 'Thursday',
+      'viernes': 'Friday',
+      'sábado': 'Saturday',
+      'domingo': 'Sunday'
     };
 
-    const englishDay = dayMap[currentDay];
+    const currentDayEN = dayMap[currentDayES]; // "Wednesday"
     
-    // Find the schedule for the current day
-    const todaySchedule = courseSchedule.find(s => s.day === englishDay);
+    // Buscamos si hoy hay clase
+    const todaySchedule = courseSchedule.find(s => s.day === currentDayEN);
     
     if (!todaySchedule) {
       setIsWithinSchedule(false);
       return;
     }
 
-    // Check if current time is within the schedule
-    const isTimeMatch = currentTime >= todaySchedule.start_time && currentTime <= todaySchedule.end_time;
+    // Validamos la hora (HH:MM strings se pueden comparar alfabéticamente)
+    // Cortamos los segundos de la base de datos (19:00:00 -> 19:00)
+    const start = todaySchedule.start_time?.slice(0, 5) || "00:00";
+    const end = todaySchedule.end_time?.slice(0, 5) || "23:59";
+
+    const isTimeMatch = currentTime >= start && currentTime <= end;
+    
     setIsWithinSchedule(isTimeMatch);
   };
 
@@ -184,6 +213,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
 
   const handleSaveAttendance = async () => {
     if (!isWithinSchedule) {
+      // BACKDOOR TEMPORAL: Comenta estas 2 líneas si necesitas probar fuera de hora urgentemente
       toast.error('La asistencia solo puede registrarse durante el horario de clase');
       return;
     }
@@ -270,6 +300,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {/* AVISO AMARILLO: Solo se muestra si NO estamos en horario y SI tenemos horario cargado */}
         {!isWithinSchedule && courseSchedule && courseSchedule.length > 0 && (
           <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
             <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
@@ -280,19 +311,19 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
                   El registro de asistencia está disponible durante el horario del curso:
                 </p>
                 <ul className="mt-2 text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
-                  {courseSchedule.map(schedule => {
+                  {courseSchedule.map((schedule, idx) => {
                     const dayNames: Record<string, string> = {
-                      'monday': 'Lunes',
-                      'tuesday': 'Martes',
-                      'wednesday': 'Miércoles',
-                      'thursday': 'Jueves',
-                      'friday': 'Viernes',
-                      'saturday': 'Sábado',
-                      'sunday': 'Domingo'
+                      'Monday': 'Lunes',
+                      'Tuesday': 'Martes',
+                      'Wednesday': 'Miércoles',
+                      'Thursday': 'Jueves',
+                      'Friday': 'Viernes',
+                      'Saturday': 'Sábado',
+                      'Sunday': 'Domingo'
                     };
                     return (
-                      <li key={schedule.day}>
-                        • {dayNames[schedule.day]}: {schedule.start_time} - {schedule.end_time}
+                      <li key={idx}>
+                        • {dayNames[schedule.day] || schedule.day}: {schedule.start_time?.slice(0,5)} - {schedule.end_time?.slice(0,5)}
                       </li>
                     );
                   })}
@@ -301,6 +332,8 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
             </div>
           </div>
         )}
+        
+        {/* TABLA DE ESTUDIANTES */}
         {students.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No hay estudiantes inscritos en este curso
@@ -328,6 +361,8 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
                       <Select
                         value={attendance[student.id]?.status || ""}
                         onValueChange={(value) => handleStatusChange(student.id, value as any)}
+                        // Deshabilitamos el select si está fuera de horario
+                        disabled={!isWithinSchedule}
                       >
                         <SelectTrigger className="w-[180px]">
                           <SelectValue placeholder="Seleccionar..." />
@@ -368,8 +403,9 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
             <div className="flex justify-end mt-4">
               <Button 
                 onClick={handleSaveAttendance} 
+                // El botón solo se activa si estamos en horario
                 disabled={saving || !isWithinSchedule} 
-                className="gap-2"
+                className={`gap-2 ${!isWithinSchedule ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Save className="h-4 w-4" />
                 {saving ? 'Guardando...' : 'Guardar Asistencia'}
