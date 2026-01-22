@@ -37,6 +37,7 @@ interface AttendanceRecord {
   first_name: string;
   last_name: string;
   email: string;
+  phone: string | null;
   status: string;
   notes: string | null;
   recorded_at: string | null;
@@ -215,6 +216,7 @@ const AdminAttendanceReport = () => {
       'Nombre': student.first_name,
       'Apellido': student.last_name,
       'Email': student.email,
+      'Teléfono': student.phone || 'No registrado',
       'Estado': getStatusLabel(student.status),
       'Notas': student.notes || '',
       'Registrado': student.recorded_at ? format(new Date(student.recorded_at), 'dd/MM/yyyy HH:mm', { locale: es }) : 'No registrado'
@@ -255,6 +257,7 @@ const AdminAttendanceReport = () => {
       'Nombre': student.first_name,
       'Apellido': student.last_name,
       'Email': student.email,
+      'Teléfono': student.phone || 'No registrado',
       'Estado': getStatusLabel(student.status),
       'Notas': student.notes || ''
     }));
@@ -481,6 +484,7 @@ const AdminAttendanceReport = () => {
                       <TableRow>
                         <TableHead>Nombre</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead>Teléfono</TableHead>
                         <TableHead>Estado</TableHead>
                         <TableHead>Notas</TableHead>
                       </TableRow>
@@ -492,6 +496,7 @@ const AdminAttendanceReport = () => {
                             {student.first_name} {student.last_name}
                           </TableCell>
                           <TableCell>{student.email}</TableCell>
+                          <TableCell>{student.phone || 'No registrado'}</TableCell>
                           <TableCell>
                             <Badge variant={getStatusBadgeVariant(student.status)}>
                               {getStatusLabel(student.status)}
@@ -522,6 +527,7 @@ const AdminAttendanceReport = () => {
                     <TableRow>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Teléfono</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Notas</TableHead>
                       <TableHead>Fecha de Registro</TableHead>
@@ -534,6 +540,7 @@ const AdminAttendanceReport = () => {
                           {student.first_name} {student.last_name}
                         </TableCell>
                         <TableCell>{student.email}</TableCell>
+                        <TableCell>{student.phone || 'No registrado'}</TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(student.status)}>
                             {getStatusLabel(student.status)}

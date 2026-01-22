@@ -78,7 +78,8 @@ serve(async (req) => {
           id,
           first_name,
           last_name,
-          email
+          email,
+          phone
         )
       `)
       .eq('course_id', course_id);
@@ -122,6 +123,7 @@ serve(async (req) => {
           first_name: student.first_name,
           last_name: student.last_name,
           email: student.email,
+          phone: student.phone || null,
           status: attendanceRecord?.status || 'not_recorded',
           notes: attendanceRecord?.notes || null,
           recorded_at: attendanceRecord?.created_at || null
