@@ -22,14 +22,14 @@ serve(async (req) => {
   }
 
   try {
+    // 1. Cliente para verificar el token del usuario
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error('Falta el header de autorización');
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      { global: { headers: { Authorization: authHeader } } }
     );
 
     // Verificar autenticación
@@ -47,8 +47,14 @@ serve(async (req) => {
     
     console.log('✓ Usuario autenticado:', user.id, user.email);
 
-    // Verificar que sea admin
-    const { data: profile, error: profileError } = await supabaseClient
+    // 2. Cliente ADMIN (Service Role) para consultas de BD
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Verificar que sea admin (usando supabaseAdmin)
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('id, role')
       .eq('user_id', user.id)
@@ -102,8 +108,8 @@ serve(async (req) => {
 
     console.log('📜 Enviando certificados - Curso:', course_id, 'Estudiantes:', student_ids.length);
 
-    // Obtener datos del curso con programa
-    const { data: course, error: courseError } = await supabaseClient
+    // Obtener datos del curso con programa (usando supabaseAdmin)
+    const { data: course, error: courseError } = await supabaseAdmin
       .from('courses')
       .select(`
         id,
@@ -133,8 +139,8 @@ serve(async (req) => {
 
     console.log('✓ Curso encontrado:', course.name);
 
-    // Obtener datos de los estudiantes
-    const { data: students, error: studentsError } = await supabaseClient
+    // Obtener datos de los estudiantes (usando supabaseAdmin)
+    const { data: students, error: studentsError } = await supabaseAdmin
       .from('profiles')
       .select(`
         id,
@@ -211,7 +217,7 @@ serve(async (req) => {
       console.error('❌ Error de conexión con n8n:', n8nError);
     }
 
-    // Registrar cada envío en la base de datos
+    // Registrar cada envío en la base de datos (usando supabaseAdmin)
     console.log('📝 Registrando envíos en base de datos...');
     const logs = students.map((student, index) => ({
       course_id: course_id,
@@ -224,7 +230,7 @@ serve(async (req) => {
       metadata: certificateData[index]
     }));
 
-    const { error: logsError } = await supabaseClient
+    const { error: logsError } = await supabaseAdmin
       .from('certificate_logs')
       .insert(logs);
 
