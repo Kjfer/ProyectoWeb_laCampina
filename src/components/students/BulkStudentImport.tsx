@@ -26,6 +26,7 @@ interface StudentData {
   maternal_surname: string;
   first_name: string;
   email: string;
+  phone?: string;
   gender: string;
   birth_date: string;
 }
@@ -76,6 +77,7 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
         'APELLIDO MATERNO': 'López',
         'NOMBRES': 'Juan Carlos',
         'EMAIL': 'juan.garcia@correo.com',
+        'TELÉFONO': '987654321',
         'SEXO': 'M',
         'FECHA DE NACIMIENTO': '2010-05-15'
       }
@@ -134,6 +136,7 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
         maternal_surname: String(row['APELLIDO MATERNO'] || '').trim(),
         first_name: String(row['NOMBRES'] || '').trim(),
         email: String(row['EMAIL'] || '').trim(),
+        phone: row['TELÉFONO'] ? String(row['TELÉFONO']).trim() : undefined,
         gender: String(row['SEXO'] || '').trim().toUpperCase(),
         birth_date: row['FECHA DE NACIMIENTO'] ? formatExcelDate(row['FECHA DE NACIMIENTO']) : '',
       })).filter(student => student.document_number && student.student_code && student.first_name && student.email);
@@ -321,6 +324,7 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
                     <li>APELLIDO MATERNO</li>
                     <li>NOMBRES</li>
                     <li>EMAIL (correo del estudiante)</li>
+                    <li>TELÉFONO (opcional)</li>
                     <li>SEXO (M/F)</li>
                     <li>FECHA DE NACIMIENTO (YYYY-MM-DD)</li>
                   </ul>
