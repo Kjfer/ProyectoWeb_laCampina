@@ -67,9 +67,11 @@ export default function CourseDetail() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [additionalTeachers, setAdditionalTeachers] = useState<Teacher[]>([]);
 
-  // Check if user can edit this course
-  const canEdit = profile && course && (
-    profile.role === 'admin' || 
+  // Check if user can edit this course (solo admin)
+  const canEdit = profile && profile.role === 'admin';
+  
+  // Check if user is a teacher of this course (para otras funcionalidades)
+  const isTeacher = profile && course && (
     (profile.role === 'teacher' && course.teacher && profile.id === course.teacher.id) ||
     (profile.role === 'teacher' && additionalTeachers.some(t => t.id === profile.id))
   );
@@ -342,14 +344,12 @@ export default function CourseDetail() {
           <TabsContent value="content">
             <WeeklyContentManager 
               courseId={course.id} 
-              canEdit={canEdit || false}
+              canEdit={canEdit || isTeacher || false}
             />
           </TabsContent>
 
           <TabsContent value="attendance">
-            {profile?.role === 'admin' || 
-             (profile?.role === 'teacher' && course.teacher && profile.id === course.teacher.id) ||
-             (profile?.role === 'teacher' && additionalTeachers.some(t => t.id === profile.id)) ? (
+            {profile?.role === 'admin' || isTeacher ? (
               <div className="space-y-6">
                 <AttendanceManager courseId={course.id} />
                 <AttendanceRecords courseId={course.id} />
@@ -365,7 +365,7 @@ export default function CourseDetail() {
 
           <TabsContent value="exams">
             <div className="space-y-4">
-              {canEdit && (
+              {(canEdit || isTeacher) && (
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -379,7 +379,7 @@ export default function CourseDetail() {
                 </Card>
               )}
               
-              <ExamsList courseId={course.id} canEdit={canEdit || false} />
+              <ExamsList courseId={course.id} canEdit={canEdit || isTeacher || false} />
             </div>
           </TabsContent>
 

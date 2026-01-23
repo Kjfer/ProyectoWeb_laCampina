@@ -211,52 +211,64 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
               const schedule = daySchedules.find(d => d.day === day.value);
               if (!schedule) return null;
               
+              // Si no puede editar y el día no está habilitado, no mostrar nada
+              if (!canEdit && !schedule.enabled) return null;
+              
               return (
                 <div
                   key={day.value}
                   className="border rounded-lg p-4 space-y-3 bg-card"
                 >
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`checkbox-${day.value}`}
-                      checked={schedule.enabled}
-                      onCheckedChange={() => handleDayToggle(day.value)}
-                      disabled={!canEdit}
-                    />
-                    <label
-                      htmlFor={`checkbox-${day.value}`}
-                      className="text-sm font-medium leading-none cursor-pointer"
-                    >
-                      {day.label}
-                    </label>
-                  </div>
-                  
-                  {schedule.enabled && (
-                    <div className="grid grid-cols-2 gap-3 ml-6">
-                      <div className="space-y-1">
-                        <Label htmlFor={`start-${day.value}`} className="text-xs text-muted-foreground">
-                          Hora de inicio
-                        </Label>
-                        <Input
-                          id={`start-${day.value}`}
-                          type="time"
-                          value={schedule.start_time}
-                          onChange={(e) => handleTimeChange(day.value, 'start_time', e.target.value)}
-                          disabled={!canEdit}
+                  {canEdit ? (
+                    <>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`checkbox-${day.value}`}
+                          checked={schedule.enabled}
+                          onCheckedChange={() => handleDayToggle(day.value)}
                         />
+                        <label
+                          htmlFor={`checkbox-${day.value}`}
+                          className="text-sm font-medium leading-none cursor-pointer"
+                        >
+                          {day.label}
+                        </label>
                       </div>
-                      <div className="space-y-1">
-                        <Label htmlFor={`end-${day.value}`} className="text-xs text-muted-foreground">
-                          Hora de fin
-                        </Label>
-                        <Input
-                          id={`end-${day.value}`}
-                          type="time"
-                          value={schedule.end_time}
-                          onChange={(e) => handleTimeChange(day.value, 'end_time', e.target.value)}
-                          disabled={!canEdit}
-                        />
-                      </div>
+                      
+                      {schedule.enabled && (
+                        <div className="grid grid-cols-2 gap-3 ml-6">
+                          <div className="space-y-1">
+                            <Label htmlFor={`start-${day.value}`} className="text-xs text-muted-foreground">
+                              Hora de inicio
+                            </Label>
+                            <Input
+                              id={`start-${day.value}`}
+                              type="time"
+                              value={schedule.start_time}
+                              onChange={(e) => handleTimeChange(day.value, 'start_time', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor={`end-${day.value}`} className="text-xs text-muted-foreground">
+                              Hora de fin
+                            </Label>
+                            <Input
+                              id={`end-${day.value}`}
+                              type="time"
+                              value={schedule.end_time}
+                              onChange={(e) => handleTimeChange(day.value, 'end_time', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    // Vista de solo lectura
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{day.label}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {schedule.start_time} - {schedule.end_time}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -274,9 +286,9 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
           </div>
         )}
 
-        {!canEdit && (
-          <div className="text-sm text-muted-foreground">
-            No tienes permisos para editar el horario del curso
+        {!canEdit && daySchedules.filter(d => d.enabled).length === 0 && (
+          <div className="text-sm text-muted-foreground text-center py-4">
+            No hay horarios configurados para este curso
           </div>
         )}
       </CardContent>
