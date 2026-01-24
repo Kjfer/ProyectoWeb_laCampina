@@ -318,7 +318,7 @@ export default function CourseDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="content" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className={`grid w-full ${profile?.role === 'admin' ? 'grid-cols-6' : 'grid-cols-5'}`}>
             <TabsTrigger value="content">Contenido</TabsTrigger>
             <TabsTrigger value="attendance" className="flex items-center gap-2">
               <ClipboardCheck className="h-4 w-4" />
@@ -335,10 +335,12 @@ export default function CourseDetail() {
               <Users className="h-4 w-4" />
               Estudiantes
             </TabsTrigger>
-            <TabsTrigger value="schedule" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Horario
-            </TabsTrigger>
+            {profile?.role === 'admin' && (
+              <TabsTrigger value="schedule" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Horario
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="content">
@@ -423,9 +425,11 @@ export default function CourseDetail() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="schedule">
-            <CourseScheduleManager courseId={course.id} canEdit={canEdit || false} />
-          </TabsContent>
+          {profile?.role === 'admin' && (
+            <TabsContent value="schedule">
+              <CourseScheduleManager courseId={course.id} canEdit={canEdit || false} />
+            </TabsContent>
+          )}
         </Tabs>
 
         {/* Course Edit Dialog */}
