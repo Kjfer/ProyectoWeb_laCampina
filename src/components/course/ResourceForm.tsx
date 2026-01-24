@@ -257,52 +257,69 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>📁 Subir Archivos (máximo 5MB por archivo)</Label>
-            <div className="border-2 border-dashed border-muted rounded-lg p-4">
-              <FileUpload
-                onFileSelect={handleFileUpload}
-                multiple={true}
-                accept={
-                  formData.resource_type === 'video' ? 'video/*' : 
-                  formData.resource_type === 'document' ? '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx' : 
-                  undefined
-                }
-              />
-              {uploading && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                  Subiendo archivo(s)...
-                </div>
-              )}
-              {uploadedFiles.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  <p className="text-sm font-medium">Archivos adjuntos ({uploadedFiles.length}):</p>
-                  {uploadedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileText className="h-4 w-4 flex-shrink-0 text-primary" />
-                        <div className="min-w-0">
-                          <p className="text-sm truncate">{file.file_name}</p>
-                          <p className="text-xs text-muted-foreground">{(file.file_size / 1024).toFixed(2)} KB</p>
+          {/* --- AQUÍ ESTÁ LA CORRECCIÓN: ZONA DINÁMICA DE URL vs ARCHIVO --- */}
+          {formData.resource_type === 'link' ? (
+             <div className="space-y-2">
+               <Label htmlFor="resource_url">URL del Enlace *</Label>
+               <Input
+                 id="resource_url"
+                 type="url"
+                 value={formData.resource_url}
+                 onChange={(e) => setFormData(prev => ({ ...prev, resource_url: e.target.value }))}
+                 placeholder="https://ejemplo.com/recurso"
+                 required
+               />
+               <p className="text-xs text-muted-foreground">
+                 Pega aquí la dirección completa del sitio web.
+               </p>
+             </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>📁 Subir Archivos (máximo 5MB por archivo)</Label>
+              <div className="border-2 border-dashed border-muted rounded-lg p-4">
+                <FileUpload
+                  onFileSelect={handleFileUpload}
+                  multiple={true}
+                  accept={
+                    formData.resource_type === 'video' ? 'video/*' : 
+                    formData.resource_type === 'document' ? '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx' : 
+                    undefined
+                  }
+                />
+                {uploading && (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    Subiendo archivo(s)...
+                  </div>
+                )}
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium">Archivos adjuntos ({uploadedFiles.length}):</p>
+                    {uploadedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between gap-2 p-2 bg-muted rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="h-4 w-4 flex-shrink-0 text-primary" />
+                          <div className="min-w-0">
+                            <p className="text-sm truncate">{file.file_name}</p>
+                            <p className="text-xs text-muted-foreground">{(file.file_size / 1024).toFixed(2)} KB</p>
+                          </div>
                         </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(index)}
+                          className="flex-shrink-0"
+                        >
+                          ✕
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFile(index)}
-                        className="flex-shrink-0"
-                      >
-                        ✕
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-
+          )}
 
           {/* Configuraciones especiales para tareas y exámenes */}
           {(formData.resource_type === 'assignment' || formData.resource_type === 'exam') && (
