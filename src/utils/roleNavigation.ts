@@ -16,7 +16,9 @@ import {
   Eye,
   Award,
   DollarSign,
-  Layers
+  Layers,
+  ShoppingBag,
+  Video
 } from 'lucide-react';
 
 export type UserRole = 'admin' | 'teacher' | 'student' | 'parent' | 'tutor' | 'directivo';
@@ -192,6 +194,24 @@ export const adminNavigationItems: NavItem[] = [
     title: 'Pagos',
     url: '/admin/pagos',
     icon: DollarSign,
+    roles: ['admin']
+  },
+  {
+    title: 'Materiales',
+    url: '/admin/materiales',
+    icon: ShoppingBag,
+    roles: ['admin']
+  },
+  {
+    title: 'Cursos Grabados',
+    url: '/admin/cursos-grabados',
+    icon: Video,
+    roles: ['admin']
+  },
+  {
+    title: 'Ventas de Cursos',
+    url: '/admin/ventas-cursos-grabados',
+    icon: ShoppingBag,
     roles: ['admin']
   },
   {

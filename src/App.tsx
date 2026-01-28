@@ -48,6 +48,9 @@ import AdminMatriculasManagement from "./pages/AdminMatriculasManagement";
 import AdminPagosManagement from "./pages/AdminPagosManagement";
 import AdminEdicionForm from "./pages/AdminEdicionForm";
 import AdminMatriculaForm from "./pages/AdminMatriculaForm";
+import AdminMaterialesManagement from "./pages/AdminMaterialesManagement";
+import AdminCursosGrabadosManagement from "./pages/AdminCursosGrabadosManagement";
+import AdminVentasCursosGrabadosManagement from "./pages/AdminVentasCursosGrabadosManagement";
 
 const queryClient = new QueryClient();
 
@@ -231,6 +234,21 @@ const App = () => (
             <Route path="/admin/pagos" element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminPagosManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/materiales" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminMaterialesManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/cursos-grabados" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminCursosGrabadosManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/ventas-cursos-grabados" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminVentasCursosGrabadosManagement />
               </ProtectedRoute>
             } />
             <Route path="/admin/*" element={

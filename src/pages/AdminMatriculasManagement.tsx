@@ -47,7 +47,7 @@ export default function AdminMatriculasManagement() {
         .from('matriculas' as any)
         .select(`
           *,
-          estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name, email, codigo_estudiante),
+          estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name, email),
           usuario:profiles!matriculas_usuario_id_fkey(id, first_name, last_name),
           curso_grabado:cursos_grabados(id, name)
         `)
