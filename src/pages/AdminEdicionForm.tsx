@@ -38,6 +38,8 @@ export default function AdminEdicionForm() {
   const [programas, setProgramas] = useState<Programa[]>([]);
   const [teachers, setTeachers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [bookFile, setBookFile] = useState<File | null>(null);
+  const [uploadingBook, setUploadingBook] = useState(false);
   const [formData, setFormData] = useState<Partial<CourseInsert>>({
     name: '',
     description: '',
@@ -51,6 +53,7 @@ export default function AdminEdicionForm() {
     end_date: '',
     numero_modulos: 1,
     material: 'none',
+    book_url: '',
   });
 
   useEffect(() => {
@@ -114,29 +117,82 @@ export default function AdminEdicionForm() {
     }
   };
 
+  const generateEdicionName = (programId: string, startDate: string) => {
+    const programa = programas.find(p => p.id === programId);
+    if (!programa || !startDate) return '';
+    
+    const date = new Date(startDate);
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const mes = meses[date.getMonth()];
+    const año = date.getFullYear();
+    
+    return `${programa.name} - ${mes} ${año}`;
+  };
+
   const handleProgramChange = (programId: string) => {
-    setFormData({ ...formData, program_id: programId });
+    const newFormData = { ...formData, program_id: programId };
     
     // Generar código automáticamente
     if (formData.start_date) {
       const programa = programas.find(p => p.id === programId);
       if (programa) {
         const code = generateCourseCode(programa.code, new Date(formData.start_date));
-        setFormData(prev => ({ ...prev, code }));
+        const name = generateEdicionName(programId, formData.start_date);
+        newFormData.code = code;
+        newFormData.name = name;
       }
     }
+    
+    setFormData(newFormData);
   };
 
   const handleStartDateChange = (date: string) => {
-    setFormData({ ...formData, start_date: date });
+    const newFormData = { ...formData, start_date: date };
     
-    // Regenerar código si ya hay programa seleccionado
+    // Regenerar código y nombre si ya hay programa seleccionado
     if (formData.program_id) {
       const programa = programas.find(p => p.id === formData.program_id);
       if (programa) {
         const code = generateCourseCode(programa.code, new Date(date));
-        setFormData(prev => ({ ...prev, code }));
+        const name = generateEdicionName(formData.program_id, date);
+        newFormData.code = code;
+        newFormData.name = name;
       }
+    }
+    
+    setFormData(newFormData);
+  };
+
+  const uploadBookToStorage = async (): Promise<string | null> => {
+    if (!bookFile) return formData.book_url || null;
+
+    try {
+      setUploadingBook(true);
+      const fileExt = bookFile.name.split('.').pop();
+      const fileName = `${formData.code}_book_${Date.now()}.${fileExt}`;
+      const filePath = `books/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('course-materials')
+        .upload(filePath, bookFile);
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from('course-materials')
+        .getPublicUrl(filePath);
+
+      return urlData.publicUrl;
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: `Error al subir el libro: ${error.message}`,
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setUploadingBook(false);
     }
   };
 
@@ -166,11 +222,22 @@ export default function AdminEdicionForm() {
     try {
       setLoading(true);
 
+      // Subir libro si hay uno y material es 'book'
+      let bookUrl = formData.book_url;
+      if (formData.material === 'book' && bookFile) {
+        const uploadedUrl = await uploadBookToStorage();
+        if (uploadedUrl) {
+          bookUrl = uploadedUrl;
+        }
+      }
+
+      const dataToSave = { ...formData, book_url: bookUrl };
+
       if (isEditing) {
         // Actualizar
         const { error } = await supabase
           .from('courses')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', id);
 
         if (error) throw error;
@@ -183,7 +250,7 @@ export default function AdminEdicionForm() {
         // Crear
         const { error } = await supabase
           .from('courses')
-          .insert(formData as CourseInsert);
+          .insert(dataToSave as CourseInsert);
 
         if (error) throw error;
 
@@ -193,7 +260,7 @@ export default function AdminEdicionForm() {
         });
       }
 
-      navigate('/admin/ediciones');
+      navigate('/admin/courses');
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -214,7 +281,7 @@ export default function AdminEdicionForm() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/admin/ediciones')}
+              onClick={() => navigate('/admin/courses')}
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -253,15 +320,12 @@ export default function AdminEdicionForm() {
             {/* Nombre y Código */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Nombre de la Edición *</Label>
+                <Label htmlFor="name">Nombre de la Edición (auto-generado) *</Label>
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="Ej: Programación Básica - Enero 2026"
-                  required
+                  placeholder="Seleccione programa y fecha de inicio"
+                  disabled
                 />
               </div>
               <div className="space-y-2">
@@ -269,11 +333,8 @@ export default function AdminEdicionForm() {
                 <Input
                   id="code"
                   value={formData.code}
-                  onChange={(e) =>
-                    setFormData({ ...formData, code: e.target.value })
-                  }
                   placeholder="AUTO"
-                  disabled={!isEditing}
+                  disabled
                 />
               </div>
             </div>
@@ -410,6 +471,25 @@ export default function AdminEdicionForm() {
               </div>
             </div>
 
+            {/* Subir Libro (solo si material es 'book') */}
+            {formData.material === 'book' && (
+              <div className="space-y-2">
+                <Label htmlFor="book_file">Archivo del Libro (PDF) *</Label>
+                <Input
+                  id="book_file"
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => setBookFile(e.target.files?.[0] || null)}
+                />
+                {bookFile && (
+                  <p className="text-sm text-gray-600">Archivo seleccionado: {bookFile.name}</p>
+                )}
+                {formData.book_url && !bookFile && (
+                  <p className="text-sm text-green-600">✓ Libro ya cargado</p>
+                )}
+              </div>
+            )}
+
             {/* Estado */}
             <div className="flex items-center space-x-2">
               <Switch
@@ -427,7 +507,7 @@ export default function AdminEdicionForm() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => navigate('/admin/ediciones')}
+                onClick={() => navigate('/admin/courses')}
               >
                 Cancelar
               </Button>

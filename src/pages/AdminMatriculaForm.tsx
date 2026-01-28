@@ -130,7 +130,7 @@ export default function AdminMatriculaForm() {
 
       // Cargar módulos activos
       const { data: modulosData, error: modulosError } = await supabase
-        .from('peri_modulos')
+        .from('modulos' as any)
         .select(`
           *,
           course:courses(*)
