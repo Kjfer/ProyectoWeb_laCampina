@@ -45,7 +45,7 @@ export function AdminProgramManagement() {
   const fetchPrograms = async () => {
     try {
       const { data, error } = await supabase
-        .from('programs')
+        .from('programas')
         .select('*')
         .order('created_at', { ascending: false });
         
@@ -66,7 +66,7 @@ export function AdminProgramManagement() {
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from('programs').insert([{ ...formData }]);
+      const { error } = await supabase.from('programas').insert([{ ...formData }]);
       if (error) throw error;
       toast({ title: "Éxito", description: "Programa creado correctamente" });
       setIsCreateOpen(false);
@@ -96,7 +96,7 @@ export function AdminProgramManagement() {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from('programs')
+        .from('programas')
         .update({ ...formData })
         .eq('id', selectedProgram.id);
 
@@ -116,7 +116,7 @@ export function AdminProgramManagement() {
     if (!selectedProgram) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('programs').delete().eq('id', selectedProgram.id);
+      const { error } = await supabase.from('programas').delete().eq('id', selectedProgram.id);
       if (error) throw error;
       toast({ title: "Eliminado", description: "Programa borrado correctamente." });
       setIsDeleteOpen(false);

@@ -177,9 +177,27 @@ export const navigationItems: NavItem[] = [
 
 export const adminNavigationItems: NavItem[] = [
   {
+    title: 'Programas',
+    url: '/admin/programas',
+    icon: Layers,
+    roles: ['admin']
+  },
+  {
     title: 'Gestión de Cursos',
     url: '/admin/courses',
     icon: BookOpen,
+    roles: ['admin']
+  },
+  {
+    title: 'Matrículas',
+    url: '/admin/matriculas',
+    icon: ClipboardList,
+    roles: ['admin']
+  },
+  {
+    title: 'Pagos',
+    url: '/admin/pagos',
+    icon: DollarSign,
     roles: ['admin']
   },
   {
@@ -204,36 +222,6 @@ export const adminNavigationItems: NavItem[] = [
     title: 'Certificados',
     url: '/admin/certificates',
     icon: Award,
-    roles: ['admin']
-  },
-  {
-    title: 'Programas',
-    url: '/admin/programas',
-    icon: Layers,
-    roles: ['admin']
-  },
-  {
-    title: 'Ediciones',
-    url: '/admin/ediciones',
-    icon: Calendar,
-    roles: ['admin']
-  },
-  {
-    title: 'Módulos',
-    url: '/admin/modulos',
-    icon: Library,
-    roles: ['admin']
-  },
-  {
-    title: 'Matrículas',
-    url: '/admin/matriculas',
-    icon: ClipboardList,
-    roles: ['admin']
-  },
-  {
-    title: 'Pagos',
-    url: '/admin/pagos',
-    icon: DollarSign,
     roles: ['admin']
   },
   {

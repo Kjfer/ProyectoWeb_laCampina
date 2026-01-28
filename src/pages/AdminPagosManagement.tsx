@@ -96,7 +96,7 @@ export default function AdminPagosManagement() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('pagos')
+        .from('pagos' as any)
         .select(`
           *,
           estudiante:profiles!pagos_estudiante_id_fkey(id, first_name, last_name, email),
@@ -105,7 +105,7 @@ export default function AdminPagosManagement() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPagos(data || []);
+      setPagos(data as any || []);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -181,7 +181,7 @@ export default function AdminPagosManagement() {
       };
 
       const { error } = await supabase
-        .from('pagos')
+        .from('pagos' as any)
         .insert(pagoData);
 
       if (error) throw error;

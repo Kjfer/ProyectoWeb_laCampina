@@ -68,7 +68,7 @@ export default function AdminEdicionesManagement() {
 
       // Cargar programas activos
       const { data: programasData, error: programasError } = await supabase
-        .from('programas')
+        .from('programas' as any)
         .select('*')
         .eq('is_active', true)
         .order('name');
@@ -84,8 +84,8 @@ export default function AdminEdicionesManagement() {
 
       if (teachersError) throw teachersError;
 
-      setCourses(coursesData || []);
-      setProgramas(programasData || []);
+      setCourses(coursesData as any || []);
+      setProgramas(programasData as any || []);
       setTeachers(teachersData || []);
     } catch (error: any) {
       toast({

@@ -98,27 +98,27 @@ export default function AdminModulosManagement() {
         .single();
 
       if (courseError) throw courseError;
-      setCourse(courseData);
+      setCourse(courseData as any);
 
       // Cargar programa
       const { data: programaData, error: programaError } = await supabase
-        .from('programas')
+        .from('programas' as any)
         .select('*')
-        .eq('id', courseData.program_id)
+        .eq('id', (courseData as any).program_id)
         .single();
 
       if (programaError) throw programaError;
-      setPrograma(programaData);
+      setPrograma(programaData as any);
 
       // Cargar módulos
       const { data: modulosData, error: modulosError } = await supabase
-        .from('modulos')
+        .from('modulos' as any)
         .select('*')
         .eq('course_id', courseId)
         .order('num_modulo');
 
       if (modulosError) throw modulosError;
-      setModulos(modulosData || []);
+      setModulos(modulosData as any || []);
 
       // Cargar profesores
       const { data: teachersData, error: teachersError } = await supabase
@@ -133,9 +133,9 @@ export default function AdminModulosManagement() {
       // Inicializar datos del formulario
       setFormData(prev => ({
         ...prev,
-        teacher_principal_id: courseData.teacher_principal_id,
-        academic_year: courseData.academic_year,
-        semester_year: courseData.academic_year + '-' + courseData.semester,
+        teacher_principal_id: (courseData as any).teacher_principal_id,
+        academic_year: (courseData as any).academic_year,
+        semester_year: (courseData as any).academic_year + '-' + (courseData as any).semester,
       }));
 
     } catch (error: any) {
@@ -242,7 +242,7 @@ export default function AdminModulosManagement() {
       if (editingModulo) {
         // Actualizar
         const { error } = await supabase
-          .from('modulos')
+          .from('modulos' as any)
           .update(dataToSave)
           .eq('id', editingModulo.id);
 
@@ -255,7 +255,7 @@ export default function AdminModulosManagement() {
       } else {
         // Crear
         const { error } = await supabase
-          .from('modulos')
+          .from('modulos' as any)
           .insert(dataToSave as ModuloInsert);
 
         if (error) throw error;
@@ -282,7 +282,7 @@ export default function AdminModulosManagement() {
 
     try {
       const { error } = await supabase
-        .from('modulos')
+        .from('modulos' as any)
         .delete()
         .eq('id', id);
 

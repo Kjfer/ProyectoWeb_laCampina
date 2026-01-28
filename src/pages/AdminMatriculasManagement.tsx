@@ -41,7 +41,7 @@ export default function AdminMatriculasManagement() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('matriculas')
+        .from('matriculas' as any)
         .select(`
           *,
           estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name, email, codigo_estudiante),
@@ -52,7 +52,7 @@ export default function AdminMatriculasManagement() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setMatriculas(data || []);
+      setMatriculas(data as any || []);
     } catch (error: any) {
       toast({
         title: 'Error',
