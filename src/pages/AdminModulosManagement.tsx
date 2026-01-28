@@ -328,11 +328,11 @@ export default function AdminModulosManagement() {
       toast({
         title: 'Éxito',
         description: 'Módulo eliminado correctamente',
+      });
+
       if (selectedCourseId) {
         fetchData(selectedCourseId);
       }
-
-      fetchData();
     } catch (error: any) {
       toast({
         title: 'Error',
