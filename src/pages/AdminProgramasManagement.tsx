@@ -46,7 +46,7 @@ export default function ProgramasManagement() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('peri_programas')
+        .from('programas' as any)
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -111,7 +111,7 @@ export default function ProgramasManagement() {
       if (editingPrograma) {
         // Actualizar
         const { error } = await supabase
-          .from('peri_programas')
+          .from('programas' as any)
           .update(formData as ProgramaUpdate)
           .eq('id', editingPrograma.id);
 
@@ -124,7 +124,7 @@ export default function ProgramasManagement() {
       } else {
         // Crear
         const { error } = await supabase
-          .from('peri_programas')
+          .from('programas' as any)
           .insert(formData as ProgramaInsert);
 
         if (error) throw error;
@@ -151,7 +151,7 @@ export default function ProgramasManagement() {
 
     try {
       const { error } = await supabase
-        .from('peri_programas')
+        .from('programas' as any)
         .delete()
         .eq('id', id);
 

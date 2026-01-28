@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { MatriculaWithRelations } from '@/integrations/supabase/peri-types';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,13 +42,13 @@ export default function AdminMatriculasManagement() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('peri_matriculas')
+        .from('matriculas' as any)
         .select(`
           *,
-          estudiante:profiles!peri_matriculas_estudiante_id_fkey(id, first_name, last_name, email, codigo_estudiante),
-          usuario:profiles!peri_matriculas_usuario_id_fkey(id, first_name, last_name),
+          estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name, email, codigo_estudiante),
+          usuario:profiles!matriculas_usuario_id_fkey(id, first_name, last_name),
           curso_grabado:cursos_grabados(id, name),
-          pagos:peri_pagos(monto_pago, fecha_pago, estado_pago, metodo_pago)
+          pagos:pagos(monto_pago, fecha_pago, estado_pago, metodo_pago)
         `)
         .order('created_at', { ascending: false });
 
@@ -93,9 +94,10 @@ export default function AdminMatriculasManagement() {
   }, 0);
 
   return (
-    <div className="container mx-auto py-8">
-      <Card>
-        <CardHeader>
+    <DashboardLayout>
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-2xl flex items-center gap-2">
@@ -444,5 +446,6 @@ export default function AdminMatriculasManagement() {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardLayout>
   );
 }

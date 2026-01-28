@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   CourseInsert,
   Programa,
@@ -60,7 +61,7 @@ export default function AdminEdicionForm() {
     try {
       // Cargar programas activos
       const { data: programasData, error: programasError } = await supabase
-        .from('peri_programas' as any)
+        .from('programas' as any)
         .select('*')
         .eq('is_active', true)
         .order('name');
@@ -205,9 +206,10 @@ export default function AdminEdicionForm() {
   };
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
-      <Card>
-        <CardHeader>
+    <DashboardLayout>
+      <div className="container mx-auto py-8 max-w-4xl">
+        <Card>
+          <CardHeader>
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -438,5 +440,6 @@ export default function AdminEdicionForm() {
         </CardContent>
       </Card>
     </div>
+    </DashboardLayout>
   );
 }

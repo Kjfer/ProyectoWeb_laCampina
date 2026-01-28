@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   MatriculaFormData,
   Modulo,
@@ -398,9 +399,10 @@ export default function AdminMatriculaForm() {
   })).filter(group => group.modulos.length > 0);
 
   return (
-    <div className="container mx-auto py-8 max-w-6xl">
-      <Card>
-        <CardHeader>
+    <DashboardLayout>
+      <div className="container mx-auto py-8 max-w-6xl">
+        <Card>
+          <CardHeader>
           <CardTitle className="text-2xl flex items-center gap-2">
             <UserPlus className="h-6 w-6" />
             Nueva Matrícula
@@ -762,5 +764,6 @@ export default function AdminMatriculaForm() {
         </CardContent>
       </Card>
     </div>
+    </DashboardLayout>
   );
 }

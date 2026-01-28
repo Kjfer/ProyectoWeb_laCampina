@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   Pago,
   PagoWithRelations,
@@ -96,11 +97,11 @@ export default function AdminPagosManagement() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('peri_pagos')
+        .from('pagos' as any)
         .select(`
           *,
-          estudiante:profiles!peri_pagos_estudiante_id_fkey(id, first_name, last_name, email),
-          usuario:profiles!peri_pagos_usuario_id_fkey(id, first_name, last_name)
+          estudiante:profiles!pagos_estudiante_id_fkey(id, first_name, last_name, email),
+          usuario:profiles!pagos_usuario_id_fkey(id, first_name, last_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -181,7 +182,7 @@ export default function AdminPagosManagement() {
       };
 
       const { error } = await supabase
-        .from('peri_pagos')
+        .from('pagos' as any)
         .insert(pagoData);
 
       if (error) throw error;
@@ -217,9 +218,10 @@ export default function AdminPagosManagement() {
   }, 0);
 
   return (
-    <div className="container mx-auto py-8">
-      <Card>
-        <CardHeader>
+    <DashboardLayout>
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-2xl flex items-center gap-2">
@@ -612,5 +614,6 @@ export default function AdminPagosManagement() {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardLayout>
   );
 }
