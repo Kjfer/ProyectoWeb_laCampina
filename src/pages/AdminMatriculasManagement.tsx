@@ -41,19 +41,33 @@ export default function AdminMatriculasManagement() {
   const fetchMatriculas = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Cargar matrículas
+      const { data: matriculasData, error: matriculasError } = await supabase
         .from('matriculas' as any)
         .select(`
           *,
           estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name, email, codigo_estudiante),
           usuario:profiles!matriculas_usuario_id_fkey(id, first_name, last_name),
-          curso_grabado:cursos_grabados(id, name),
-          pagos:pagos(monto_pago, fecha_pago, estado_pago, metodo_pago)
+          curso_grabado:cursos_grabados(id, name)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setMatriculas(data as any || []);
+      if (matriculasError) throw matriculasError;
+
+      // Cargar pagos relacionados
+      const { data: pagosData } = await supabase
+        .from('pagos' as any)
+        .select('*')
+        .eq('categoria_producto', 'matricula');
+
+      // Asociar pagos con matrículas
+      const matriculasConPagos = (matriculasData || []).map((mat: any) => ({
+        ...mat,
+        pagos: (pagosData || []).filter((pago: any) => pago.codigo_producto === mat.cod_matricula)
+      }));
+
+      setMatriculas(matriculasConPagos as any);
     } catch (error: any) {
       toast({
         title: 'Error',

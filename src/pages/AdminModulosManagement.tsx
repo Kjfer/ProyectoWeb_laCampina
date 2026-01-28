@@ -51,9 +51,11 @@ interface Profile {
 const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 export default function AdminModulosManagement() {
-  const { courseId } = useParams();
+  const { courseId: urlCourseId } = useParams();
   const navigate = useNavigate();
   
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(urlCourseId || null);
   const [course, setCourse] = useState<Course | null>(null);
   const [programa, setPrograma] = useState<Programa | null>(null);
   const [modulos, setModulos] = useState<Modulo[]>([]);
@@ -67,7 +69,7 @@ export default function AdminModulosManagement() {
     num_modulo: 1,
     description: '',
     code: '',
-    course_id: courseId,
+    course_id: selectedCourseId || '',
     teacher_principal_id: '',
     academic_year: '',
     semester_year: '',
@@ -81,12 +83,45 @@ export default function AdminModulosManagement() {
   const [schedule, setSchedule] = useState<ModuloSchedule>({});
 
   useEffect(() => {
-    if (courseId) {
-      fetchData();
+    if (urlCourseId) {
+      // Si viene de URL, cargar directamente esa edición
+      setSelectedCourseId(urlCourseId);
+      fetchData(urlCourseId);
+    } else {
+      // Si no, cargar lista de ediciones
+      fetchCourses();
     }
-  }, [courseId]);
+  }, [urlCourseId]);
 
-  const fetchData = async () => {
+  useEffect(() => {
+    if (selectedCourseId && !urlCourseId) {
+      fetchData(selectedCourseId);
+    }
+  }, [selectedCourseId]);
+
+  const fetchCourses = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCourses(data || []);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: `Error al cargar ediciones: ${error.message}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchData = async (courseId: string) => {
     try {
       setLoading(true);
 
@@ -179,7 +214,7 @@ export default function AdminModulosManagement() {
         num_modulo: nextNum,
         description: '',
         code: '',
-        course_id: courseId,
+        course_id: selectedCourseId || '',
         teacher_principal_id: course?.teacher_principal_id || '',
         academic_year: course?.academic_year || '',
         semester_year: course?.academic_year + '-' + course?.semester || '',
@@ -267,7 +302,9 @@ export default function AdminModulosManagement() {
       }
 
       handleCloseDialog();
-      fetchData();
+      if (selectedCourseId) {
+        fetchData(selectedCourseId);
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -291,7 +328,9 @@ export default function AdminModulosManagement() {
       toast({
         title: 'Éxito',
         description: 'Módulo eliminado correctamente',
-      });
+      if (selectedCourseId) {
+        fetchData(selectedCourseId);
+      }
 
       fetchData();
     } catch (error: any) {
@@ -307,6 +346,45 @@ export default function AdminModulosManagement() {
     return <div className="container mx-auto py-8 text-center">Cargando...</div>;
   }
 
+  // Si no hay courseId seleccionado, mostrar selector de edición
+  if (!selectedCourseId) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <Calendar className="h-6 w-6" />
+              Gestión de Módulos
+            </CardTitle>
+            <CardDescription>
+              Seleccione una edición para gestionar sus módulos
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label>Seleccionar Edición</Label>
+              <Select
+                value={selectedCourseId || ''}
+                onValueChange={setSelectedCourseId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione una edición" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} - {c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!course || !programa) {
     return <div className="container mx-auto py-8 text-center">Edición no encontrada</div>;
   }
@@ -316,13 +394,15 @@ export default function AdminModulosManagement() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/admin/ediciones')}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            {urlCourseId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/admin/courses')}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
             <div className="flex-1">
               <CardTitle className="text-2xl flex items-center gap-2">
                 <Calendar className="h-6 w-6" />
