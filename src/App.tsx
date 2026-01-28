@@ -42,6 +42,12 @@ import GradingView from "./pages/GradingView";
 import AdminAttendanceReport from "./pages/AdminAttendanceReport";
 import AdminReports from "./pages/AdminReports";
 import AdminCertificates from "./pages/AdminCertificates";
+// Peri Institute Model imports
+import AdminProgramasManagement from "./pages/AdminProgramasManagement";
+import AdminEdicionesManagement from "./pages/AdminEdicionesManagement";
+import AdminModulosManagement from "./pages/AdminModulosManagement";
+import AdminMatriculasManagement from "./pages/AdminMatriculasManagement";
+import AdminPagosManagement from "./pages/AdminPagosManagement";
 
 const queryClient = new QueryClient();
 
@@ -194,6 +200,32 @@ const App = () => (
             <Route path="/admin/certificates" element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminCertificates />
+              </ProtectedRoute>
+            } />
+            {/* Peri Institute Model Routes */}
+            <Route path="/admin/programas" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminProgramasManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/ediciones" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminEdicionesManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/modulos" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminModulosManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/matriculas" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminMatriculasManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/pagos" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminPagosManagement />
               </ProtectedRoute>
             } />
             <Route path="/admin/*" element={

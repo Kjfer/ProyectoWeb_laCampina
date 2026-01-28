@@ -14,7 +14,9 @@ import {
   HelpCircle,
   Settings,
   Eye,
-  Award
+  Award,
+  DollarSign,
+  Layers
 } from 'lucide-react';
 
 export type UserRole = 'admin' | 'teacher' | 'student' | 'parent' | 'tutor' | 'directivo';
@@ -202,6 +204,36 @@ export const adminNavigationItems: NavItem[] = [
     title: 'Certificados',
     url: '/admin/certificates',
     icon: Award,
+    roles: ['admin']
+  },
+  {
+    title: 'Programas',
+    url: '/admin/programas',
+    icon: Layers,
+    roles: ['admin']
+  },
+  {
+    title: 'Ediciones',
+    url: '/admin/ediciones',
+    icon: Calendar,
+    roles: ['admin']
+  },
+  {
+    title: 'Módulos',
+    url: '/admin/modulos',
+    icon: Library,
+    roles: ['admin']
+  },
+  {
+    title: 'Matrículas',
+    url: '/admin/matriculas',
+    icon: ClipboardList,
+    roles: ['admin']
+  },
+  {
+    title: 'Pagos',
+    url: '/admin/pagos',
+    icon: DollarSign,
     roles: ['admin']
   },
   {
