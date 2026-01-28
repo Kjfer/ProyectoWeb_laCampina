@@ -130,11 +130,10 @@ export default function AdminMaterialesManagement() {
 
       if (studentsError) throw studentsError;
 
-      // Cargar cursos con material
+      // Cargar cursos con material (sin material para evitar recursión)
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
-        .select('id, name, code, material')
-        .neq('material', 'none')
+        .select('id, name, code')
         .eq('is_active', true)
         .order('name');
 

@@ -214,7 +214,7 @@ export default function AdminMatriculasManagement() {
                           : '-'}
                       </TableCell>
                       <TableCell>
-                        {matricula.codigo_estudiante || '-'}
+                        {matricula.student_code || '-'}
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
@@ -308,7 +308,7 @@ export default function AdminMatriculasManagement() {
                   </div>
                   <div>
                     <Label className="text-gray-600">Código Estudiante</Label>
-                    <p className="font-medium">{selectedMatricula.codigo_estudiante || '-'}</p>
+                    <p className="font-medium">{selectedMatricula.student_code || '-'}</p>
                   </div>
                   <div>
                     <Label className="text-gray-600">Registrado por</Label>

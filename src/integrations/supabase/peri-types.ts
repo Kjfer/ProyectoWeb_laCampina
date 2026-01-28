@@ -96,7 +96,7 @@ export interface Matricula {
   id: string;
   cod_matricula: string; // Código único (ej: MAT-2026-0001)
   estudiante_id: string;
-  codigo_estudiante?: string | null;
+  student_code?: string | null;
   usuario_id: string; // Quien registró la matrícula
   modulos_matriculados: ModuloMatriculado[]; // JSONB
   num_cursos: number;
@@ -192,7 +192,7 @@ export interface MatriculaWithRelations extends Matricula {
     first_name: string;
     last_name: string;
     email: string;
-    codigo_estudiante?: string;
+    student_code?: string;
   };
   usuario?: {
     id: string;
@@ -301,7 +301,7 @@ export type PagoUpdate = Partial<Omit<Pago, 'id' | 'created_at' | 'updated_at'>>
 
 export interface MatriculaFormData {
   estudiante_id: string;
-  codigo_estudiante?: string;
+  student_code?: string;
   modulos_seleccionados: string[]; // IDs de módulos
   valor_matricula: number;
   descuento: number;

@@ -94,7 +94,6 @@ export default function AdminCursosGrabadosManagement() {
       const { data: programasData, error: programasError } = await supabase
         .from('programas' as any)
         .select('id, name, code')
-        .eq('is_active', true)
         .order('name');
 
       if (programasError) throw programasError;

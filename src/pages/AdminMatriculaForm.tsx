@@ -41,7 +41,7 @@ interface Profile {
   first_name: string;
   last_name: string;
   email: string;
-  codigo_estudiante?: string;
+  student_code?: string;
 }
 
 interface ModuloConCurso extends Modulo {
@@ -60,7 +60,7 @@ export default function AdminMatriculaForm() {
 
   const [formData, setFormData] = useState<MatriculaFormData>({
     estudiante_id: '',
-    codigo_estudiante: '',
+    student_code: '',
     modulos_seleccionados: [],
     valor_matricula: 0,
     descuento: 0,
@@ -113,7 +113,7 @@ export default function AdminMatriculaForm() {
       // Cargar estudiantes
       const { data: studentsData, error: studentsError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, codigo_estudiante')
+        .select('id, first_name, last_name, email, student_code')
         .eq('role', 'student')
         .order('first_name');
 
@@ -167,7 +167,7 @@ export default function AdminMatriculaForm() {
     setFormData({
       ...formData,
       estudiante_id: estudianteId,
-      codigo_estudiante: student?.codigo_estudiante || '',
+      student_code: student?.student_code || '',
     });
   };
 
@@ -256,7 +256,7 @@ export default function AdminMatriculaForm() {
       const matriculaData = {
         cod_matricula: codMatricula,
         estudiante_id: formData.estudiante_id,
-        codigo_estudiante: formData.codigo_estudiante,
+        student_code: formData.student_code,
         usuario_id: currentUser.id,
         modulos_matriculados: modulosMatriculados,
         num_cursos: uniqueCourses.size,
@@ -436,12 +436,12 @@ export default function AdminMatriculaForm() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="codigo_estudiante">Código Estudiante</Label>
+                  <Label htmlFor="student_code">Código Estudiante</Label>
                   <Input
-                    id="codigo_estudiante"
-                    value={formData.codigo_estudiante}
+                    id="student_code"
+                    value={formData.student_code}
                     onChange={(e) =>
-                      setFormData({ ...formData, codigo_estudiante: e.target.value })
+                      setFormData({ ...formData, student_code: e.target.value })
                     }
                     placeholder="Opcional"
                   />

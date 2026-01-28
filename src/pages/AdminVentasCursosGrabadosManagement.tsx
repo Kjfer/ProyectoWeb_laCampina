@@ -44,7 +44,8 @@ interface VentaCursoGrabado {
   created_at: string;
   estudiante?: {
     id: string;
-    full_name: string;
+    first_name: string;
+    last_name: string;
     email: string;
   };
   curso_grabado?: {
@@ -59,7 +60,8 @@ interface VentaCursoGrabado {
 
 interface Profile {
   id: string;
-  full_name: string;
+  first_name: string;
+  last_name: string;
   email: string;
 }
 
@@ -110,7 +112,7 @@ export default function AdminVentasCursosGrabadosManagement() {
         .from('venta_cursos_grabados' as any)
         .select(`
           *,
-          estudiante:profiles!venta_cursos_grabados_estudiante_id_fkey(id, full_name, email),
+          estudiante:profiles!venta_cursos_grabados_estudiante_id_fkey(id, first_name, last_name, email),
           curso_grabado:cursos_grabados(id, name),
           matricula:matriculas(id, cod_matricula)
         `)
@@ -121,9 +123,9 @@ export default function AdminVentasCursosGrabadosManagement() {
       // Cargar estudiantes
       const { data: estudiantesData, error: estudiantesError } = await supabase
         .from('profiles')
-        .select('id, full_name, email')
+        .select('id, first_name, last_name, email')
         .eq('role', 'student')
-        .order('full_name');
+        .order('first_name');
 
       if (estudiantesError) throw estudiantesError;
 
@@ -301,7 +303,7 @@ export default function AdminVentasCursosGrabadosManagement() {
                   {ventas.map((venta) => (
                     <TableRow key={venta.id}>
                       <TableCell className="font-medium">
-                        {venta.estudiante?.full_name || '-'}
+                        {venta.estudiante ? `${venta.estudiante.first_name} ${venta.estudiante.last_name}` : '-'}
                       </TableCell>
                       <TableCell>{venta.curso_grabado?.name || '-'}</TableCell>
                       <TableCell>{venta.matricula?.cod_matricula || '-'}</TableCell>
@@ -362,7 +364,7 @@ export default function AdminVentasCursosGrabadosManagement() {
                   <SelectContent>
                     {estudiantes.map((estudiante) => (
                       <SelectItem key={estudiante.id} value={estudiante.id}>
-                        {estudiante.full_name} ({estudiante.email})
+                        {estudiante.first_name} {estudiante.last_name} ({estudiante.email})
                       </SelectItem>
                     ))}
                   </SelectContent>
