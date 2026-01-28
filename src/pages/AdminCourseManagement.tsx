@@ -2,6 +2,7 @@
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { BookOpen } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AdminProgramasManagement from './AdminProgramasManagement';
 import AdminEdicionesManagement from './AdminEdicionesManagement';
 import AdminModulosManagement from './AdminModulosManagement';
 
@@ -14,14 +15,19 @@ const AdminCourseManagement = () => {
             <BookOpen className="h-8 w-8" />
             Gestión de Cursos
           </h1>
-          <p className="text-gray-600">Administra ediciones y módulos de los programas educativos</p>
+          <p className="text-gray-600">Administra programas, ediciones y módulos de los cursos educativos</p>
         </div>
 
-        <Tabs defaultValue="ediciones" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+        <Tabs defaultValue="programas" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 max-w-[600px]">
+            <TabsTrigger value="programas">Programas</TabsTrigger>
             <TabsTrigger value="ediciones">Ediciones</TabsTrigger>
             <TabsTrigger value="modulos">Módulos</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="programas" className="space-y-6">
+            <AdminProgramasManagement />
+          </TabsContent>
 
           <TabsContent value="ediciones" className="space-y-6">
             <AdminEdicionesManagement />

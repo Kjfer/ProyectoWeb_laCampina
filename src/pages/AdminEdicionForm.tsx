@@ -60,7 +60,7 @@ export default function AdminEdicionForm() {
     try {
       // Cargar programas activos
       const { data: programasData, error: programasError } = await supabase
-        .from('programas')
+        .from('peri_programas' as any)
         .select('*')
         .eq('is_active', true)
         .order('name');

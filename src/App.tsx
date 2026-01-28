@@ -46,6 +46,8 @@ import AdminCertificates from "./pages/AdminCertificates";
 import AdminProgramasManagement from "./pages/AdminProgramasManagement";
 import AdminMatriculasManagement from "./pages/AdminMatriculasManagement";
 import AdminPagosManagement from "./pages/AdminPagosManagement";
+import AdminEdicionForm from "./pages/AdminEdicionForm";
+import AdminMatriculaForm from "./pages/AdminMatriculaForm";
 
 const queryClient = new QueryClient();
 
@@ -206,9 +208,24 @@ const App = () => (
                 <AdminProgramasManagement />
               </ProtectedRoute>
             } />
+            <Route path="/admin/ediciones/nueva" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminEdicionForm />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/ediciones/:id/editar" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminEdicionForm />
+              </ProtectedRoute>
+            } />
             <Route path="/admin/matriculas" element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminMatriculasManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/matriculas/nueva" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminMatriculaForm />
               </ProtectedRoute>
             } />
             <Route path="/admin/pagos" element={

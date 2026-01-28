@@ -177,12 +177,6 @@ export const navigationItems: NavItem[] = [
 
 export const adminNavigationItems: NavItem[] = [
   {
-    title: 'Programas',
-    url: '/admin/programas',
-    icon: Layers,
-    roles: ['admin']
-  },
-  {
     title: 'Gestión de Cursos',
     url: '/admin/courses',
     icon: BookOpen,

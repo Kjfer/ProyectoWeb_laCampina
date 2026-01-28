@@ -59,7 +59,7 @@ export default function AdminEdicionesManagement() {
         .from('courses')
         .select(`
           *,
-          programa:programas(*),
+          programa:peri_programas!courses_program_id_fkey(*),
           teacher:profiles!courses_teacher_principal_id_fkey(id, first_name, last_name, email)
         `)
         .order('created_at', { ascending: false });
@@ -68,7 +68,7 @@ export default function AdminEdicionesManagement() {
 
       // Cargar programas activos
       const { data: programasData, error: programasError } = await supabase
-        .from('programas' as any)
+        .from('peri_programas' as any)
         .select('*')
         .eq('is_active', true)
         .order('name');

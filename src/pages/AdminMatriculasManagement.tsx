@@ -41,13 +41,13 @@ export default function AdminMatriculasManagement() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('matriculas' as any)
+        .from('peri_matriculas')
         .select(`
           *,
-          estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name, email, codigo_estudiante),
-          usuario:profiles!matriculas_usuario_id_fkey(id, first_name, last_name),
+          estudiante:profiles!peri_matriculas_estudiante_id_fkey(id, first_name, last_name, email, codigo_estudiante),
+          usuario:profiles!peri_matriculas_usuario_id_fkey(id, first_name, last_name),
           curso_grabado:cursos_grabados(id, name),
-          pagos:pagos(monto_pago, fecha_pago, estado_pago, metodo_pago)
+          pagos:peri_pagos(monto_pago, fecha_pago, estado_pago, metodo_pago)
         `)
         .order('created_at', { ascending: false });
 

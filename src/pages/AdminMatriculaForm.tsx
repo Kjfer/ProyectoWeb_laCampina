@@ -129,7 +129,7 @@ export default function AdminMatriculaForm() {
 
       // Cargar módulos activos
       const { data: modulosData, error: modulosError } = await supabase
-        .from('modulos')
+        .from('peri_modulos')
         .select(`
           *,
           course:courses(*)
@@ -215,7 +215,7 @@ export default function AdminMatriculaForm() {
       // 1. Obtener el último número de matrícula del año
       const currentYear = new Date().getFullYear();
       const { data: lastMatricula } = await supabase
-        .from('matriculas')
+        .from('peri_matriculas')
         .select('cod_matricula')
         .like('cod_matricula', `MAT-${currentYear}-%`)
         .order('created_at', { ascending: false })
@@ -271,7 +271,7 @@ export default function AdminMatriculaForm() {
       };
 
       const { data: newMatricula, error: matriculaError } = await supabase
-        .from('matriculas')
+        .from('peri_matriculas')
         .insert(matriculaData)
         .select()
         .single();
@@ -368,7 +368,7 @@ export default function AdminMatriculaForm() {
         };
 
         const { error: pagoError } = await supabase
-          .from('pagos')
+          .from('peri_pagos')
           .insert(pagoData);
 
         if (pagoError) throw pagoError;

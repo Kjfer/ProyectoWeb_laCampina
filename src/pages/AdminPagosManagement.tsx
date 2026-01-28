@@ -96,11 +96,11 @@ export default function AdminPagosManagement() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('pagos' as any)
+        .from('peri_pagos')
         .select(`
           *,
-          estudiante:profiles!pagos_estudiante_id_fkey(id, first_name, last_name, email),
-          usuario:profiles!pagos_usuario_id_fkey(id, first_name, last_name)
+          estudiante:profiles!peri_pagos_estudiante_id_fkey(id, first_name, last_name, email),
+          usuario:profiles!peri_pagos_usuario_id_fkey(id, first_name, last_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -181,7 +181,7 @@ export default function AdminPagosManagement() {
       };
 
       const { error } = await supabase
-        .from('pagos' as any)
+        .from('peri_pagos')
         .insert(pagoData);
 
       if (error) throw error;

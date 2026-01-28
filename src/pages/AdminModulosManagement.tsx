@@ -102,7 +102,7 @@ export default function AdminModulosManagement() {
 
       // Cargar programa
       const { data: programaData, error: programaError } = await supabase
-        .from('programas' as any)
+        .from('peri_programas')
         .select('*')
         .eq('id', (courseData as any).program_id)
         .single();
@@ -112,7 +112,7 @@ export default function AdminModulosManagement() {
 
       // Cargar módulos
       const { data: modulosData, error: modulosError } = await supabase
-        .from('modulos' as any)
+        .from('peri_modulos')
         .select('*')
         .eq('course_id', courseId)
         .order('num_modulo');
@@ -242,7 +242,7 @@ export default function AdminModulosManagement() {
       if (editingModulo) {
         // Actualizar
         const { error } = await supabase
-          .from('modulos' as any)
+          .from('peri_modulos')
           .update(dataToSave)
           .eq('id', editingModulo.id);
 
@@ -255,7 +255,7 @@ export default function AdminModulosManagement() {
       } else {
         // Crear
         const { error } = await supabase
-          .from('modulos' as any)
+          .from('peri_modulos')
           .insert(dataToSave as ModuloInsert);
 
         if (error) throw error;
@@ -282,7 +282,7 @@ export default function AdminModulosManagement() {
 
     try {
       const { error } = await supabase
-        .from('modulos' as any)
+        .from('peri_modulos')
         .delete()
         .eq('id', id);
 
