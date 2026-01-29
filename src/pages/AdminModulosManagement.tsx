@@ -81,6 +81,9 @@ export default function AdminModulosManagement() {
   });
 
   const [schedule, setSchedule] = useState<ModuloSchedule>({});
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [horarioInicio, setHorarioInicio] = useState('09:00');
+  const [horarioFin, setHorarioFin] = useState('11:00');
 
   useEffect(() => {
     if (urlCourseId) {
@@ -203,6 +206,15 @@ export default function AdminModulosManagement() {
         aditional_teachers: modulo.aditional_teachers || [],
       });
       setSchedule(modulo.schedule || {});
+      // Cargar días seleccionados desde el schedule
+      setSelectedDays(Object.keys(modulo.schedule || {}));
+      // Intentar extraer horario del primer día
+      const primerDia = Object.values(modulo.schedule || {})[0];
+      if (primerDia && typeof primerDia === 'string' && primerDia.includes('-')) {
+        const [inicio, fin] = primerDia.split('-');
+        setHorarioInicio(inicio.trim());
+        setHorarioFin(fin.trim());
+      }
     } else {
       const nextNum = modulos.length > 0 
         ? Math.max(...modulos.map(m => m.num_modulo)) + 1 
@@ -225,6 +237,9 @@ export default function AdminModulosManagement() {
         aditional_teachers: [],
       });
       setSchedule({});
+      setSelectedDays([]);
+      setHorarioInicio('09:00');
+      setHorarioFin('11:00');
     }
     setDialogOpen(true);
   };
@@ -243,6 +258,35 @@ export default function AdminModulosManagement() {
       delete newSchedule[dia];
     }
     setSchedule(newSchedule);
+  };
+
+  const handleDayToggle = (dia: string) => {
+    const newSelectedDays = selectedDays.includes(dia)
+      ? selectedDays.filter(d => d !== dia)
+      : [...selectedDays, dia];
+    
+    setSelectedDays(newSelectedDays);
+    
+    // Actualizar schedule con el horario actual
+    const newSchedule: ModuloSchedule = {};
+    newSelectedDays.forEach(day => {
+      newSchedule[day] = `${horarioInicio}-${horarioFin}`;
+    });
+    setSchedule(newSchedule);
+    setFormData({ ...formData, schedule: newSchedule });
+  };
+
+  const handleHorarioChange = (inicio: string, fin: string) => {
+    setHorarioInicio(inicio);
+    setHorarioFin(fin);
+    
+    // Actualizar todos los días seleccionados con el nuevo horario
+    const newSchedule: ModuloSchedule = {};
+    selectedDays.forEach(day => {
+      newSchedule[day] = `${inicio}-${fin}`;
+    });
+    setSchedule(newSchedule);
+    setFormData({ ...formData, schedule: newSchedule });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -609,20 +653,121 @@ export default function AdminModulosManagement() {
               </div>
 
               {/* Horario */}
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label>Horario Semanal</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {DIAS_SEMANA.map((dia) => (
-                    <div key={dia} className="flex items-center gap-2">
-                      <Label className="w-24 text-sm">{dia}:</Label>
+                
+                {/* Selección de días */}
+                <div>
+                  <Label className="text-sm text-gray-600 mb-2 block">Días de clase:</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DIAS_SEMANA.map((dia) => (
+                      <label key={dia} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedDays.includes(dia)}
+                          onChange={() => handleDayToggle(dia)}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm">{dia}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Rango de horas */}
+                {selectedDays.length > 0 && (
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="horario_inicio" className="text-sm text-gray-600">
+                        Hora de inicio:
+                      </Label>
                       <Input
-                        placeholder="Ej: 10:00-12:00"
-                        value={schedule[dia] || ''}
-                        onChange={(e) => handleScheduleChange(dia, e.target.value)}
+                        id="horario_inicio"
+                        type="time"
+                        value={horarioInicio}
+                        onChange={(e) => handleHorarioChange(e.target.value, horarioFin)}
                       />
                     </div>
-                  ))}
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="horario_fin" className="text-sm text-gray-600">
+                        Hora de fin:
+                      </Label>
+                      <Input
+                        id="horario_fin"
+                        type="time"
+                        value={horarioFin}
+                        onChange={(e) => handleHorarioChange(horarioInicio, e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Vista previa del horario */}
+                {selectedDays.length > 0 && (
+                  <div className="text-sm text-gray-600 pt-2">
+                    <strong>Vista previa:</strong> {selectedDays.join(', ')} de {horarioInicio} a {horarioFin}
+                  </div>
+                )}
+              </div>
+
+              {/* Profesores Adicionales */}
+              <div className="space-y-2">
+                <Label htmlFor="aditional_teachers">Profesores Adicionales</Label>
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    const current = formData.aditional_teachers || [];
+                    if (!current.includes(value)) {
+                      setFormData({ 
+                        ...formData, 
+                        aditional_teachers: [...current, value] 
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Agregar profesor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teachers
+                      .filter(t => t.id !== formData.teacher_principal_id)
+                      .filter(t => !formData.aditional_teachers?.includes(t.id))
+                      .map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>
+                          {teacher.first_name} {teacher.last_name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                
+                {/* Lista de profesores adicionales */}
+                {formData.aditional_teachers && formData.aditional_teachers.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {formData.aditional_teachers.map((teacherId) => {
+                      const teacher = teachers.find(t => t.id === teacherId);
+                      return teacher ? (
+                        <span
+                          key={teacherId}
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                        >
+                          {teacher.first_name} {teacher.last_name}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                aditional_teachers: formData.aditional_teachers?.filter(id => id !== teacherId)
+                              });
+                            }}
+                            className="ml-1 hover:text-blue-600"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Estado */}

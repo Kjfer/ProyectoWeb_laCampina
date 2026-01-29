@@ -199,11 +199,10 @@ const AdminStudentManagementHub = () => {
   const fetchCourses = async () => {
     try {
       const { data, error } = await supabase
-        .from('courses')
-        .select('*')
+        .from('modulos' as any)
+        .select('*, course:courses(name, code)')
         .eq('is_active', true)
-        .order('academic_year', { ascending: false })
-        .order('name');
+        .order('start_date', { ascending: false });
 
       if (error) throw error;
       setCourses(data || []);

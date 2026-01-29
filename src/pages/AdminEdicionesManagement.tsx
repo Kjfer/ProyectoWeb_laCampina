@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Eye, GraduationCap, Calendar } from 'lucide-react';
+import { Plus, Edit, Eye, GraduationCap, Calendar, Trash2 } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -99,7 +99,7 @@ export default function AdminEdicionesManagement() {
   };
 
   const handleViewModulos = (courseId: string) => {
-    navigate(`/admin/ediciones/${courseId}/modulos`);
+    navigate(`/admin/courses?tab=modulos&courseId=${courseId}`);
   };
 
   const handleCreateEdicion = () => {
@@ -108,6 +108,35 @@ export default function AdminEdicionesManagement() {
 
   const handleEditEdicion = (courseId: string) => {
     navigate(`/admin/ediciones/${courseId}/editar`);
+  };
+
+  const handleDeleteEdicion = async (courseId: string, courseName: string) => {
+    if (!confirm(`¿Está seguro de eliminar la edición "${courseName}"? Esto también eliminará todos sus módulos.`)) {
+      return;
+    }
+
+    try {
+      // Los módulos se eliminarán automáticamente por CASCADE
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Éxito',
+        description: 'Edición y sus módulos eliminados correctamente',
+      });
+
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: `Error al eliminar: ${error.message}`,
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -208,6 +237,14 @@ export default function AdminEdicionesManagement() {
                           title="Editar"
                         >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteEdicion(course.id, course.name)}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
