@@ -161,16 +161,7 @@ const Courses = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">Mis Cursos</h1>
-          {profile?.role === 'teacher' && (
-          <Button 
-            className="bg-gradient-primary shadow-glow"
-            onClick={() => navigate('/admin/courses')}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Crear Curso
-          </Button>
-        )}
-      </div>
+        </div>
 
       {courses.length === 0 ? (
         <Card className="bg-gradient-card shadow-card border-0">

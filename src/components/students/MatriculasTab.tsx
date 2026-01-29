@@ -74,14 +74,15 @@ export function MatriculasTab() {
     try {
       setLoading(true);
       
-      // Cargar matrículas
+      // Cargar matrículas con información completa de módulos
       const { data: matriculasData, error: matriculasError } = await supabase
         .from('matriculas' as any)
         .select(`
           *,
           estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name, email, student_code),
           usuario:profiles!matriculas_usuario_id_fkey(id, first_name, last_name),
-          curso_grabado:cursos_grabados(id, name)
+          curso_grabado:cursos_grabados(id, name),
+          modulo:modulos(id, nombre, course_id)
         `)
         .order('created_at', { ascending: false });
 
@@ -133,9 +134,12 @@ export function MatriculasTab() {
       return matriculaDate === selectedDate;
     } else if (searchType === 'curso') {
       if (!selectedCourseId) return true;
-      // Necesitamos verificar si alguno de los módulos pertenece al curso seleccionado
-      // Como no tenemos esa info directamente, por ahora filtramos por texto
-      return true; // TODO: Implementar filtro por curso cuando tengamos la relación módulo-curso
+      // Verificar si algún módulo matriculado pertenece al curso seleccionado
+      const modulos = mat.modulos_matriculados || [];
+      return modulos.some((modulo: any) => {
+        // Buscar si el módulo tiene relación con el curso seleccionado
+        return modulo.course_id === selectedCourseId;
+      });
     }
 
     return true;

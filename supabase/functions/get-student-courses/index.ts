@@ -70,18 +70,22 @@ serve(async (req: Request) => {
     let coursesData = []
 
     if (profile.role === 'student') {
-      // For students: get modules they are enrolled in via matriculas
+      // For students: get modules they are enrolled in via course_enrollments
+      // Cada registro en course_enrollments representa un módulo individual
       const { data, error } = await supabaseClient
-        .from('matriculas')
+        .from('course_enrollments')
         .select(`
-          fecha_matricula,
-          modulo:modulos (
+          enrolled_at,
+          payment_status,
+          modulo_id,
+          modulo:modulos!course_enrollments_modulo_id_fkey (
             id,
             nombre,
             codigo,
             start_date,
             end_date,
             teacher_principal_id,
+            course_id,
             course:courses (
               id,
               name,
@@ -101,24 +105,25 @@ serve(async (req: Request) => {
             )
           )
         `)
-        .eq('student_code', profile.student_code)
-        .order('fecha_matricula', { ascending: false })
+        .eq('student_id', profile.id)
+        .order('enrolled_at', { ascending: false })
 
       if (error) {
-        console.error('❌ Error obteniendo cursos del estudiante:', error)
+        console.error('❌ Error obteniendo módulos del estudiante:', error)
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: 'Error al obtener cursos del estudiante',
+            error: 'Error al obtener módulos del estudiante',
             details: error.message 
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
         )
       }
 
-      // Transform the data to include enrollment info from modulos
-      coursesData = data?.map(matricula => {
-        const modulo = matricula.modulo
+      // Transform the data to include enrollment info from course_enrollments
+      coursesData = data?.map(enrollment => {
+        const modulo = enrollment.modulo
+        if (!modulo) return null
         return {
           id: modulo.id,
           name: modulo.nombre,
@@ -129,10 +134,12 @@ serve(async (req: Request) => {
           is_active: true,
           created_at: modulo.start_date,
           teacher: modulo.teacher,
-          enrolled_at: matricula.fecha_matricula,
-          enrollment_status: 'enrolled'
+          enrolled_at: enrollment.enrolled_at,
+          enrollment_status: 'enrolled',
+          payment_status: enrollment.payment_status,
+          course_id: modulo.course_id // Importante: incluir course_id para agrupar por edición
         }
-      }).filter(item => item.id) || []
+      }).filter(item => item && item.id) || []
 
     } else if (profile.role === 'teacher') {
       // For teachers: get modules they teach (primary or additional)

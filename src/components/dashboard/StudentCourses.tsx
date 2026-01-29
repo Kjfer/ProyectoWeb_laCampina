@@ -44,11 +44,11 @@ export function StudentCourses() {
     try {
       setLoading(true);
 
-      // Get total count first - usando matriculas con student_code
+      // Get total count first - usando course_enrollments (cada registro = un módulo)
       const { count: totalCount, error: countError } = await supabase
-        .from('matriculas')
+        .from('course_enrollments')
         .select('*', { count: 'exact', head: true })
-        .eq('student_code', profile!.student_code);
+        .eq('student_id', profile!.id);
 
       setTotalCourses(totalCount || 0);
 
@@ -58,13 +58,13 @@ export function StudentCourses() {
         return;
       }
 
-      // Get paginated enrolled modules via matriculas
+      // Get paginated enrolled modules via course_enrollments
       const { data: enrollments, error: enrollError } = await supabase
-        .from('matriculas')
-        .select('modulo_id, fecha_matricula')
-        .eq('student_code', profile!.student_code)
+        .from('course_enrollments')
+        .select('modulo_id, enrolled_at')
+        .eq('student_id', profile!.id)
         .range((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE - 1)
-        .order('fecha_matricula', { ascending: false });
+        .order('enrolled_at', { ascending: false });
 
       if (enrollError) throw enrollError;
 

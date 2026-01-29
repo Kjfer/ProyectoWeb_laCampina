@@ -221,20 +221,23 @@ export default function TutorDashboard() {
       const coursesForSchedule = tutorCourses.length > 0 ? tutorCourses : allCourseIds.map(id => ({ id, name: '', code: '' }));
       setCourses(coursesForSchedule);
 
-      // Fetch students enrolled in ALL tutor modules (not just selected one)
+      // Fetch students enrolled in ALL tutor modules via course_enrollments
       console.log('📡 Consultando estudiantes matriculados en todos los módulos del tutor...');
       const { data: studentsData, error: studentsError } = await supabase
-        .from('matriculas')
-        .select('student_code, profiles!inner(*)')
+        .from('course_enrollments')
+        .select(`
+          student_id,
+          student:profiles!course_enrollments_student_id_fkey(*)
+        `)
         .in('modulo_id', allCourseIds);
 
       console.log('📦 Respuesta de estudiantes:', { studentsData, studentsError });
 
       if (studentsError) throw studentsError;
 
-      // Remove duplicates by student_code
+      // Remove duplicates by student_id
       const uniqueStudents = Array.from(
-        new Map(studentsData.map(item => [item.student_code, item.profiles])).values()
+        new Map(studentsData.map(item => [item.student_id, item.student])).values()
       ) as Student[];
 
       console.log('👥 Total estudiantes únicos encontrados:', uniqueStudents.length);

@@ -185,12 +185,6 @@ export const adminNavigationItems: NavItem[] = [
     roles: ['admin']
   },
   {
-    title: 'Matrículas',
-    url: '/admin/matriculas',
-    icon: ClipboardList,
-    roles: ['admin']
-  },
-  {
     title: 'Pagos',
     url: '/admin/pagos',
     icon: DollarSign,

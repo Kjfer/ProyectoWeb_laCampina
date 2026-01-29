@@ -47,10 +47,6 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Determinar el curso activo (ya sea el prop classroom o el seleccionado)
-  const activeCourse = classroom || (courses && selectedCourseId ? courses.find(c => c.id === selectedCourseId) : null);
-  const showCourseSelector = !classroom && courses && courses.length > 0;
-
   // Auto-scroll to latest log
   useEffect(() => {
     if (logsEndRef.current) {
@@ -219,19 +215,20 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
       addLog(`✅ Procesamiento completado`);
       addLog(`📊 Resultados:`);
       addLog(`   • ${summary.new} estudiantes nuevos creados`);
-      addLog(`   • ${summary.existing} estudiantes existentes matriculados`);
+      addLog(`   • ${summary.existing} estudiantes ya existían en la base de datos`);
       if (summary.errors > 0) {
         addLog(`   ⚠️ ${summary.errors} errores encontrados`);
       }
       addLog(`🎉 Importación finalizada exitosamente`);
+      addLog(`⚠️ Para matricular a los estudiantes, usa la pestaña "Matrícula"`);
 
       let description = '';
       if (summary.new > 0 && summary.existing > 0) {
-        description = `${summary.new} estudiantes nuevos creados, ${summary.existing} estudiantes existentes matriculados`;
+        description = `${summary.new} estudiantes nuevos creados, ${summary.existing} ya existían`;
       } else if (summary.new > 0) {
-        description = `${summary.new} estudiantes nuevos creados y matriculados al curso`;
+        description = `${summary.new} estudiantes nuevos creados. Usa la pestaña "Matrícula" para inscribirlos en cursos.`;
       } else if (summary.existing > 0) {
-        description = `${summary.existing} estudiantes existentes matriculados al curso`;
+        description = `${summary.existing} estudiantes ya existían en el sistema`;
       }
 
       if (summary.errors > 0) {
@@ -263,53 +260,17 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
 
   return (
     <div className="space-y-4">
-      {showCourseSelector && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Seleccionar Curso Destino
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Label htmlFor="course-select">Curso</Label>
-            <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
-              <SelectTrigger id="course-select">
-                <SelectValue placeholder="Selecciona un curso para importar estudiantes" />
-              </SelectTrigger>
-              <SelectContent>
-                {courses?.map((course) => (
-                  <SelectItem key={course.id} value={course.id}>
-                    {course.name} ({course.code})
-                    {course.grade && course.section && ` - ${course.grade}${course.section}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
             Importación Masiva de Estudiantes
           </CardTitle>
-          {activeCourse && (
-            <p className="text-sm text-muted-foreground">
-              Curso: {activeCourse.name} ({activeCourse.code})
-              {activeCourse.grade && activeCourse.section && ` - ${activeCourse.grade}${activeCourse.section}`}
-            </p>
-          )}
+          <p className="text-sm text-muted-foreground">
+            Importa estudiantes desde un archivo Excel. Los estudiantes serán creados en el sistema sin matrícula automática.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!activeCourse ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Por favor, selecciona un curso antes de importar estudiantes
-            </div>
-          ) : (
-            <>
               {importStatus === 'idle' && (
                 <>
                   <div className="bg-muted/50 p-4 rounded-lg space-y-3">
@@ -341,7 +302,15 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
                       ℹ️ Estudiantes duplicados
                     </p>
                     <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
-                      Si un estudiante ya existe (mismo DNI o código), será reconocido y asociado automáticamente al aula virtual seleccionada sin crear un duplicado.
+                      Si un estudiante ya existe (mismo DNI o código), será reconocido automáticamente sin crear un duplicado.
+                    </p>
+                  </div>
+                  <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                    <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                      ⚠️ Matrícula de estudiantes
+                    </p>
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200 mt-1">
+                      Esta función solo crea perfiles de estudiantes. Para matricularlos en cursos, usa la pestaña "Matrícula" después de la importación.
                     </p>
                   </div>
                 </div>
@@ -461,8 +430,6 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
             </Button>
           </div>
         )}
-            </>
-          )}
         </CardContent>
       </Card>
     </div>

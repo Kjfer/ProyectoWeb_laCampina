@@ -158,6 +158,10 @@ export interface CourseEnrollment {
   tipo_estudiante: 'nuevo' | 'antiguo';
   enrolled_at: string;
   is_active: boolean;
+  payment_status?: 'pending' | 'verified' | 'blocked';
+  payment_verified_by?: string | null;
+  payment_verified_at?: string | null;
+  payment_notes?: string | null;
 }
 
 // ============================================

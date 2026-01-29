@@ -141,12 +141,11 @@ export default function CourseDetail() {
   const fetchStudents = async () => {
     try {
       const { data, error } = await supabase
-        .from('matriculas')
+        .from('course_enrollments')
         .select(`
-          fecha_matricula,
-          estado_pago,
-          student_code,
-          profiles!inner(
+          enrolled_at,
+          payment_status,
+          student:profiles!course_enrollments_student_id_fkey(
             id,
             first_name,
             last_name,
@@ -159,15 +158,16 @@ export default function CourseDetail() {
       if (error) throw error;
       
       const enrolledStudents = data
-        ?.map(matricula => {
-          const student = matricula.profiles;
+        ?.map(enrollment => {
+          const student = enrollment.student;
           if (!student) {
-            console.warn('Matricula without student data:', matricula);
+            console.warn('Enrollment without student data:', enrollment);
             return null;
           }
           return {
             ...(student as any),
-            enrolled_at: matricula.fecha_matricula
+            enrolled_at: enrollment.enrolled_at,
+            payment_status: enrollment.payment_status
           };
         })
         .filter((student): student is Student => student !== null) || [];
