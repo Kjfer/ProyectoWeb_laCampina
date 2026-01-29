@@ -147,11 +147,11 @@ export default function TutorDashboard() {
       const { data: coursesData, error: coursesError } = await supabase
         .from('course_teachers')
         .select(`
-          modulo_id,
-          modulos!inner(
+          course_id,
+          modulos!course_teachers_course_id_fkey!inner(
             id,
-            nombre,
-            codigo,
+            name,
+            code,
             start_date,
             end_date,
             course:courses (
@@ -162,8 +162,7 @@ export default function TutorDashboard() {
             )
           )
         `)
-        .eq('teacher_id', profile.id)
-        .eq('is_tutor', true);
+        .eq('teacher_id', profile.id);
 
       console.log('📦 Respuesta de módulos:', { coursesData, coursesError });
 

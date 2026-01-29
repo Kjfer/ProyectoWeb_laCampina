@@ -91,11 +91,10 @@ export default function CourseDetail() {
         .from('modulos')
         .select(`
           id,
-          nombre,
-          codigo,
+          name,
+          code,
           start_date,
           end_date,
-          horario_semanal,
           teacher_principal_id,
           course:courses (
             id,
@@ -117,8 +116,8 @@ export default function CourseDetail() {
       // Transformar datos del módulo para que coincidan con la estructura de Course
       const transformedCourse = {
         id: data.id,
-        name: data.nombre,
-        code: data.codigo,
+        name: data.name,
+        code: data.code,
         description: `${data.course?.name || ''} - Inicio: ${new Date(data.start_date).toLocaleDateString()}`,
         academic_year: data.course?.academic_year || '',
         semester: data.course?.semester || '',
@@ -126,7 +125,7 @@ export default function CourseDetail() {
         created_at: data.start_date,
         start_time: '',
         end_time: '',
-        schedule: data.horario_semanal ? Object.keys(data.horario_semanal) : [],
+        schedule: [],
         teacher: data.teacher
       };
       
@@ -145,7 +144,8 @@ export default function CourseDetail() {
         .select(`
           enrolled_at,
           payment_status,
-          student:profiles!course_enrollments_student_id_fkey(
+          student_id,
+          profiles!inner(
             id,
             first_name,
             last_name,
@@ -159,7 +159,7 @@ export default function CourseDetail() {
       
       const enrolledStudents = data
         ?.map(enrollment => {
-          const student = enrollment.student;
+          const student = enrollment.profiles;
           if (!student) {
             console.warn('Enrollment without student data:', enrollment);
             return null;
@@ -193,7 +193,7 @@ export default function CourseDetail() {
             last_name
           )
         `)
-        .eq('modulo_id', id);
+        .eq('course_id', id);
 
       if (error) throw error;
       setAdditionalTeachers(data?.map(item => item.teacher).filter(Boolean) || []);

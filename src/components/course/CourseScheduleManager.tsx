@@ -65,11 +65,10 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
       try {
         const { data: teacherData, error } = await supabase
           .from('course_teachers')
-          .select('is_tutor')
+          .select('id')
           .eq('course_id', courseId)
           .eq('teacher_id', profile.id)
-          .eq('is_tutor', true)
-          .single();
+          .maybeSingle();
 
         if (!error && teacherData) {
           setCanEdit(true);
