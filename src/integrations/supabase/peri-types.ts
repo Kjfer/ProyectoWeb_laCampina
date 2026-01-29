@@ -395,7 +395,7 @@ export const generateModuloCode = (programCode: string, numModulo: number, date:
 };
 
 export const generateMatriculaCode = (year: number, sequential: number): string => {
-  const paddedSeq = String(sequential).padStart(4, '0');
+  const paddedSeq = String(sequential).padStart(5, '0');
   return `MAT-${year}-${paddedSeq}`;
 };
 

@@ -556,218 +556,247 @@ export default function AdminPagosManagement() {
 
       {/* Dialog para registrar pago */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Registrar Nuevo Pago</DialogTitle>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Registrar Nuevo Pago
+            </DialogTitle>
             <DialogDescription>
               Complete los datos del pago recibido
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
-              {/* Categoría */}
-              <div className="space-y-2">
-                <Label htmlFor="categoria_producto">Categoría *</Label>
-                <Select
-                  value={formData.categoria_producto}
-                  onValueChange={handleCategoriaChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIAS_PRODUCTO.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat === 'matricula' ? 'Matrícula' : 
-                         cat === 'material' ? 'Material (Book/Kit)' : 
-                         'Curso Grabado'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Sección 1: Información del Producto */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">1. Información del Producto</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="categoria_producto">Categoría *</Label>
+                    <Select
+                      value={formData.categoria_producto}
+                      onValueChange={handleCategoriaChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIAS_PRODUCTO.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat === 'matricula' ? 'Matrícula' : 
+                             cat === 'material' ? 'Material (Book/Kit)' : 
+                             'Curso Grabado'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {/* Código del Producto */}
-              <div className="space-y-2">
-                <Label htmlFor="codigo_producto">Código del Producto *</Label>
-                {loadingProductos ? (
-                  <div className="text-sm text-gray-500">Cargando productos...</div>
-                ) : (
-                  <Select
-                    value={formData.codigo_producto}
-                    onValueChange={handleProductoChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccione un producto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {productosDisponibles.map((producto) => (
-                        <SelectItem key={producto.codigo} value={producto.codigo}>
-                          {producto.codigo} - {producto.descripcion} ({producto.estudiante_nombre})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <p className="text-xs text-gray-500">
-                  Seleccione primero la categoría para ver los productos disponibles
-                </p>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="estudiante_id">Estudiante *</Label>
+                    <Select
+                      value={formData.estudiante_id}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, estudiante_id: value })
+                      }
+                      disabled={!formData.codigo_producto}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Se autocompletará" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {students.map((student) => (
+                          <SelectItem key={student.id} value={student.id}>
+                            {student.first_name} {student.last_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {formData.estudiante_id && (
+                      <p className="text-xs text-green-600">
+                        ✓ Autocompletado del producto
+                      </p>
+                    )}
+                  </div>
+                </div>
 
-              {/* Estudiante (autocompletado, solo lectura) */}
-              <div className="space-y-2">
-                <Label htmlFor="estudiante_id">Estudiante *</Label>
-                <Select
-                  value={formData.estudiante_id}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, estudiante_id: value })
-                  }
-                  disabled={!formData.codigo_producto}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Se llenará automáticamente al seleccionar el producto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.first_name} {student.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {formData.estudiante_id && (
-                  <p className="text-xs text-green-600">
-                    ✓ Estudiante seleccionado automáticamente del producto
+                <div className="space-y-2">
+                  <Label htmlFor="codigo_producto">Código del Producto *</Label>
+                  {loadingProductos ? (
+                    <div className="text-sm text-gray-500 p-2 bg-gray-50 rounded">Cargando productos...</div>
+                  ) : (
+                    <Select
+                      value={formData.codigo_producto}
+                      onValueChange={handleProductoChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione un producto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {productosDisponibles.map((producto) => (
+                          <SelectItem key={producto.codigo} value={producto.codigo}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{producto.codigo}</span>
+                              <span className="text-xs text-gray-500">
+                                {producto.descripcion} - {producto.estudiante_nombre}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Seleccione la categoría para ver productos disponibles
                   </p>
-                )}
-              </div>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Monto, Moneda y Fecha */}
-              <div className="grid grid-cols-3 gap-4">
+            {/* Sección 2: Detalles del Pago */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">2. Detalles del Pago</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="monto_pago">Monto *</Label>
+                    <Input
+                      id="monto_pago"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.monto_pago}
+                      onChange={(e) =>
+                        setFormData({ ...formData, monto_pago: parseFloat(e.target.value) || 0 })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="moneda_pago">Moneda *</Label>
+                    <Select
+                      value={formData.moneda_pago}
+                      onValueChange={(value: any) =>
+                        setFormData({ ...formData, moneda_pago: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONEDAS.map((moneda) => (
+                          <SelectItem key={moneda} value={moneda}>
+                            {moneda}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fecha_pago">Fecha *</Label>
+                    <Input
+                      id="fecha_pago"
+                      type="date"
+                      value={formData.fecha_pago}
+                      onChange={(e) =>
+                        setFormData({ ...formData, fecha_pago: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="metodo_pago">Método de Pago *</Label>
+                    <Select
+                      value={formData.metodo_pago}
+                      onValueChange={(value: any) =>
+                        setFormData({ ...formData, metodo_pago: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {METODOS_PAGO.map((metodo) => (
+                          <SelectItem key={metodo} value={metodo}>
+                            {metodo.charAt(0).toUpperCase() + metodo.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="estado_pago">Estado del Pago *</Label>
+                    <Select
+                      value={formData.estado_pago}
+                      onValueChange={(value: any) =>
+                        setFormData({ ...formData, estado_pago: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIPOS_PAGO.map((tipo) => (
+                          <SelectItem key={tipo} value={tipo}>
+                            {tipo.replace('_', ' ').charAt(0).toUpperCase() + tipo.replace('_', ' ').slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Sección 3: Información Adicional */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">3. Información Adicional</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="monto_pago">Monto *</Label>
+                  <Label htmlFor="comprobante">Número de Comprobante</Label>
                   <Input
-                    id="monto_pago"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.monto_pago}
+                    id="comprobante"
+                    value={formData.comprobante}
                     onChange={(e) =>
-                      setFormData({ ...formData, monto_pago: parseFloat(e.target.value) || 0 })
+                      setFormData({ ...formData, comprobante: e.target.value })
                     }
-                    required
+                    placeholder="Boleta, factura, recibo..."
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="moneda_pago">Moneda</Label>
-                  <Select
-                    value={formData.moneda_pago}
-                    onValueChange={(value: any) =>
-                      setFormData({ ...formData, moneda_pago: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MONEDAS.map((moneda) => (
-                        <SelectItem key={moneda} value={moneda}>
-                          {moneda}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fecha_pago">Fecha *</Label>
-                  <Input
-                    id="fecha_pago"
-                    type="date"
-                    value={formData.fecha_pago}
+                  <Label htmlFor="observaciones">Observaciones</Label>
+                  <Textarea
+                    id="observaciones"
+                    value={formData.observaciones}
                     onChange={(e) =>
-                      setFormData({ ...formData, fecha_pago: e.target.value })
+                      setFormData({ ...formData, observaciones: e.target.value })
                     }
-                    required
+                    rows={3}
+                    placeholder="Notas adicionales sobre el pago..."
                   />
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Método y Estado */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="metodo_pago">Método de Pago *</Label>
-                  <Select
-                    value={formData.metodo_pago}
-                    onValueChange={(value: any) =>
-                      setFormData({ ...formData, metodo_pago: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {METODOS_PAGO.map((metodo) => (
-                        <SelectItem key={metodo} value={metodo}>
-                          {metodo.toUpperCase()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="estado_pago">Estado del Pago *</Label>
-                  <Select
-                    value={formData.estado_pago}
-                    onValueChange={(value: any) =>
-                      setFormData({ ...formData, estado_pago: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIPOS_PAGO.map((tipo) => (
-                        <SelectItem key={tipo} value={tipo}>
-                          {tipo.replace('_', ' ').toUpperCase()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Comprobante */}
-              <div className="space-y-2">
-                <Label htmlFor="comprobante">Número de Comprobante</Label>
-                <Input
-                  id="comprobante"
-                  value={formData.comprobante}
-                  onChange={(e) =>
-                    setFormData({ ...formData, comprobante: e.target.value })
-                  }
-                  placeholder="Opcional"
-                />
-              </div>
-
-              {/* Observaciones */}
-              <div className="space-y-2">
-                <Label htmlFor="observaciones">Observaciones</Label>
-                <Textarea
-                  id="observaciones"
-                  value={formData.observaciones}
-                  onChange={(e) =>
-                    setFormData({ ...formData, observaciones: e.target.value })
-                  }
-                  rows={2}
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
+            <DialogFooter className="gap-2">
               <Button type="button" variant="outline" onClick={handleCloseDialog}>
                 Cancelar
               </Button>
-              <Button type="submit">Registrar Pago</Button>
+              <Button type="submit">
+                <DollarSign className="mr-2 h-4 w-4" />
+                Registrar Pago
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

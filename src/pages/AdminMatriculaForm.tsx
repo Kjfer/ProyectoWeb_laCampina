@@ -55,7 +55,7 @@ export default function AdminMatriculaForm() {
   const [students, setStudents] = useState<Profile[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Profile[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
-  const [searchType, setSearchType] = useState<'codigo' | 'dni'>('codigo');
+  const [searchType, setSearchType] = useState<'codigo' | 'dni' | 'codigoMatricula'>('codigo');
   const [courses, setCourses] = useState<Course[]>([]);
   const [modulos, setModulos] = useState<ModuloConCurso[]>([]);
   const [cursosGrabados, setCursosGrabados] = useState<CursoGrabado[]>([]);
@@ -108,14 +108,21 @@ export default function AdminMatriculaForm() {
     }
 
     const searchLower = studentSearch.toLowerCase();
-    const filtered = students.filter(student => {
-      if (searchType === 'codigo') {
-        return student.student_code?.toLowerCase().includes(searchLower);
-      } else {
-        return student.document_number?.toLowerCase().includes(searchLower);
-      }
-    });
-    setFilteredStudents(filtered);
+    
+    if (searchType === 'codigoMatricula') {
+      // Búsqueda por código de matrícula
+      fetchStudentsByMatriculaCode(searchLower);
+    } else {
+      // Búsqueda normal por código de estudiante o DNI
+      const filtered = students.filter(student => {
+        if (searchType === 'codigo') {
+          return student.student_code?.toLowerCase().includes(searchLower);
+        } else {
+          return student.document_number?.toLowerCase().includes(searchLower);
+        }
+      });
+      setFilteredStudents(filtered);
+    }
   }, [studentSearch, searchType, students]);
 
   const getCurrentUser = async () => {
@@ -127,6 +134,36 @@ export default function AdminMatriculaForm() {
         .eq('user_id', user.id)
         .single();
       setCurrentUser(profile);
+    }
+  };
+
+  const fetchStudentsByMatriculaCode = async (codMatricula: string) => {
+    try {
+      // Buscar matrículas que coincidan con el código
+      const { data: matriculasData, error } = await supabase
+        .from('matriculas' as any)
+        .select('estudiante_id, cod_matricula')
+        .ilike('cod_matricula', `%${codMatricula}%`);
+
+      if (error) throw error;
+
+      if (matriculasData && matriculasData.length > 0) {
+        // Obtener los IDs únicos de estudiantes
+        const estudianteIds = [...new Set(matriculasData.map((m: any) => m.estudiante_id))];
+        
+        // Filtrar estudiantes que tienen esas matrículas
+        const filtered = students.filter(student => estudianteIds.includes(student.id));
+        setFilteredStudents(filtered);
+      } else {
+        setFilteredStudents([]);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: `Error al buscar por código de matrícula: ${error.message}`,
+        variant: 'destructive',
+      });
+      setFilteredStudents([]);
     }
   };
 
@@ -233,6 +270,8 @@ export default function AdminMatriculaForm() {
       return;
     }
 
+    let matriculaId: string | null = null;
+    
     try {
       setLoading(true);
 
@@ -301,101 +340,144 @@ export default function AdminMatriculaForm() {
         .single();
 
       if (matriculaError) throw matriculaError;
+      
+      // Guardar ID para posible rollback
+      matriculaId = newMatricula.id;
 
-      // 5. Crear enrollments para cada módulo
-      for (const moduloId of selectedModulos) {
-        const enrollmentData: CourseEnrollmentInsert = {
-          modulo_id: moduloId,
-          student_id: formData.estudiante_id,
-          matricula_id: newMatricula.id,
-          tipo_estudiante: 'nuevo', // Esto se puede determinar con lógica adicional
-          is_active: true,
-        };
+      try {
+        // 5. Crear enrollments para cada módulo
+        for (const moduloId of selectedModulos) {
+          const enrollmentData: CourseEnrollmentInsert = {
+            modulo_id: moduloId,
+            student_id: formData.estudiante_id,
+            matricula_id: newMatricula.id,
+            tipo_estudiante: 'nuevo', // Esto se puede determinar con lógica adicional
+            is_active: true,
+          };
 
-        const { error: enrollError } = await supabase
-          .from('course_enrollments')
-          .insert(enrollmentData);
+          const { error: enrollError } = await supabase
+            .from('course_enrollments')
+            .insert(enrollmentData);
 
-        if (enrollError) throw enrollError;
-      }
+          if (enrollError) throw enrollError;
+        }
 
-      // 6. Si incluye clases grabadas, registrar venta
-      if (formData.incluir_clases_grabadas && formData.id_clases_grabadas) {
-        const ventaData: VentaCursoGrabadoInsert = {
-          estudiante_id: formData.estudiante_id,
-          usuario_id: currentUser.id,
-          id_clases_grabadas: formData.id_clases_grabadas,
-          valor_venta: formData.valor_clase_grabada || 0,
-          matricula_id: newMatricula.id,
-        };
+        // 6. Si incluye clases grabadas, registrar venta
+        if (formData.incluir_clases_grabadas && formData.id_clases_grabadas) {
+          const ventaData: VentaCursoGrabadoInsert = {
+            estudiante_id: formData.estudiante_id,
+            usuario_id: currentUser.id,
+            id_clases_grabadas: formData.id_clases_grabadas,
+            valor_venta: formData.valor_clase_grabada || 0,
+            matricula_id: newMatricula.id,
+          };
 
-        const { error: ventaError } = await supabase
-          .from('venta_cursos_grabados')
-          .insert(ventaData);
+          const { error: ventaError } = await supabase
+            .from('venta_cursos_grabados')
+            .insert(ventaData);
 
-        if (ventaError) throw ventaError;
-      }
+          if (ventaError) throw ventaError;
+        }
 
-      // 7. Registrar compra de materiales
-      // Para books: siempre se registra
-      const courseId = modulos.find(m => m.id === selectedModulos[0])?.course_id;
-      if (courseId) {
-        const bookData: RegistroCompraMaterialInsert = {
-          nombre: 'Material de curso',
-          tipo_material: 'book',
-          usuario_id: currentUser.id,
-          estudiante_id: formData.estudiante_id,
-          course_id: courseId,
-          estado_pago: formData.book_incluido ? 'pagado' : 'pendiente',
-          fecha_pago: formData.book_incluido ? new Date().toISOString() : undefined,
-        };
-
-        const { error: bookError } = await supabase
-          .from('registro_compra_materiales')
-          .insert(bookData);
-
-        if (bookError) throw bookError;
-
-        // Para kits: solo si está incluido
-        if (formData.kit_incluido) {
-          const kitData: RegistroCompraMaterialInsert = {
-            nombre: 'Kit de curso',
-            tipo_material: 'kit',
+        // 7. Registrar compra de materiales
+        // Para books: siempre se registra
+        const courseId = modulos.find(m => m.id === selectedModulos[0])?.course_id;
+        if (courseId) {
+          const bookData: RegistroCompraMaterialInsert = {
+            nombre: 'Material de curso',
+            tipo_material: 'book',
             usuario_id: currentUser.id,
             estudiante_id: formData.estudiante_id,
             course_id: courseId,
-            estado_pago: 'pagado',
-            fecha_pago: new Date().toISOString(),
+            estado_pago: formData.book_incluido ? 'pagado' : 'pendiente',
+            fecha_pago: formData.book_incluido ? new Date().toISOString() : undefined,
           };
 
-          const { error: kitError } = await supabase
+          const { error: bookError } = await supabase
             .from('registro_compra_materiales')
-            .insert(kitData);
+            .insert(bookData);
 
-          if (kitError) throw kitError;
+          if (bookError) throw bookError;
+
+          // Para kits: solo si está incluido
+          if (formData.kit_incluido) {
+            const kitData: RegistroCompraMaterialInsert = {
+              nombre: 'Kit de curso',
+              tipo_material: 'kit',
+              usuario_id: currentUser.id,
+              estudiante_id: formData.estudiante_id,
+              course_id: courseId,
+              estado_pago: 'pagado',
+              fecha_pago: new Date().toISOString(),
+            };
+
+            const { error: kitError } = await supabase
+              .from('registro_compra_materiales')
+              .insert(kitData);
+
+            if (kitError) throw kitError;
+          }
         }
-      }
 
-      // 8. Si se registra pago inicial
-      if (formData.registrar_pago_inicial && formData.monto_pago && formData.monto_pago > 0) {
-        const pagoData: PagoInsert = {
-          codigo_producto: codMatricula,
-          categoria_producto: 'matricula',
-          comprobante: formData.comprobante,
-          monto_pago: formData.monto_pago,
-          fecha_pago: formData.fecha_pago || new Date().toISOString().split('T')[0],
-          metodo_pago: formData.metodo_pago!,
-          moneda_pago: formData.moneda,
-          estado_pago: formData.tipo_pago!,
-          usuario_id: currentUser.id,
-          estudiante_id: formData.estudiante_id,
-        };
+        // 8. Si se registra pago inicial
+        if (formData.registrar_pago_inicial && formData.monto_pago && formData.monto_pago > 0) {
+          const pagoData: PagoInsert = {
+            codigo_producto: codMatricula,
+            categoria_producto: 'matricula',
+            comprobante: formData.comprobante,
+            monto_pago: formData.monto_pago,
+            fecha_pago: formData.fecha_pago || new Date().toISOString().split('T')[0],
+            metodo_pago: formData.metodo_pago!,
+            moneda_pago: formData.moneda,
+            estado_pago: formData.tipo_pago!,
+            usuario_id: currentUser.id,
+            estudiante_id: formData.estudiante_id,
+          };
 
-        const { error: pagoError } = await supabase
-          .from('peri_pagos')
-          .insert(pagoData);
+          const { error: pagoError } = await supabase
+            .from('pagos' as any)
+            .insert(pagoData);
 
-        if (pagoError) throw pagoError;
+          if (pagoError) throw pagoError;
+        }
+      } catch (innerError: any) {
+        // Si falla algo después de crear la matrícula, hacer rollback
+        if (matriculaId) {
+          console.error('Error en transacción, haciendo rollback...', innerError);
+          
+          // Eliminar enrollments
+          await supabase
+            .from('course_enrollments')
+            .delete()
+            .eq('matricula_id', matriculaId);
+          
+          // Eliminar ventas de cursos grabados
+          await supabase
+            .from('venta_cursos_grabados')
+            .delete()
+            .eq('matricula_id', matriculaId);
+          
+          // Eliminar registros de materiales
+          await supabase
+            .from('registro_compra_materiales')
+            .delete()
+            .eq('estudiante_id', formData.estudiante_id)
+            .gte('created_at', new Date(Date.now() - 10000).toISOString()); // Últimos 10 segundos
+          
+          // Eliminar pagos
+          await supabase
+            .from('pagos' as any)
+            .delete()
+            .eq('codigo_producto', codMatricula);
+          
+          // Eliminar la matrícula
+          await supabase
+            .from('matriculas' as any)
+            .delete()
+            .eq('id', matriculaId);
+        }
+        
+        throw innerError;
       }
 
       toast({
@@ -451,15 +533,26 @@ export default function AdminMatriculaForm() {
                     <SelectContent>
                       <SelectItem value="codigo">Código de Estudiante</SelectItem>
                       <SelectItem value="dni">DNI</SelectItem>
+                      <SelectItem value="codigoMatricula">Código de Matrícula</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="col-span-2 space-y-2">
                   <Label>
-                    {searchType === 'codigo' ? 'Código de Estudiante' : 'Número de DNI'}
+                    {searchType === 'codigo' 
+                      ? 'Código de Estudiante' 
+                      : searchType === 'dni' 
+                      ? 'Número de DNI'
+                      : 'Código de Matrícula'}
                   </Label>
                   <Input
-                    placeholder={searchType === 'codigo' ? 'Buscar por código...' : 'Buscar por DNI...'}
+                    placeholder={
+                      searchType === 'codigo' 
+                        ? 'Buscar por código de estudiante...' 
+                        : searchType === 'dni' 
+                        ? 'Buscar por DNI...'
+                        : 'Buscar por código de matrícula (ej: MAT-2026-00001)...'
+                    }
                     value={studentSearch}
                     onChange={(e) => setStudentSearch(e.target.value)}
                   />

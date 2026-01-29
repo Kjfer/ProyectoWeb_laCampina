@@ -74,6 +74,22 @@ export default function AdminCursosGrabadosManagement() {
     fetchData();
   }, []);
 
+  // Autocompletar nombre según programa seleccionado
+  useEffect(() => {
+    if (formData.program_id && !editingCurso) {
+      const programa = programas.find(p => p.id === formData.program_id);
+      if (programa) {
+        // Solo autocompletar si el nombre está vacío o es el valor por defecto
+        if (!formData.name || formData.name === '') {
+          setFormData(prev => ({
+            ...prev,
+            name: `${programa.name} - Curso Grabado`
+          }));
+        }
+      }
+    }
+  }, [formData.program_id, programas, editingCurso]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -289,84 +305,109 @@ export default function AdminCursosGrabadosManagement() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-xl flex items-center gap-2">
+                <Video className="h-5 w-5" />
                 {editingCurso ? 'Editar Curso Grabado' : 'Nuevo Curso Grabado'}
               </DialogTitle>
               <DialogDescription>
                 Complete los datos del curso grabado
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ej: English Complete Course"
-                  required
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Información del Curso</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="program_id">Programa</Label>
+                    <Select
+                      value={formData.program_id}
+                      onValueChange={(value) => setFormData({ ...formData, program_id: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sin programa - Seleccione si aplica" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {programas.map((programa) => (
+                          <SelectItem key={programa.id} value={programa.id}>
+                            {programa.name} ({programa.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      💡 El nombre se autocompletará según el programa seleccionado
+                    </p>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="program_id">Programa</Label>
-                <Select
-                  value={formData.program_id}
-                  onValueChange={(value) => setFormData({ ...formData, program_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sin programa - Seleccione si aplica" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {programas.map((programa) => (
-                      <SelectItem key={programa.id} value={programa.id}>
-                        {programa.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nombre del Curso *</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Ej: English Complete Course"
+                      required
+                    />
+                    {formData.program_id && !editingCurso && (
+                      <p className="text-xs text-green-600">
+                        ✓ Nombre autocompletado - Puede editarlo si lo desea
+                      </p>
+                    )}
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Descripción</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descripción del curso..."
-                  rows={3}
-                />
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Descripción</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Descripción detallada del contenido del curso..."
+                      rows={3}
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="duration_hours">Duración (horas)</Label>
-                <Input
-                  id="duration_hours"
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  value={formData.duration_hours}
-                  onChange={(e) =>
-                    setFormData({ ...formData, duration_hours: parseFloat(e.target.value) || 0 })
-                  }
-                />
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="duration_hours">Duración (horas)</Label>
+                      <Input
+                        id="duration_hours"
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={formData.duration_hours}
+                        onChange={(e) =>
+                          setFormData({ ...formData, duration_hours: parseFloat(e.target.value) || 0 })
+                        }
+                        placeholder="Ej: 40"
+                      />
+                    </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label htmlFor="is_active">Activo</Label>
-              </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="is_active">Estado</Label>
+                      <div className="flex items-center space-x-2 h-10">
+                        <Switch
+                          id="is_active"
+                          checked={formData.is_active}
+                          onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                        />
+                        <Label htmlFor="is_active" className="cursor-pointer">
+                          {formData.is_active ? 'Activo' : 'Inactivo'}
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-              <DialogFooter>
+              <DialogFooter className="gap-2">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
                 </Button>
                 <Button type="submit">
-                  {editingCurso ? 'Actualizar' : 'Crear'}
+                  <Video className="mr-2 h-4 w-4" />
+                  {editingCurso ? 'Actualizar Curso' : 'Crear Curso'}
                 </Button>
               </DialogFooter>
             </form>
