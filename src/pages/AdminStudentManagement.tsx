@@ -48,15 +48,34 @@ interface Course {
   code: string;
 }
 
+interface ModuloForEnrollment {
+  id: string;
+  name: string;
+  code: string;
+  num_modulo: number;
+  course: {
+    id: string;
+    name: string;
+    code: string;
+  };
+}
+
+interface Modulo {
+  id: string;
+  name: string;
+  code: string;
+  num_modulo: number;
+  course: Course;
+}
+
 interface Enrollment {
   id: string;
   student_id: string;
-  course_id: string;
+  modulo_id: string;
   enrolled_at: string;
-  course: Course;
-  payment_status?: 'pending' | 'verified' | 'blocked';
-  payment_verified_at?: string | null;
-  payment_notes?: string | null;
+  modulo: Modulo;
+  tipo_estudiante?: 'nuevo' | 'antiguo';
+  matricula_id?: string | null;
 }
 
 interface StudentFormData {
@@ -72,7 +91,7 @@ const AdminStudentManagement = () => {
   
   // States
   const [students, setStudents] = useState<Student[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [modulos, setModulos] = useState<ModuloForEnrollment[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -83,9 +102,6 @@ const AdminStudentManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedCourseForEnrollment, setSelectedCourseForEnrollment] = useState('');
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
-  const [paymentNotes, setPaymentNotes] = useState('');
   const [formData, setFormData] = useState<StudentFormData>({
     first_name: '',
     last_name: '',
@@ -113,7 +129,7 @@ const AdminStudentManagement = () => {
 
   useEffect(() => {
     fetchStudents();
-    fetchCourses();
+    fetchModulos();
   }, []);
 
   const fetchStudents = async () => {
@@ -144,18 +160,28 @@ const AdminStudentManagement = () => {
     }
   };
 
-  const fetchCourses = async () => {
+  const fetchModulos = async () => {
     try {
       const { data, error } = await supabase
-        .from('courses')
-        .select('id, name, code')
+        .from('modulos')
+        .select(`
+          id,
+          name,
+          code,
+          num_modulo,
+          course:courses (
+            id,
+            name,
+            code
+          )
+        `)
         .eq('is_active', true)
-        .order('name');
+        .order('code');
 
       if (error) {
-        console.error('Error fetching courses:', error);
+        console.error('Error fetching modulos:', error);
       } else {
-        setCourses(data || []);
+        setModulos(data || []);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -168,10 +194,16 @@ const AdminStudentManagement = () => {
         .from('course_enrollments')
         .select(`
           *,
-          course:courses (
+          modulo:modulos (
             id,
             name,
-            code
+            code,
+            num_modulo,
+            course:courses (
+              id,
+              name,
+              code
+            )
           )
         `)
         .eq('student_id', studentId)
@@ -184,69 +216,6 @@ const AdminStudentManagement = () => {
       }
     } catch (error) {
       console.error('Error:', error);
-    }
-  };
-
-  const openPaymentDialog = (enrollment: Enrollment) => {
-    setSelectedEnrollment(enrollment);
-    setPaymentNotes(enrollment.payment_notes || '');
-    setIsPaymentDialogOpen(true);
-  };
-
-  const handleToggleCourseAccess = async (newStatus: 'pending' | 'verified' | 'blocked') => {
-    if (!selectedEnrollment) return;
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No hay sesión activa');
-      }
-
-      const SUPABASE_URL = "https://bnbtmubibnupttnnhijr.supabase.co";
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/toggle-course-access`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            enrollment_id: selectedEnrollment.id,
-            payment_status: newStatus,
-            notes: paymentNotes || null,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error actualizando acceso al curso');
-      }
-
-      const result = await response.json();
-      
-      toast({
-        title: "Éxito",
-        description: result.message,
-      });
-
-      setIsPaymentDialogOpen(false);
-      setSelectedEnrollment(null);
-      setPaymentNotes('');
-
-      // Refresh enrollments
-      if (selectedStudent) {
-        fetchStudentEnrollments(selectedStudent.id);
-      }
-    } catch (error) {
-      console.error('Error toggling course access:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'No se pudo actualizar el acceso',
-        variant: "destructive",
-      });
     }
   };
 
@@ -381,13 +350,13 @@ const AdminStudentManagement = () => {
         .from('course_enrollments')
         .select('id')
         .eq('student_id', selectedStudent.id)
-        .eq('course_id', selectedCourseForEnrollment)
+        .eq('modulo_id', selectedCourseForEnrollment)
         .single();
 
       if (existingEnrollment) {
         toast({
           title: "Error",
-          description: "El estudiante ya está inscrito en este curso",
+          description: "El estudiante ya está inscrito en este módulo",
           variant: "destructive",
         });
         return;
@@ -397,8 +366,9 @@ const AdminStudentManagement = () => {
         .from('course_enrollments')
         .insert([{
           student_id: selectedStudent.id,
-          course_id: selectedCourseForEnrollment,
-          enrolled_at: new Date().toISOString()
+          modulo_id: selectedCourseForEnrollment,
+          enrolled_at: new Date().toISOString(),
+          tipo_estudiante: 'nuevo'
         }]);
 
       if (error) {
@@ -827,14 +797,14 @@ const AdminStudentManagement = () => {
               <form onSubmit={handleEnrollStudent} className="flex gap-2">
                 <Select value={selectedCourseForEnrollment} onValueChange={setSelectedCourseForEnrollment}>
                   <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Seleccionar curso" />
+                    <SelectValue placeholder="Seleccionar módulo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {courses
-                      .filter(course => !studentEnrollments.some(enrollment => enrollment.course_id === course.id))
-                      .map((course) => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.name} ({course.code})
+                    {modulos
+                      .filter(modulo => !studentEnrollments.some(enrollment => enrollment.modulo_id === modulo.id))
+                      .map((modulo) => (
+                        <SelectItem key={modulo.id} value={modulo.id}>
+                          {modulo.course.name} - Módulo {modulo.num_modulo}: {modulo.name} ({modulo.code})
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -853,83 +823,43 @@ const AdminStudentManagement = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Curso</TableHead>
+                      <TableHead>Módulo</TableHead>
                       <TableHead>Código</TableHead>
                       <TableHead>Fecha Inscripción</TableHead>
-                      <TableHead>Estado de Pago</TableHead>
-                      <TableHead>Acceso</TableHead>
+                      <TableHead>Tipo</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {studentEnrollments.map((enrollment) => {
-                      const paymentStatus = enrollment.payment_status || 'pending';
-                      const isAccessGranted = paymentStatus === 'verified';
-                      
                       return (
-                        <TableRow key={enrollment.id} className={paymentStatus === 'blocked' ? 'bg-red-50 dark:bg-red-950/20' : ''}>
-                          <TableCell className="font-medium">{enrollment.course.name}</TableCell>
-                          <TableCell>{enrollment.course.code}</TableCell>
-                          <TableCell>{new Date(enrollment.enrolled_at).toLocaleDateString()}</TableCell>
+                        <TableRow key={enrollment.id}>
+                          <TableCell className="font-medium">{enrollment.modulo.course.name}</TableCell>
                           <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <Badge 
-                                variant={
-                                  paymentStatus === 'verified' ? 'default' : 
-                                  paymentStatus === 'blocked' ? 'destructive' : 
-                                  'secondary'
-                                }
-                                className="w-fit"
-                              >
-                                {paymentStatus === 'verified' && <DollarSign className="w-3 h-3 mr-1" />}
-                                {paymentStatus === 'blocked' && <AlertCircle className="w-3 h-3 mr-1" />}
-                                {paymentStatus === 'verified' ? 'Pago Verificado' : 
-                                 paymentStatus === 'blocked' ? 'Bloqueado' : 
-                                 'Pago Pendiente'}
-                              </Badge>
-                              {enrollment.payment_notes && (
-                                <span className="text-xs text-muted-foreground">
-                                  {enrollment.payment_notes}
-                                </span>
-                              )}
-                              {enrollment.payment_verified_at && (
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(enrollment.payment_verified_at).toLocaleDateString()}
-                                </span>
-                              )}
+                            <div className="flex flex-col">
+                              <span>Módulo {enrollment.modulo.num_modulo}</span>
+                              <span className="text-sm text-muted-foreground">{enrollment.modulo.name}</span>
                             </div>
                           </TableCell>
+                          <TableCell>{enrollment.modulo.code}</TableCell>
+                          <TableCell>{new Date(enrollment.enrolled_at).toLocaleDateString()}</TableCell>
                           <TableCell>
                             <Badge 
-                              variant={isAccessGranted ? 'default' : 'secondary'}
+                              variant={enrollment.tipo_estudiante === 'nuevo' ? 'default' : 'secondary'}
                               className="w-fit"
                             >
-                              {isAccessGranted ? (
-                                <><Unlock className="w-3 h-3 mr-1" /> Habilitado</>
-                              ) : (
-                                <><Lock className="w-3 h-3 mr-1" /> Bloqueado</>
-                              )}
+                              {enrollment.tipo_estudiante === 'nuevo' ? 'Nuevo' : 'Antiguo'}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openPaymentDialog(enrollment)}
-                                title="Gestionar pago y acceso"
-                              >
-                                <DollarSign className="w-4 h-4 mr-1" />
-                                Gestionar Pago
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleUnenrollStudent(enrollment.id)}
-                                title="Dar de baja del curso"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleUnenrollStudent(enrollment.id)}
+                              title="Dar de baja del módulo"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );
@@ -944,107 +874,6 @@ const AdminStudentManagement = () => {
               )}
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Payment Management Dialog */}
-      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Gestionar Pago y Acceso al Curso</DialogTitle>
-          </DialogHeader>
-          {selectedEnrollment && (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Curso:</span>
-                  <span className="text-sm text-muted-foreground">{selectedEnrollment.course.name}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Estado Actual:</span>
-                  <Badge 
-                    variant={
-                      selectedEnrollment.payment_status === 'verified' ? 'default' : 
-                      selectedEnrollment.payment_status === 'blocked' ? 'destructive' : 
-                      'secondary'
-                    }
-                  >
-                    {selectedEnrollment.payment_status === 'verified' ? 'Pago Verificado' : 
-                     selectedEnrollment.payment_status === 'blocked' ? 'Bloqueado' : 
-                     'Pago Pendiente'}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="payment-notes">Notas sobre el Pago</Label>
-                <Textarea
-                  id="payment-notes"
-                  value={paymentNotes}
-                  onChange={(e) => setPaymentNotes(e.target.value)}
-                  placeholder="Ej: Pago recibido el 15/01/2026 vía transferencia..."
-                  rows={3}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Estas notas serán visibles para otros administradores
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <Label>Actualizar Estado:</Label>
-                <div className="grid grid-cols-1 gap-2">
-                  <Button
-                    variant={selectedEnrollment.payment_status === 'verified' ? 'default' : 'outline'}
-                    className="w-full justify-start"
-                    onClick={() => handleToggleCourseAccess('verified')}
-                  >
-                    <Unlock className="w-4 h-4 mr-2" />
-                    <div className="flex-1 text-left">
-                      <div className="font-medium">Verificar Pago</div>
-                      <div className="text-xs opacity-80">Habilitar acceso completo al curso</div>
-                    </div>
-                  </Button>
-                  
-                  <Button
-                    variant={selectedEnrollment.payment_status === 'pending' ? 'default' : 'outline'}
-                    className="w-full justify-start"
-                    onClick={() => handleToggleCourseAccess('pending')}
-                  >
-                    <AlertCircle className="w-4 h-4 mr-2" />
-                    <div className="flex-1 text-left">
-                      <div className="font-medium">Marcar como Pendiente</div>
-                      <div className="text-xs opacity-80">Pago en proceso de verificación</div>
-                    </div>
-                  </Button>
-                  
-                  <Button
-                    variant={selectedEnrollment.payment_status === 'blocked' ? 'destructive' : 'outline'}
-                    className="w-full justify-start"
-                    onClick={() => handleToggleCourseAccess('blocked')}
-                  >
-                    <Lock className="w-4 h-4 mr-2" />
-                    <div className="flex-1 text-left">
-                      <div className="font-medium">Bloquear por Impago</div>
-                      <div className="text-xs opacity-80">Restringir acceso al curso</div>
-                    </div>
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setIsPaymentDialogOpen(false);
-                    setSelectedEnrollment(null);
-                    setPaymentNotes('');
-                  }}
-                >
-                  Cerrar
-                </Button>
-              </div>
-            </div>
-          )}
         </DialogContent>
       </Dialog>
     </div>
