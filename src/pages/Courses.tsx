@@ -67,8 +67,8 @@ const Courses = () => {
   const [loading, setLoading] = useState(true);
   const [courseToDelete, setCourseToDelete] = useState<string | null>(null);
   
-  // Determinar si se debe mostrar vista agrupada (profesores y admins)
-  const showGroupedView = profile?.role === 'teacher' || profile?.role === 'admin';
+  // Mostrar vista agrupada para todos los roles (estudiantes, profesores y admins)
+  const showGroupedView = true;
 
   useEffect(() => {
     fetchCourses();

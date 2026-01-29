@@ -522,47 +522,29 @@ const AdminStudentManagementHub = () => {
 
   const openPaymentDialog = (enrollment: Enrollment) => {
     setSelectedEnrollment(enrollment);
-    setPaymentNotes(enrollment.payment_notes || '');
+    setPaymentNotes('');
     setIsPaymentDialogOpen(true);
   };
 
-  const handleToggleCourseAccess = async (newStatus: 'pending' | 'verified' | 'blocked') => {
+  const handleToggleCourseAccess = async (newStatus: 'pending' | 'granted' | 'blocked') => {
     if (!selectedEnrollment) return;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No hay sesión activa');
-      }
+      // Actualizar access_status en course_enrollments
+      const { error } = await supabase
+        .from('course_enrollments')
+        .update({ access_status: newStatus })
+        .eq('id', selectedEnrollment.id);
 
-      const SUPABASE_URL = "https://bnbtmubibnupttnnhijr.supabase.co";
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/toggle-course-access`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            enrollment_id: selectedEnrollment.id,
-            payment_status: newStatus,
-            notes: paymentNotes || null,
-          }),
-        }
-      );
+      if (error) throw error;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error actualizando acceso al curso');
-      }
-
-      const result = await response.json();
-      
       toast({
         title: "Éxito",
-        description: result.message,
+        description: `Estado actualizado a: ${
+          newStatus === 'granted' ? 'Acceso Habilitado' :
+          newStatus === 'blocked' ? 'Bloqueado' :
+          'Pendiente'
+        }`,
       });
 
       setIsPaymentDialogOpen(false);
@@ -983,40 +965,30 @@ const AdminStudentManagementHub = () => {
                     </TableHeader>
                     <TableBody>
                       {studentEnrollments.map((enrollment) => {
-                        const paymentStatus = enrollment.payment_status || 'pending';
-                        const isAccessGranted = paymentStatus === 'verified';
+                        const paymentStatus = enrollment.access_status || 'pending';
+                        const isAccessGranted = paymentStatus === 'granted';
                         
                         return (
                           <TableRow key={enrollment.id} className={paymentStatus === 'blocked' ? 'bg-red-50 dark:bg-red-950/20' : ''}>
-                            <TableCell className="font-medium">{enrollment.course.name}</TableCell>
-                            <TableCell>{enrollment.course.code}</TableCell>
+                            <TableCell className="font-medium">{enrollment.modulo?.course?.name || 'N/A'}</TableCell>
+                            <TableCell>{enrollment.modulo?.code || 'N/A'}</TableCell>
                             <TableCell>{new Date(enrollment.enrolled_at).toLocaleDateString()}</TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-1">
                                 <Badge 
                                   variant={
-                                    paymentStatus === 'verified' ? 'default' : 
+                                    paymentStatus === 'granted' ? 'default' : 
                                     paymentStatus === 'blocked' ? 'destructive' : 
                                     'secondary'
                                   }
                                   className="w-fit"
                                 >
-                                  {paymentStatus === 'verified' && <DollarSign className="w-3 h-3 mr-1" />}
+                                  {paymentStatus === 'granted' && <DollarSign className="w-3 h-3 mr-1" />}
                                   {paymentStatus === 'blocked' && <AlertCircle className="w-3 h-3 mr-1" />}
-                                  {paymentStatus === 'verified' ? 'Pago Verificado' : 
+                                  {paymentStatus === 'granted' ? 'Acceso Habilitado' : 
                                    paymentStatus === 'blocked' ? 'Bloqueado' : 
-                                   'Pago Pendiente'}
+                                   'Acceso Pendiente'}
                                 </Badge>
-                                {enrollment.payment_notes && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {enrollment.payment_notes}
-                                  </span>
-                                )}
-                                {enrollment.payment_verified_at && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {new Date(enrollment.payment_verified_at).toLocaleDateString()}
-                                  </span>
-                                )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -1078,21 +1050,25 @@ const AdminStudentManagementHub = () => {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Curso:</span>
-                    <span className="text-sm text-muted-foreground">{selectedEnrollment.course.name}</span>
+                    <span className="text-sm font-medium">Módulo:</span>
+                    <span className="text-sm text-muted-foreground">{selectedEnrollment.modulo?.name || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Edición:</span>
+                    <span className="text-sm text-muted-foreground">{selectedEnrollment.modulo?.course?.name || 'N/A'}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Estado Actual:</span>
                     <Badge 
                       variant={
-                        selectedEnrollment.payment_status === 'verified' ? 'default' : 
-                        selectedEnrollment.payment_status === 'blocked' ? 'destructive' : 
+                        selectedEnrollment.access_status === 'granted' ? 'default' : 
+                        selectedEnrollment.access_status === 'blocked' ? 'destructive' : 
                         'secondary'
                       }
                     >
-                      {selectedEnrollment.payment_status === 'verified' ? 'Pago Verificado' : 
-                       selectedEnrollment.payment_status === 'blocked' ? 'Bloqueado' : 
-                       'Pago Pendiente'}
+                      {selectedEnrollment.access_status === 'granted' ? 'Acceso Habilitado' : 
+                       selectedEnrollment.access_status === 'blocked' ? 'Bloqueado' : 
+                       'Acceso Pendiente'}
                     </Badge>
                   </div>
                 </div>
@@ -1115,19 +1091,19 @@ const AdminStudentManagementHub = () => {
                   <Label>Actualizar Estado:</Label>
                   <div className="grid grid-cols-1 gap-2">
                     <Button
-                      variant={selectedEnrollment.payment_status === 'verified' ? 'default' : 'outline'}
+                      variant={selectedEnrollment.access_status === 'granted' ? 'default' : 'outline'}
                       className="w-full justify-start"
-                      onClick={() => handleToggleCourseAccess('verified')}
+                      onClick={() => handleToggleCourseAccess('granted')}
                     >
                       <Unlock className="w-4 h-4 mr-2" />
                       <div className="flex-1 text-left">
-                        <div className="font-medium">Verificar Pago</div>
-                        <div className="text-xs opacity-80">Habilitar acceso completo al curso</div>
+                        <div className="font-medium">Habilitar Acceso</div>
+                        <div className="text-xs opacity-80">Permitir acceso completo al módulo</div>
                       </div>
                     </Button>
                     
                     <Button
-                      variant={selectedEnrollment.payment_status === 'pending' ? 'default' : 'outline'}
+                      variant={selectedEnrollment.access_status === 'pending' ? 'default' : 'outline'}
                       className="w-full justify-start"
                       onClick={() => handleToggleCourseAccess('pending')}
                     >
@@ -1139,7 +1115,7 @@ const AdminStudentManagementHub = () => {
                     </Button>
                     
                     <Button
-                      variant={selectedEnrollment.payment_status === 'blocked' ? 'destructive' : 'outline'}
+                      variant={selectedEnrollment.access_status === 'blocked' ? 'destructive' : 'outline'}
                       className="w-full justify-start"
                       onClick={() => handleToggleCourseAccess('blocked')}
                     >

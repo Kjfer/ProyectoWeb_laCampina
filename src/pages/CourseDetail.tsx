@@ -143,10 +143,8 @@ export default function CourseDetail() {
         .from('course_enrollments')
         .select(`
           enrolled_at,
+          access_status,
           student_id,
-          matricula:matriculas(
-            payment_status
-          ),
           profiles!inner(
             id,
             first_name,
@@ -169,7 +167,7 @@ export default function CourseDetail() {
           return {
             ...(student as any),
             enrolled_at: enrollment.enrolled_at,
-            payment_status: enrollment.matricula?.payment_status || 'pending'
+            payment_status: enrollment.access_status || 'pending'
           };
         })
         .filter((student): student is Student => student !== null) || [];

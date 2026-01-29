@@ -135,7 +135,9 @@ serve(async (req: Request) => {
           teacher: modulo.teacher,
           enrolled_at: enrollment.enrolled_at,
           enrollment_status: 'enrolled',
-          course_id: modulo.course_id // Importante: incluir course_id para agrupar por edición
+          course_id: modulo.course_id, // ID de la edición para agrupar
+          course_name: modulo.course?.name, // Nombre de la edición
+          program_name: modulo.course?.program?.name // Nombre del programa
         }
       }).filter(item => item && item.id) || []
 
