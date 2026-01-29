@@ -256,76 +256,16 @@ export default function AdminEdicionForm() {
           description: 'Edición actualizada correctamente',
         });
       } else {
-        // Crear edición
-        const { data: newCourse, error: courseError } = await supabase
+        // Crear edición (los módulos se crearán automáticamente mediante trigger)
+        const { error: courseError } = await supabase
           .from('courses')
-          .insert(dataToSave as CourseInsert)
-          .select()
-          .single();
+          .insert(dataToSave as CourseInsert);
 
         if (courseError) throw courseError;
 
-        // Crear módulos automáticamente
-        if (newCourse && formData.numero_modulos) {
-          const programa = programas.find(p => p.id === formData.program_id);
-          const startDate = new Date(formData.start_date!);
-          const endDate = formData.end_date ? new Date(formData.end_date) : null;
-          
-          // Calcular duración de cada módulo
-          const totalDias = endDate 
-            ? Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-            : formData.numero_modulos! * 30; // Por defecto 30 días por módulo
-          
-          const diasPorModulo = Math.floor(totalDias / formData.numero_modulos!);
-          
-          const modulos = [];
-          for (let i = 1; i <= formData.numero_modulos!; i++) {
-            const moduloStartDate = new Date(startDate);
-            moduloStartDate.setDate(startDate.getDate() + (i - 1) * diasPorModulo);
-            
-            const moduloEndDate = new Date(moduloStartDate);
-            moduloEndDate.setDate(moduloStartDate.getDate() + diasPorModulo - 1);
-            
-            // Si es el último módulo, usar la fecha de fin de la edición
-            if (i === formData.numero_modulos && endDate) {
-              moduloEndDate.setTime(endDate.getTime());
-            }
-            
-            const mes = moduloStartDate.toLocaleDateString('es', { month: 'short' }).toUpperCase().slice(0, 3);
-            const año = moduloStartDate.getFullYear();
-            const moduloCode = `${programa?.code}-M${i}-${mes}-${año}`;
-            
-            modulos.push({
-              name: `Módulo ${i}`,
-              num_modulo: i,
-              code: moduloCode,
-              course_id: newCourse.id,
-              teacher_principal_id: formData.teacher_principal_id,
-              academic_year: formData.academic_year,
-              semester_year: formData.semester,
-              is_active: true,
-              start_date: moduloStartDate.toISOString().split('T')[0],
-              end_date: moduloEndDate.toISOString().split('T')[0],
-            });
-          }
-          
-          const { error: modulosError } = await supabase
-            .from('modulos' as any)
-            .insert(modulos);
-          
-          if (modulosError) {
-            console.error('Error al crear módulos:', modulosError);
-            toast({
-              title: 'Advertencia',
-              description: 'Edición creada pero hubo un error al crear los módulos automáticamente',
-              variant: 'destructive',
-            });
-          }
-        }
-
         toast({
           title: 'Éxito',
-          description: `Edición creada correctamente con ${formData.numero_modulos} módulo(s).`,
+          description: `Edición creada correctamente. Los ${formData.numero_modulos} módulo(s) se crearán automáticamente.`,
         });
       }
 
