@@ -68,15 +68,20 @@ interface Course {
 interface Enrollment {
   id: string;
   student_id: string;
-  course_id: string;
+  modulo_id: string;
   enrolled_at: string;
-  payment_status?: 'pending' | 'verified' | 'blocked';
-  payment_verified_at?: string | null;
-  payment_notes?: string | null;
-  course: {
+  tipo_estudiante?: 'nuevo' | 'antiguo';
+  matricula_id?: string | null;
+  modulo: {
     id: string;
     name: string;
     code: string;
+    num_modulo: number;
+    course: {
+      id: string;
+      name: string;
+      code: string;
+    };
   };
 }
 
@@ -228,7 +233,7 @@ const AdminStudentManagementHub = () => {
         const { data: enrollments } = await supabase
           .from('course_enrollments')
           .select('student_id')
-          .eq('course_id', filterCourse);
+          .eq('modulo_id', filterCourse);
         
         const enrolledIds = new Set(enrollments?.map(e => e.student_id) || []);
         filtered = filtered.filter(s => enrolledIds.has(s.id));
@@ -280,7 +285,7 @@ const AdminStudentManagementHub = () => {
       const { data: enrollments } = await supabase
         .from('course_enrollments')
         .select('student_id')
-        .eq('course_id', selectedCourseEnroll.id);
+        .eq('modulo_id', selectedCourseEnroll.id);
 
       const enrolledIds = new Set(enrollments?.map(e => e.student_id) || []);
       filtered = filtered.filter(student => !enrolledIds.has(student.id));
@@ -442,7 +447,7 @@ const AdminStudentManagementHub = () => {
       const { data: existingEnrollments } = await supabase
         .from('course_enrollments')
         .select('student_id')
-        .eq('course_id', selectedCourseEnroll.id)
+        .eq('modulo_id', selectedCourseEnroll.id)
         .in('student_id', Array.from(selectedStudentsEnroll));
 
       const alreadyEnrolledIds = new Set(existingEnrollments?.map(e => e.student_id) || []);
@@ -459,8 +464,9 @@ const AdminStudentManagementHub = () => {
 
       const enrollmentData = toEnroll.map(studentId => ({
         student_id: studentId,
-        course_id: selectedCourseEnroll.id,
-        enrolled_at: new Date().toISOString()
+        modulo_id: selectedCourseEnroll.id,
+        enrolled_at: new Date().toISOString(),
+        tipo_estudiante: 'nuevo'
       }));
 
       const { error } = await supabase
@@ -501,10 +507,16 @@ const AdminStudentManagementHub = () => {
         .from('course_enrollments')
         .select(`
           *,
-          course:courses (
+          modulo:modulos (
             id,
             name,
-            code
+            code,
+            num_modulo,
+            course:courses (
+              id,
+              name,
+              code
+            )
           )
         `)
         .eq('student_id', studentId)
