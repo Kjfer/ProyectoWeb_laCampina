@@ -142,46 +142,54 @@ export default function TutorDashboard() {
 
       setLoading(true);
 
-      // Fetch courses where user is tutor - check course_teachers table
-      console.log('📡 Consultando cursos donde el usuario es tutor:', profile.id);
+      // Fetch modules where user is tutor - check modulo_teachers table
+      console.log('📡 Consultando módulos donde el usuario es tutor:', profile.id);
       const { data: coursesData, error: coursesError } = await supabase
-        .from('course_teachers')
+        .from('modulo_teachers')
         .select(`
-          course_id,
-          courses!inner(
+          modulo_id,
+          modulos!inner(
             id,
-            name,
-            code,
-            grade,
-            section,
-            academic_year
+            nombre,
+            codigo,
+            start_date,
+            end_date,
+            course:courses (
+              id,
+              name,
+              academic_year,
+              semester
+            )
           )
         `)
         .eq('teacher_id', profile.id)
         .eq('is_tutor', true);
 
-      console.log('📦 Respuesta de cursos:', { coursesData, coursesError });
+      console.log('📦 Respuesta de módulos:', { coursesData, coursesError });
 
       if (coursesError) {
         throw coursesError;
       }
       
       if (!coursesData || coursesData.length === 0) {
-        console.warn('⚠️ No se encontraron cursos asignados como tutor');
-        toast.error('No tienes cursos asignados como tutor');
+        console.warn('⚠️ No se encontraron módulos asignados como tutor');
+        toast.error('No tienes módulos asignados como tutor');
         setLoading(false);
         return;
       }
 
-      // Extract courses from the join
-      const courses = coursesData.map(item => ({
-        id: (item.courses as any).id,
-        name: (item.courses as any).name,
-        code: (item.courses as any).code,
-        grade: (item.courses as any).grade,
-        section: (item.courses as any).section,
-        academic_year: (item.courses as any).academic_year
-      }));
+      // Extract modules from the join
+      const courses = coursesData.map(item => {
+        const modulo = (item.modulos as any);
+        return {
+          id: modulo.id,
+          name: modulo.nombre,
+          code: modulo.codigo,
+          grade: modulo.course?.name || '',
+          section: '',
+          academic_year: modulo.course?.academic_year || ''
+        };
+      });
 
       console.log(`✅ ${courses.length} cursos encontrados:`, courses);
       setTutorCourses(courses);
@@ -213,20 +221,20 @@ export default function TutorDashboard() {
       const coursesForSchedule = tutorCourses.length > 0 ? tutorCourses : allCourseIds.map(id => ({ id, name: '', code: '' }));
       setCourses(coursesForSchedule);
 
-      // Fetch students enrolled in ALL tutor courses (not just selected one)
-      console.log('📡 Consultando estudiantes matriculados en todos los cursos del tutor...');
+      // Fetch students enrolled in ALL tutor modules (not just selected one)
+      console.log('📡 Consultando estudiantes matriculados en todos los módulos del tutor...');
       const { data: studentsData, error: studentsError } = await supabase
-        .from('course_enrollments')
-        .select('student_id, profiles!inner(*)')
-        .in('course_id', allCourseIds);
+        .from('matriculas')
+        .select('student_code, profiles!inner(*)')
+        .in('modulo_id', allCourseIds);
 
       console.log('📦 Respuesta de estudiantes:', { studentsData, studentsError });
 
       if (studentsError) throw studentsError;
 
-      // Remove duplicates
+      // Remove duplicates by student_code
       const uniqueStudents = Array.from(
-        new Map(studentsData.map(item => [item.student_id, item.profiles])).values()
+        new Map(studentsData.map(item => [item.student_code, item.profiles])).values()
       ) as Student[];
 
       console.log('👥 Total estudiantes únicos encontrados:', uniqueStudents.length);

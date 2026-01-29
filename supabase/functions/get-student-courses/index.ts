@@ -70,20 +70,30 @@ serve(async (req: Request) => {
     let coursesData = []
 
     if (profile.role === 'student') {
-      // For students: get courses they are enrolled in
+      // For students: get modules they are enrolled in via matriculas
       const { data, error } = await supabaseClient
-        .from('course_enrollments')
+        .from('matriculas')
         .select(`
-          enrolled_at,
-          course:courses (
+          fecha_matricula,
+          modulo:modulos (
             id,
-            name,
-            description,
-            code,
-            academic_year,
-            is_active,
-            created_at,
-            teacher:profiles!courses_teacher_id_fkey (
+            nombre,
+            codigo,
+            start_date,
+            end_date,
+            teacher_principal_id,
+            course:courses (
+              id,
+              name,
+              code,
+              academic_year,
+              semester,
+              program:programas (
+                id,
+                nombre
+              )
+            ),
+            teacher:profiles!modulos_teacher_principal_id_fkey (
               id,
               first_name,
               last_name,
@@ -91,9 +101,8 @@ serve(async (req: Request) => {
             )
           )
         `)
-        .eq('student_id', profile.id)
-        .eq('course.is_active', true)
-        .order('enrolled_at', { ascending: false })
+        .eq('student_code', profile.student_code)
+        .order('fecha_matricula', { ascending: false })
 
       if (error) {
         console.error('❌ Error obteniendo cursos del estudiante:', error)
@@ -107,107 +116,186 @@ serve(async (req: Request) => {
         )
       }
 
-      // Transform the data to include enrollment info
-      coursesData = data?.map(enrollment => ({
-        ...enrollment.course,
-        enrolled_at: enrollment.enrolled_at,
-        enrollment_status: 'enrolled'
-      })) || []
+      // Transform the data to include enrollment info from modulos
+      coursesData = data?.map(matricula => {
+        const modulo = matricula.modulo
+        return {
+          id: modulo.id,
+          name: modulo.nombre,
+          description: `${modulo.course?.program?.nombre || ''} - ${modulo.course?.name || ''}`,
+          code: modulo.codigo,
+          academic_year: modulo.course?.academic_year,
+          semester: modulo.course?.semester,
+          is_active: true,
+          created_at: modulo.start_date,
+          teacher: modulo.teacher,
+          enrolled_at: matricula.fecha_matricula,
+          enrollment_status: 'enrolled'
+        }
+      }).filter(item => item.id) || []
 
     } else if (profile.role === 'teacher') {
-      // For teachers: get courses they teach (primary or additional)
+      // For teachers: get modules they teach (primary or additional)
       
-      // Get courses where they are the primary teacher
-      const { data: primaryCourses, error: primaryError } = await supabaseClient
-        .from('courses')
+      // Get modules where they are the primary teacher
+      const { data: primaryModulos, error: primaryError } = await supabaseClient
+        .from('modulos')
         .select(`
-          *,
-          teacher:profiles!courses_teacher_id_fkey (
+          id,
+          nombre,
+          codigo,
+          start_date,
+          end_date,
+          teacher_principal_id,
+          course:courses (
+            id,
+            name,
+            code,
+            academic_year,
+            semester,
+            program:programas (
+              id,
+              nombre
+            )
+          ),
+          teacher:profiles!modulos_teacher_principal_id_fkey (
             id,
             first_name,
             last_name,
             email
           ),
-          enrollments:course_enrollments (count)
+          enrollments:matriculas (count)
         `)
-        .eq('teacher_id', profile.id)
-        .eq('is_active', true)
+        .eq('teacher_principal_id', profile.id)
 
       if (primaryError) {
-        console.error('❌ Error obteniendo cursos principales del profesor:', primaryError)
+        console.error('❌ Error obteniendo módulos principales del profesor:', primaryError)
       }
 
-      // Get courses where they are an additional teacher
-      const { data: additionalCourses, error: additionalError } = await supabaseClient
-        .from('course_teachers')
+      // Get modules where they are an additional teacher
+      const { data: additionalModulos, error: additionalError } = await supabaseClient
+        .from('modulo_teachers')
         .select(`
-          course:courses (
-            *,
-            teacher:profiles!courses_teacher_id_fkey (
+          modulo:modulos (
+            id,
+            nombre,
+            codigo,
+            start_date,
+            end_date,
+            teacher_principal_id,
+            course:courses (
+              id,
+              name,
+              code,
+              academic_year,
+              semester,
+              program:programas (
+                id,
+                nombre
+              )
+            ),
+            teacher:profiles!modulos_teacher_principal_id_fkey (
               id,
               first_name,
               last_name,
               email
             ),
-            enrollments:course_enrollments (count)
+            enrollments:matriculas (count)
           )
         `)
         .eq('teacher_id', profile.id)
-        .eq('course.is_active', true)
 
       if (additionalError) {
-        console.error('❌ Error obteniendo cursos adicionales del profesor:', additionalError)
+        console.error('❌ Error obteniendo módulos adicionales del profesor:', additionalError)
       }
 
       // Combine both arrays and remove duplicates
-      const allCourses = [
-        ...(primaryCourses || []),
-        ...(additionalCourses?.map(ct => ct.course).filter(Boolean) || [])
+      const allModulos = [
+        ...(primaryModulos || []),
+        ...(additionalModulos?.map(mt => mt.modulo).filter(Boolean) || [])
       ]
 
-      // Remove duplicates based on course id
-      const uniqueCourses = allCourses.reduce((acc, course) => {
-        if (!acc.find(c => c.id === course.id)) {
-          acc.push(course)
+      // Remove duplicates based on module id
+      const uniqueModulos = allModulos.reduce((acc, modulo) => {
+        if (!acc.find(m => m.id === modulo.id)) {
+          acc.push(modulo)
         }
         return acc
       }, [] as any[])
 
-      // Sort by created_at
-      coursesData = uniqueCourses.sort((a, b) => 
+      // Transform to match course structure and sort by start_date
+      coursesData = uniqueModulos.map(modulo => ({
+        id: modulo.id,
+        name: modulo.nombre,
+        description: `${modulo.course?.program?.nombre || ''} - ${modulo.course?.name || ''}`,
+        code: modulo.codigo,
+        academic_year: modulo.course?.academic_year,
+        semester: modulo.course?.semester,
+        is_active: true,
+        created_at: modulo.start_date,
+        teacher: modulo.teacher,
+        enrollments: modulo.enrollments
+      })).sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )
 
     } else if (profile.role === 'admin') {
-      // For admins: get all courses
+      // For admins: get all modules
       const { data, error } = await supabaseClient
-        .from('courses')
+        .from('modulos')
         .select(`
-          *,
-          teacher:profiles!courses_teacher_id_fkey (
+          id,
+          nombre,
+          codigo,
+          start_date,
+          end_date,
+          teacher_principal_id,
+          course:courses (
+            id,
+            name,
+            code,
+            academic_year,
+            semester,
+            program:programas (
+              id,
+              nombre
+            )
+          ),
+          teacher:profiles!modulos_teacher_principal_id_fkey (
             id,
             first_name,
             last_name,
             email
           ),
-          enrollments:course_enrollments (count)
+          enrollments:matriculas (count)
         `)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
+        .order('start_date', { ascending: false })
 
       if (error) {
-        console.error('❌ Error obteniendo todos los cursos:', error)
+        console.error('❌ Error obteniendo todos los módulos:', error)
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: 'Error al obtener cursos',
+            error: 'Error al obtener módulos',
             details: error.message 
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
         )
       }
 
-      coursesData = data || []
+      // Transform modules to match course structure
+      coursesData = data?.map(modulo => ({
+        id: modulo.id,
+        name: modulo.nombre,
+        description: `${modulo.course?.program?.nombre || ''} - ${modulo.course?.name || ''}`,
+        code: modulo.codigo,
+        academic_year: modulo.course?.academic_year,
+        semester: modulo.course?.semester,
+        is_active: true,
+        created_at: modulo.start_date,
+        teacher: modulo.teacher,
+        enrollments: modulo.enrollments
+      })) || []
     } else if (profile.role === 'tutor') {
       // For tutors: return empty array since virtual classrooms were removed
       coursesData = []

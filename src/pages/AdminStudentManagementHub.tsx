@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { BulkStudentImport } from '@/components/students/BulkStudentImport';
+import { MatriculasTab } from '@/components/students/MatriculasTab';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Plus,
@@ -91,7 +92,6 @@ interface StudentFormData {
   birth_date: string;
   country: string;
   education_level: string;
-  courseId: string;
 }
 
 const AdminStudentManagementHub = () => {
@@ -137,8 +137,7 @@ const AdminStudentManagementHub = () => {
     gender: 'M',
     birth_date: '',
     country: 'Perú',
-    education_level: '',
-    courseId: 'none'
+    education_level: ''
   });
 
   if (profile?.role !== 'admin') {
@@ -357,8 +356,7 @@ const AdminStudentManagementHub = () => {
             phone: formData.phone,
             country: formData.country,
             educationLevel: formData.education_level
-          }],
-          courseId: formData.courseId !== 'none' ? formData.courseId : undefined
+          }]
         })
       });
 
@@ -372,7 +370,7 @@ const AdminStudentManagementHub = () => {
 
       toast({
         title: "Éxito",
-        description: "Estudiante creado y matriculado exitosamente",
+        description: "Estudiante creado exitosamente. Usa la pestaña 'Matrícula' para inscribirlo en un curso.",
       });
 
       setIsCreateModalOpen(false);
@@ -387,8 +385,7 @@ const AdminStudentManagementHub = () => {
         gender: 'M',
         birth_date: '',
         country: 'Perú',
-        education_level: '',
-        courseId: 'none'
+        education_level: ''
       });
       fetchStudents();
     } catch (error: any) {
@@ -643,7 +640,7 @@ const AdminStudentManagementHub = () => {
             </TabsTrigger>
             <TabsTrigger value="enroll">
               <UserPlus className="h-4 w-4 mr-2" />
-              Matricular Existentes
+              Matrícula
             </TabsTrigger>
             <TabsTrigger value="import">
               <Upload className="h-4 w-4 mr-2" />
@@ -792,33 +789,15 @@ const AdminStudentManagementHub = () => {
                           />
                         </div>
 
-                        <div>
-                          <Label htmlFor="courseId">Curso (Opcional)</Label>
-                          <Select value={formData.courseId} onValueChange={(value) => setFormData({ ...formData, courseId: value })}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar curso para matricular" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Sin curso</SelectItem>
-                              {courses.map((course) => (
-                                <SelectItem key={course.id} value={course.id}>
-                                  {course?.name || 'Sin nombre'} ({course?.code || 'Sin código'})
-                                  {course?.grade && course?.section && ` - ${course.grade}${course.section}`}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            El estudiante será matriculado automáticamente en el curso seleccionado
-                          </p>
-                        </div>
-
                         <div className="bg-muted p-3 rounded-lg text-sm">
                           <p className="font-medium mb-1">Credenciales de acceso:</p>
                           <p>Email: {formData.email || '(ingresa un email)'}</p>
                           <p>Contraseña: {formData.document_number || '(se usará el DNI)'}</p>
                           <p className="text-xs text-muted-foreground mt-2">
                             El estudiante podrá iniciar sesión con estas credenciales
+                          </p>
+                          <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-2 font-medium">
+                            ⚠️ Para matricular al estudiante, usa la pestaña "Matrícula"
                           </p>
                         </div>
 
@@ -968,181 +947,9 @@ const AdminStudentManagementHub = () => {
             </Card>
           </TabsContent>
 
-          {/* Tab 2: Matricular Existentes */}
+          {/* Tab 2: Matrícula (nueva) */}
           <TabsContent value="enroll" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5" />
-                  Seleccionar Curso Destino
-                </CardTitle>
-                <CardDescription>
-                  Elige el curso en el que deseas matricular a los estudiantes
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Select
-                  value={selectedCourseEnroll?.id || ''}
-                  onValueChange={(value) => {
-                    const course = courses.find(c => c.id === value);
-                    setSelectedCourseEnroll(course || null);
-                    clearSelectionEnroll();
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona un curso" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course?.name || 'Sin nombre'} ({course?.code || 'Sin código'})
-                        {course?.grade && course?.section && ` - ${course.grade}${course.section}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            {selectedCourseEnroll && (
-              <>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Buscar y Filtrar Estudiantes
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex gap-4 items-end">
-                      <div className="flex-1">
-                        <Label htmlFor="enroll-search">Buscar</Label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="enroll-search"
-                            placeholder="Buscar por nombre, código o DNI..."
-                            value={enrollSearchTerm}
-                            onChange={(e) => setEnrollSearchTerm(e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="not-enrolled"
-                          checked={showOnlyNotEnrolled}
-                          onCheckedChange={(checked) => setShowOnlyNotEnrolled(checked === true)}
-                        />
-                        <Label htmlFor="not-enrolled" className="cursor-pointer">
-                          Solo no matriculados
-                        </Label>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        {enrollFilteredStudents.length} estudiante{enrollFilteredStudents.length !== 1 ? 's' : ''} encontrado{enrollFilteredStudents.length !== 1 ? 's' : ''}
-                        {selectedStudentsEnroll.size > 0 && (
-                          <span className="ml-2 font-medium text-primary">
-                            ({selectedStudentsEnroll.size} seleccionado{selectedStudentsEnroll.size !== 1 ? 's' : ''})
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        {selectedStudentsEnroll.size > 0 && (
-                          <Button variant="outline" size="sm" onClick={clearSelectionEnroll}>
-                            <X className="h-4 w-4 mr-1" />
-                            Limpiar
-                          </Button>
-                        )}
-                        <Button variant="outline" size="sm" onClick={selectAllEnroll} disabled={enrollFilteredStudents.length === 0}>
-                          Seleccionar todos
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Lista de Estudiantes</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {enrollFilteredStudents.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No se encontraron estudiantes
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                        {enrollFilteredStudents.map((student) => (
-                          <div
-                            key={student.id}
-                            className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-colors ${
-                              selectedStudentsEnroll.has(student.id)
-                                ? 'bg-primary/10 border-primary'
-                                : 'hover:bg-muted/50'
-                            }`}
-                            onClick={() => toggleStudentSelection(student.id)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Checkbox
-                                checked={selectedStudentsEnroll.has(student.id)}
-                                onCheckedChange={() => toggleStudentSelection(student.id)}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <div>
-                                <p className="font-medium">
-                                  {student.paternal_surname} {student.maternal_surname}, {student.first_name}
-                                </p>
-                                <div className="flex gap-3 text-sm text-muted-foreground">
-                                  <span>Código: {student.student_code}</span>
-                                  {student.document_number && <span>DNI: {student.document_number}</span>}
-                                  {student.gender && <span>Sexo: {student.gender}</span>}
-                                </div>
-                              </div>
-                            </div>
-                            <Badge variant={student.is_active ? 'default' : 'secondary'}>
-                              {student.is_active ? 'Activo' : 'Inactivo'}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {selectedStudentsEnroll.size > 0 && (
-                  <Card className="bg-gradient-card">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold text-lg">
-                            Matricular {selectedStudentsEnroll.size} estudiante{selectedStudentsEnroll.size !== 1 ? 's' : ''}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            En el curso: {selectedCourseEnroll?.name || 'Sin nombre'} ({selectedCourseEnroll?.code || 'Sin código'})
-                          </p>
-                        </div>
-                        <Button onClick={handleEnrollStudents} disabled={enrolling} size="lg">
-                          {enrolling ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Matriculando...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Matricular Ahora
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
+            <MatriculasTab />
           </TabsContent>
 
           {/* Tab 3: Importación Masiva */}

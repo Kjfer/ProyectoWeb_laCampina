@@ -42,6 +42,7 @@ interface Profile {
   last_name: string;
   email: string;
   student_code?: string;
+  document_number?: string;
 }
 
 interface ModuloConCurso extends Modulo {
@@ -52,6 +53,9 @@ export default function AdminMatriculaForm() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState<Profile[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<Profile[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [searchType, setSearchType] = useState<'codigo' | 'dni'>('codigo');
   const [courses, setCourses] = useState<Course[]>([]);
   const [modulos, setModulos] = useState<ModuloConCurso[]>([]);
   const [cursosGrabados, setCursosGrabados] = useState<CursoGrabado[]>([]);
@@ -96,6 +100,24 @@ export default function AdminMatriculaForm() {
     setPrecioFinal(precio);
   }, [formData.valor_matricula, formData.valor_clase_grabada, formData.descuento, formData.incluir_clases_grabadas]);
 
+  useEffect(() => {
+    // Filtrar estudiantes según búsqueda
+    if (!studentSearch.trim()) {
+      setFilteredStudents(students);
+      return;
+    }
+
+    const searchLower = studentSearch.toLowerCase();
+    const filtered = students.filter(student => {
+      if (searchType === 'codigo') {
+        return student.student_code?.toLowerCase().includes(searchLower);
+      } else {
+        return student.document_number?.toLowerCase().includes(searchLower);
+      }
+    });
+    setFilteredStudents(filtered);
+  }, [studentSearch, searchType, students]);
+
   const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -113,11 +135,13 @@ export default function AdminMatriculaForm() {
       // Cargar estudiantes
       const { data: studentsData, error: studentsError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, student_code')
+        .select('id, first_name, last_name, email, student_code, document_number')
         .eq('role', 'student')
         .order('first_name');
 
       if (studentsError) throw studentsError;
+      setStudents(studentsData || []);
+      setFilteredStudents(studentsData || []);
 
       // Cargar ediciones activas
       const { data: coursesData, error: coursesError } = await supabase
@@ -149,7 +173,6 @@ export default function AdminMatriculaForm() {
 
       if (grabadosError) throw grabadosError;
 
-      setStudents(studentsData || []);
       setCourses(coursesData || []);
       setModulos(modulosData || []);
       setCursosGrabados(grabadosData || []);
@@ -216,7 +239,7 @@ export default function AdminMatriculaForm() {
       // 1. Obtener el último número de matrícula del año
       const currentYear = new Date().getFullYear();
       const { data: lastMatricula } = await supabase
-        .from('peri_matriculas')
+        .from('matriculas' as any)
         .select('cod_matricula')
         .like('cod_matricula', `MAT-${currentYear}-%`)
         .order('created_at', { ascending: false })
@@ -272,7 +295,7 @@ export default function AdminMatriculaForm() {
       };
 
       const { data: newMatricula, error: matriculaError } = await supabase
-        .from('peri_matriculas')
+        .from('matriculas' as any)
         .insert(matriculaData)
         .select()
         .single();
@@ -416,6 +439,38 @@ export default function AdminMatriculaForm() {
             {/* 1. DATOS DEL ESTUDIANTE */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">1. Datos del Estudiante</h3>
+              
+              {/* Búsqueda de estudiante */}
+              <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="space-y-2">
+                  <Label>Buscar por:</Label>
+                  <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="codigo">Código de Estudiante</SelectItem>
+                      <SelectItem value="dni">DNI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-2 space-y-2">
+                  <Label>
+                    {searchType === 'codigo' ? 'Código de Estudiante' : 'Número de DNI'}
+                  </Label>
+                  <Input
+                    placeholder={searchType === 'codigo' ? 'Buscar por código...' : 'Buscar por DNI...'}
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                  />
+                  {studentSearch && (
+                    <p className="text-sm text-gray-500">
+                      {filteredStudents.length} estudiante(s) encontrado(s)
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="estudiante_id">Estudiante *</Label>
@@ -427,11 +482,16 @@ export default function AdminMatriculaForm() {
                       <SelectValue placeholder="Seleccione un estudiante" />
                     </SelectTrigger>
                     <SelectContent>
-                      {students.map((student) => (
+                      {filteredStudents.map((student) => (
                         <SelectItem key={student.id} value={student.id}>
-                          {student.first_name} {student.last_name} - {student.email}
+                          {student.first_name} {student.last_name} - {student.student_code || 'Sin código'}
                         </SelectItem>
                       ))}
+                      {filteredStudents.length === 0 && (
+                        <SelectItem value="" disabled>
+                          No se encontraron estudiantes
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -440,10 +500,8 @@ export default function AdminMatriculaForm() {
                   <Input
                     id="student_code"
                     value={formData.student_code}
-                    onChange={(e) =>
-                      setFormData({ ...formData, student_code: e.target.value })
-                    }
-                    placeholder="Opcional"
+                    disabled
+                    placeholder="Se completa automáticamente"
                   />
                 </div>
               </div>

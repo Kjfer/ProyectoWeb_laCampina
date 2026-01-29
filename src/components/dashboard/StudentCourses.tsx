@@ -44,11 +44,11 @@ export function StudentCourses() {
     try {
       setLoading(true);
 
-      // Get total count first
+      // Get total count first - usando matriculas con student_code
       const { count: totalCount, error: countError } = await supabase
-        .from('course_enrollments')
+        .from('matriculas')
         .select('*', { count: 'exact', head: true })
-        .eq('student_id', profile!.id);
+        .eq('student_code', profile!.student_code);
 
       setTotalCourses(totalCount || 0);
 
@@ -58,13 +58,13 @@ export function StudentCourses() {
         return;
       }
 
-      // Get paginated enrolled courses
+      // Get paginated enrolled modules via matriculas
       const { data: enrollments, error: enrollError } = await supabase
-        .from('course_enrollments')
-        .select('course_id')
-        .eq('student_id', profile!.id)
+        .from('matriculas')
+        .select('modulo_id, fecha_matricula')
+        .eq('student_code', profile!.student_code)
         .range((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE - 1)
-        .order('enrolled_at', { ascending: false });
+        .order('fecha_matricula', { ascending: false });
 
       if (enrollError) throw enrollError;
 
@@ -74,25 +74,29 @@ export function StudentCourses() {
         return;
       }
 
-      // Get course IDs
-      const courseIds = enrollments.map(e => e.course_id);
+      // Get modulo IDs
+      const moduloIds = enrollments.map(e => e.modulo_id);
 
-      // Fetch course details separately
-      const { data: coursesData, error: coursesError } = await supabase
-        .from('courses')
+      // Fetch module details
+      const { data: modulosData, error: modulosError } = await supabase
+        .from('modulos')
         .select(`
           id,
-          name,
-          code,
-          schedule,
-          teacher_id
+          nombre,
+          codigo,
+          horario_semanal,
+          teacher_principal_id,
+          course:courses (
+            id,
+            name
+          )
         `)
-        .in('id', courseIds);
+        .in('id', moduloIds);
 
-      if (coursesError) throw coursesError;
+      if (modulosError) throw modulosError;
 
       // Fetch teachers separately
-      const teacherIds = coursesData?.map(c => c.teacher_id).filter(Boolean) || [];
+      const teacherIds = modulosData?.map(m => m.teacher_principal_id).filter(Boolean) || [];
       const { data: teachers } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
@@ -108,48 +112,52 @@ export function StudentCourses() {
 
       const submittedIds = new Set(submissions?.map(s => s.assignment_id) || []);
 
-      // Single query for all pending assignments across all courses
+      // Single query for all pending assignments across all modules
       const { data: allAssignments } = await supabase
         .from('assignments')
-        .select('id, course_id')
-        .in('course_id', courseIds)
+        .select('id, modulo_id')
+        .in('modulo_id', moduloIds)
         .eq('is_published', true)
         .gt('due_date', new Date().toISOString());
 
-      // Single query for all upcoming exams across all courses
+      // Single query for all upcoming exams across all modules
       const { data: allExams } = await supabase
         .from('exams')
-        .select('id, course_id')
-        .in('course_id', courseIds)
+        .select('id, modulo_id')
+        .in('modulo_id', moduloIds)
         .eq('is_published', true)
         .gt('start_time', new Date().toISOString());
 
-      // Group by course_id
-      const assignmentsByCourse = new Map<string, number>();
-      const examsByCourse = new Map<string, number>();
+      // Group by modulo_id
+      const assignmentsByModulo = new Map<string, number>();
+      const examsByModulo = new Map<string, number>();
 
       allAssignments?.forEach(assignment => {
         if (!submittedIds.has(assignment.id)) {
-          const current = assignmentsByCourse.get(assignment.course_id) || 0;
-          assignmentsByCourse.set(assignment.course_id, current + 1);
+          const current = assignmentsByModulo.get(assignment.modulo_id) || 0;
+          assignmentsByModulo.set(assignment.modulo_id, current + 1);
         }
       });
 
       allExams?.forEach(exam => {
-        const current = examsByCourse.get(exam.course_id) || 0;
-        examsByCourse.set(exam.course_id, current + 1);
+        const current = examsByModulo.get(exam.modulo_id) || 0;
+        examsByModulo.set(exam.modulo_id, current + 1);
       });
 
-      // Map to courses
-      const coursesWithData = coursesData?.map((course: any) => {
+      // Map to courses from modulos
+      const coursesWithData = modulosData?.map((modulo: any) => {
         return {
-          id: course.id,
-          name: course.name,
-          code: course.code,
-          schedule: course.schedule,
-          teacher: teachersMap.get(course.teacher_id),
-          pending_assignments: assignmentsByCourse.get(course.id) || 0,
-          upcoming_exams: examsByCourse.get(course.id) || 0,
+          id: modulo.id,
+          name: modulo.nombre,
+          code: modulo.codigo,
+          schedule: modulo.horario_semanal ? Object.keys(modulo.horario_semanal).map(day => ({
+            day,
+            start_time: modulo.horario_semanal[day]?.inicio || '',
+            end_time: modulo.horario_semanal[day]?.fin || ''
+          })) : [],
+          teacher: teachersMap.get(modulo.teacher_principal_id),
+          pending_assignments: assignmentsByModulo.get(modulo.id) || 0,
+          upcoming_exams: examsByModulo.get(modulo.id) || 0,
         };
       }) || [];
 

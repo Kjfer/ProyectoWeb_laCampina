@@ -86,12 +86,24 @@ export default function CourseDetail() {
 
   const fetchCourse = async () => {
     try {
-      // CORRECCIÓN CLAVE: Quitamos 'email' de la petición del profesor
+      // Consultar módulo en lugar de curso
       const { data, error } = await supabase
-        .from('courses')
+        .from('modulos')
         .select(`
-          *,
-          teacher:profiles!courses_teacher_id_fkey(
+          id,
+          nombre,
+          codigo,
+          start_date,
+          end_date,
+          horario_semanal,
+          teacher_principal_id,
+          course:courses (
+            id,
+            name,
+            academic_year,
+            semester
+          ),
+          teacher:profiles!modulos_teacher_principal_id_fkey(
             id,
             first_name,
             last_name
@@ -101,10 +113,27 @@ export default function CourseDetail() {
         .single();
 
       if (error) throw error;
-      setCourse(data);
+      
+      // Transformar datos del módulo para que coincidan con la estructura de Course
+      const transformedCourse = {
+        id: data.id,
+        name: data.nombre,
+        code: data.codigo,
+        description: `${data.course?.name || ''} - Inicio: ${new Date(data.start_date).toLocaleDateString()}`,
+        academic_year: data.course?.academic_year || '',
+        semester: data.course?.semester || '',
+        is_active: true,
+        created_at: data.start_date,
+        start_time: '',
+        end_time: '',
+        schedule: data.horario_semanal ? Object.keys(data.horario_semanal) : [],
+        teacher: data.teacher
+      };
+      
+      setCourse(transformedCourse as any);
     } catch (error) {
-      console.error('Error fetching course:', error);
-      toast.error('Error al cargar el curso');
+      console.error('Error fetching module:', error);
+      toast.error('Error al cargar el módulo');
       navigate('/courses');
     }
   };
@@ -112,30 +141,33 @@ export default function CourseDetail() {
   const fetchStudents = async () => {
     try {
       const { data, error } = await supabase
-        .from('course_enrollments')
+        .from('matriculas')
         .select(`
-          enrolled_at,
-          payment_status,
-          student:profiles!course_enrollments_student_id_fkey(
+          fecha_matricula,
+          estado_pago,
+          student_code,
+          profiles!inner(
             id,
             first_name,
             last_name,
-            email
+            email,
+            student_code
           )
         `)
-        .eq('course_id', id);
+        .eq('modulo_id', id);
 
       if (error) throw error;
       
       const enrolledStudents = data
-        ?.map(enrollment => {
-          if (!enrollment.student) {
-            console.warn('Enrollment without student data:', enrollment);
+        ?.map(matricula => {
+          const student = matricula.profiles;
+          if (!student) {
+            console.warn('Matricula without student data:', matricula);
             return null;
           }
           return {
-            ...enrollment.student,
-            enrolled_at: enrollment.enrolled_at
+            ...(student as any),
+            enrolled_at: matricula.fecha_matricula
           };
         })
         .filter((student): student is Student => student !== null) || [];
@@ -151,17 +183,17 @@ export default function CourseDetail() {
 
   const fetchAdditionalTeachers = async () => {
     try {
-      // CORRECCIÓN CLAVE: Quitamos 'email' aquí también
+      // Obtener profesores adicionales del módulo
       const { data, error } = await supabase
-        .from('course_teachers')
+        .from('modulo_teachers')
         .select(`
-          teacher:profiles!course_teachers_teacher_id_fkey(
+          teacher:profiles!modulo_teachers_teacher_id_fkey(
             id,
             first_name,
             last_name
           )
         `)
-        .eq('course_id', id);
+        .eq('modulo_id', id);
 
       if (error) throw error;
       setAdditionalTeachers(data?.map(item => item.teacher).filter(Boolean) || []);

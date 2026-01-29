@@ -102,6 +102,19 @@ export default function AdminModulosManagement() {
     }
   }, [selectedCourseId]);
 
+  // Detectar día de la semana automáticamente para módulo 1
+  useEffect(() => {
+    if (formData.num_modulo === 1 && formData.start_date && selectedDays.length === 0) {
+      const diaInicio = getDiaSemanaNombre(new Date(formData.start_date));
+      const newSchedule: ModuloSchedule = {
+        [diaInicio]: `${horarioInicio}-${horarioFin}`
+      };
+      setSelectedDays([diaInicio]);
+      setSchedule(newSchedule);
+      setFormData({ ...formData, schedule: newSchedule });
+    }
+  }, [formData.start_date, formData.num_modulo]);
+
   const fetchCourses = async () => {
     try {
       setLoading(true);
@@ -207,7 +220,16 @@ export default function AdminModulosManagement() {
       });
       setSchedule(modulo.schedule || {});
       // Cargar días seleccionados desde el schedule
-      setSelectedDays(Object.keys(modulo.schedule || {}));
+      const diasSeleccionados = Object.keys(modulo.schedule || {});
+      
+      // Si es módulo 1 y no hay días seleccionados, marcar automáticamente el día de inicio
+      if (modulo.num_modulo === 1 && diasSeleccionados.length === 0 && modulo.start_date) {
+        const diaInicio = getDiaSemanaNombre(new Date(modulo.start_date));
+        setSelectedDays([diaInicio]);
+      } else {
+        setSelectedDays(diasSeleccionados);
+      }
+      
       // Intentar extraer horario del primer día
       const primerDia = Object.values(modulo.schedule || {})[0];
       if (primerDia && typeof primerDia === 'string' && primerDia.includes('-')) {
@@ -248,6 +270,11 @@ export default function AdminModulosManagement() {
     setDialogOpen(false);
     setEditingModulo(null);
     setSchedule({});
+  };
+
+  const getDiaSemanaNombre = (fecha: Date): string => {
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    return dias[fecha.getDay()];
   };
 
   const handleScheduleChange = (dia: string, horario: string) => {
