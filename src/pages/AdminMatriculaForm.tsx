@@ -279,7 +279,7 @@ export default function AdminMatriculaForm() {
       const matriculaData = {
         cod_matricula: codMatricula,
         estudiante_id: formData.estudiante_id,
-        student_code: formData.student_code,
+        codigo_estudiante: formData.student_code,
         usuario_id: currentUser.id,
         modulos_matriculados: modulosMatriculados,
         num_cursos: uniqueCourses.size,
