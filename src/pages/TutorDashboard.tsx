@@ -226,7 +226,7 @@ export default function TutorDashboard() {
         .from('course_enrollments')
         .select(`
           student_id,
-          student:profiles!course_enrollments_student_id_fkey(*)
+          profiles!inner(*)
         `)
         .in('modulo_id', allCourseIds);
 
@@ -236,7 +236,7 @@ export default function TutorDashboard() {
 
       // Remove duplicates by student_id
       const uniqueStudents = Array.from(
-        new Map(studentsData.map(item => [item.student_id, item.student])).values()
+        new Map(studentsData.map(item => [item.student_id, item.profiles])).values()
       ) as Student[];
 
       console.log('👥 Total estudiantes únicos encontrados:', uniqueStudents.length);

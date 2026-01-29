@@ -148,7 +148,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
         .from('course_enrollments')
         .select(`
           student_id,
-          student:profiles!course_enrollments_student_id_fkey(
+          profiles!inner(
             id,
             first_name,
             last_name,
@@ -160,8 +160,8 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
       if (error) throw error;
 
       const enrolledStudents = (data || [])
-        .filter(e => e.student)
-        .map(e => e.student) as Student[];
+        .filter(e => e.profiles)
+        .map(e => e.profiles) as Student[];
       
       setStudents(enrolledStudents);
     } catch (error) {

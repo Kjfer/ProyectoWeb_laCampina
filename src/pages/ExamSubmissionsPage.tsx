@@ -88,7 +88,7 @@ const ExamSubmissionsPage = () => {
         .from('course_enrollments')
         .select(`
           student_id,
-          student:profiles!course_enrollments_student_id_fkey (
+          profiles!inner(
             id,
             first_name,
             last_name,

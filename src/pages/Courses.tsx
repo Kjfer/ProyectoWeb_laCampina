@@ -43,6 +43,19 @@ interface Course {
   enrollments?: { count: number }[];
   enrolled_at?: string; // For students
   enrollment_status?: string; // For students
+  course_id?: string; // ID de la edición (para agrupar)
+  course_name?: string; // Nombre de la edición
+  program_name?: string; // Nombre del programa
+}
+
+interface EdicionGroup {
+  course_id: string;
+  course_name: string;
+  program_name: string;
+  academic_year: string;
+  semester: string;
+  modulos: Course[];
+  total_students: number;
 }
 
 const Courses = () => {
@@ -50,8 +63,12 @@ const Courses = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [ediciones, setEdiciones] = useState<EdicionGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [courseToDelete, setCourseToDelete] = useState<string | null>(null);
+  
+  // Determinar si se debe mostrar vista agrupada (profesores y admins)
+  const showGroupedView = profile?.role === 'teacher' || profile?.role === 'admin';
 
   useEffect(() => {
     fetchCourses();
@@ -92,7 +109,34 @@ const Courses = () => {
       }
 
       console.log(`✅ Cursos cargados para ${data.user_role}:`, data.count);
-      setCourses(data.data || []);
+      const coursesData = data.data || [];
+      setCourses(coursesData);
+      
+      // Agrupar por edición para profesores y admins
+      if (showGroupedView && coursesData.length > 0) {
+        const grouped = coursesData.reduce((acc: Record<string, EdicionGroup>, modulo: Course) => {
+          const courseId = modulo.course_id || 'sin-edicion';
+          
+          if (!acc[courseId]) {
+            acc[courseId] = {
+              course_id: courseId,
+              course_name: modulo.course_name || 'Sin edición',
+              program_name: modulo.program_name || '',
+              academic_year: modulo.academic_year,
+              semester: modulo.semester,
+              modulos: [],
+              total_students: 0
+            };
+          }
+          
+          acc[courseId].modulos.push(modulo);
+          acc[courseId].total_students += modulo.enrollments?.[0]?.count || 0;
+          
+          return acc;
+        }, {});
+        
+        setEdiciones(Object.values(grouped));
+      }
 
     } catch (error) {
       console.error('Error:', error);
@@ -173,12 +217,94 @@ const Courses = () => {
             <p className="text-muted-foreground">
               {profile?.role === 'student' 
                 ? 'Aún no estás inscrito en ningún curso. Contacta a tu coordinador académico.'
-                : 'Aún no has creado ningún curso. ¡Crea tu primer curso!'
+                : 'Aún no tienes módulos asignados.'
               }
             </p>
           </CardContent>
         </Card>
+      ) : showGroupedView ? (
+        // Vista agrupada por ediciones para profesores y admins
+        <div className="space-y-8">
+          {ediciones.map((edicion) => (
+            <div key={edicion.course_id} className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-gradient-card rounded-lg border border-border/50">
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">
+                    {edicion.program_name} - {edicion.course_name}
+                  </h2>
+                  <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      {edicion.academic_year} - {edicion.semester}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users className="w-4 h-4" />
+                      {edicion.total_students} estudiantes totales
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <BookOpen className="w-4 h-4" />
+                      {edicion.modulos.length} módulos
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pl-4">
+                {edicion.modulos.map((modulo) => (
+                  <Card key={modulo.id} className="bg-gradient-card shadow-card border-0 hover:shadow-glow transition-all duration-300">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg font-semibold text-foreground mb-1">
+                            {modulo.name}
+                          </CardTitle>
+                          <Badge variant="secondary" className="text-xs">
+                            {modulo.code}
+                          </Badge>
+                        </div>
+                        <BookOpen className="w-6 h-6 text-primary" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                        {modulo.description || 'Sin descripción disponible'}
+                      </p>
+                      
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Users className="w-4 h-4" />
+                          <span>
+                            Prof. {modulo.teacher?.first_name || 'Sin asignar'} {modulo.teacher?.last_name || ''}
+                          </span>
+                        </div>
+                        
+                        {modulo.enrollments && modulo.enrollments[0] && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Users className="w-4 h-4" />
+                            <span>{modulo.enrollments[0].count} estudiantes</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-6 pt-4 border-t border-border/50">
+                        <Button 
+                          className="w-full" 
+                          variant="outline"
+                          onClick={() => navigate(`/courses/${modulo.id}`)}
+                        >
+                          Ver Módulo
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
+        // Vista normal para estudiantes (sin agrupar)
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {courses.map((course) => (
             <Card key={course.id} className="bg-gradient-card shadow-card border-0 hover:shadow-glow transition-all duration-300">

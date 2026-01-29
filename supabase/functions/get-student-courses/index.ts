@@ -208,7 +208,10 @@ serve(async (req: Request) => {
             is_active: true,
             created_at: modulo.start_date,
             teacher: modulo.teacher,
-            enrollments: [{ count: count || 0 }]
+            enrollments: [{ count: count || 0 }],
+            course_id: modulo.course_id, // ID de la edición para agrupar
+            course_name: modulo.course?.name, // Nombre de la edición
+            program_name: modulo.course?.program?.name // Nombre del programa
           }
         })
       )
@@ -278,7 +281,10 @@ serve(async (req: Request) => {
             is_active: true,
             created_at: modulo.start_date,
             teacher: modulo.teacher,
-            enrollments: [{ count: count || 0 }]
+            enrollments: [{ count: count || 0 }],
+            course_id: modulo.course_id,
+            course_name: modulo.course?.name,
+            program_name: modulo.course?.program?.name
           }
         })
       )
