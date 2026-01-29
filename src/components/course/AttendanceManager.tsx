@@ -155,7 +155,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
             email
           )
         `)
-        .eq('course_id', courseId);
+        .eq('modulo_id', courseId);
 
       if (error) throw error;
 

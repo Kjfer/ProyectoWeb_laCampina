@@ -81,7 +81,7 @@ export function ExamSubmissions({ examId, courseId }: ExamSubmissionsProps) {
             email
           )
         `)
-        .eq('course_id', courseId);
+        .eq('modulo_id', courseId);
 
       if (enrollError) throw enrollError;
       setEnrolledStudents(enrollments || []);

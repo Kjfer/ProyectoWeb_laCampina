@@ -74,19 +74,42 @@ export function MatriculasTab() {
     try {
       setLoading(true);
       
-      // Cargar matrículas con información completa de módulos
+      // Cargar matrículas con información completa
       const { data: matriculasData, error: matriculasError } = await supabase
         .from('matriculas' as any)
         .select(`
           *,
           estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name, email, student_code),
           usuario:profiles!matriculas_usuario_id_fkey(id, first_name, last_name),
-          curso_grabado:cursos_grabados(id, name),
-          modulo:modulos(id, nombre, course_id)
+          curso_grabado:cursos_grabados(id, name)
         `)
         .order('created_at', { ascending: false });
 
       if (matriculasError) throw matriculasError;
+
+      // Para cada matrícula, obtener los módulos enrollados
+      const matriculasConModulos = await Promise.all(
+        (matriculasData || []).map(async (mat: any) => {
+          // Obtener enrollments del estudiante
+          const { data: enrollments } = await supabase
+            .from('course_enrollments')
+            .select(`
+              modulo_id,
+              modulos!course_enrollments_modulo_id_fkey(
+                id,
+                name,
+                code,
+                course_id
+              )
+            `)
+            .eq('student_id', mat.estudiante_id);
+
+          return {
+            ...mat,
+            modulos_matriculados: enrollments?.map(e => e.modulos).filter(Boolean) || []
+          };
+        })
+      );
 
       // Cargar pagos relacionados
       const { data: pagosData } = await supabase
@@ -95,7 +118,7 @@ export function MatriculasTab() {
         .eq('categoria_producto', 'matricula');
 
       // Asociar pagos con matrículas
-      const matriculasConPagos = (matriculasData || []).map((mat: any) => ({
+      const matriculasConPagos = matriculasConModulos.map((mat: any) => ({
         ...mat,
         pagos: (pagosData || []).filter((pago: any) => pago.codigo_producto === mat.cod_matricula)
       }));
@@ -411,7 +434,7 @@ export function MatriculasTab() {
                 <div className="mt-2 space-y-2">
                   {selectedMatricula.modulos_matriculados?.map((modulo, index) => (
                     <Badge key={index} variant="outline" className="mr-2">
-                      {modulo.nombre || `Módulo ${index + 1}`}
+                      {modulo.name || `Módulo ${index + 1}`}
                     </Badge>
                   ))}
                 </div>

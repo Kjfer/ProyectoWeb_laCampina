@@ -59,33 +59,31 @@ export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManager
     try {
       setLoading(true);
 
-      const { data: modulesData, error } = await supabase
-        .from('course_modules')
+      // Ahora las secciones semanales están directamente asociadas al módulo
+      const { data: sectionsData, error } = await supabase
+        .from('course_weekly_sections')
         .select(`
-          id,
-          title,
-          description,
-          position,
-          sections:course_weekly_sections(
-            *,
-            resources:course_weekly_resources(*)
-          )
+          *,
+          resources:course_weekly_resources(*)
         `)
-        .eq('course_id', courseId)
+        .eq('modulo_id', courseId)
         .order('position', { ascending: true });
 
       if (error) throw error;
 
-      const processedModules = modulesData.map((mod: any) => ({
-        ...mod,
-        sections: (mod.sections || [])
-          .sort((a: any, b: any) => a.position - b.position)
+      // Agrupar como un solo módulo para mantener compatibilidad con la UI
+      const processedModules = sectionsData && sectionsData.length > 0 ? [{
+        id: courseId,
+        title: 'Contenido del Módulo',
+        description: 'Material y recursos del módulo',
+        position: 0,
+        sections: (sectionsData || [])
           .map((section: any) => ({
             ...section,
             resources: (section.resources || []).sort((a: any, b: any) => a.position - b.position)
           }))
           .filter((section: any) => canEdit || section.is_published)
-      }));
+      }] : [];
 
       setModules(processedModules);
 

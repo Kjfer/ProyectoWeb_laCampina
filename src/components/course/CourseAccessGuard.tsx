@@ -42,7 +42,7 @@ export const CourseAccessGuard = ({ courseId, children }: CourseAccessGuardProps
           .from('course_enrollments')
           .select('payment_status, id')
           .eq('student_id', profile.id)
-          .eq('course_id', courseId)
+          .eq('modulo_id', courseId)
           .maybeSingle();
 
         if (error) {

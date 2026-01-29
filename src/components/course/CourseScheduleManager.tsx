@@ -86,7 +86,7 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('courses')
+        .from('modulos')
         .select('schedule')
         .eq('id', courseId)
         .single();
@@ -168,7 +168,7 @@ export function CourseScheduleManager({ courseId, canEdit: _canEdit }: CourseSch
       }));
 
       const { error } = await supabase
-        .from('courses')
+        .from('modulos')
         .update({
           schedule: scheduleArray,
         })
