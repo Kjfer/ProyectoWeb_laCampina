@@ -577,7 +577,12 @@ export default function AdminModulosManagement() {
               {/* Fechas */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="start_date">Fecha de Inicio *</Label>
+                  <Label htmlFor="start_date">
+                    Fecha de Inicio *
+                    {editingModulo?.num_modulo === 1 && (
+                      <span className="text-sm text-gray-500 ml-2">(Bloqueada para Módulo 1)</span>
+                    )}
+                  </Label>
                   <Input
                     id="start_date"
                     type="date"
@@ -585,6 +590,7 @@ export default function AdminModulosManagement() {
                     onChange={(e) =>
                       setFormData({ ...formData, start_date: e.target.value })
                     }
+                    disabled={editingModulo?.num_modulo === 1}
                     required
                   />
                 </div>

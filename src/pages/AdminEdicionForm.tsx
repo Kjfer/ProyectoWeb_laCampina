@@ -149,12 +149,21 @@ export default function AdminEdicionForm() {
 
   const handleStartDateChange = (date: string) => {
     const newFormData = { ...formData, start_date: date };
+    const selectedDate = new Date(date);
+    
+    // Detectar año académico
+    const year = selectedDate.getFullYear();
+    newFormData.academic_year = year.toString();
+    
+    // Detectar semestre (I: Enero-Junio, II: Julio-Diciembre)
+    const month = selectedDate.getMonth() + 1; // getMonth() devuelve 0-11
+    newFormData.semester = month <= 6 ? 'I' : 'II';
     
     // Regenerar código y nombre si ya hay programa seleccionado
     if (formData.program_id) {
       const programa = programas.find(p => p.id === formData.program_id);
       if (programa) {
-        const code = generateCourseCode(programa.code, new Date(date));
+        const code = generateCourseCode(programa.code, selectedDate);
         const name = generateEdicionName(formData.program_id, date);
         newFormData.code = code;
         newFormData.name = name;
@@ -247,16 +256,76 @@ export default function AdminEdicionForm() {
           description: 'Edición actualizada correctamente',
         });
       } else {
-        // Crear
-        const { error } = await supabase
+        // Crear edición
+        const { data: newCourse, error: courseError } = await supabase
           .from('courses')
-          .insert(dataToSave as CourseInsert);
+          .insert(dataToSave as CourseInsert)
+          .select()
+          .single();
 
-        if (error) throw error;
+        if (courseError) throw courseError;
+
+        // Crear módulos automáticamente
+        if (newCourse && formData.numero_modulos) {
+          const programa = programas.find(p => p.id === formData.program_id);
+          const startDate = new Date(formData.start_date!);
+          const endDate = formData.end_date ? new Date(formData.end_date) : null;
+          
+          // Calcular duración de cada módulo
+          const totalDias = endDate 
+            ? Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+            : formData.numero_modulos! * 30; // Por defecto 30 días por módulo
+          
+          const diasPorModulo = Math.floor(totalDias / formData.numero_modulos!);
+          
+          const modulos = [];
+          for (let i = 1; i <= formData.numero_modulos!; i++) {
+            const moduloStartDate = new Date(startDate);
+            moduloStartDate.setDate(startDate.getDate() + (i - 1) * diasPorModulo);
+            
+            const moduloEndDate = new Date(moduloStartDate);
+            moduloEndDate.setDate(moduloStartDate.getDate() + diasPorModulo - 1);
+            
+            // Si es el último módulo, usar la fecha de fin de la edición
+            if (i === formData.numero_modulos && endDate) {
+              moduloEndDate.setTime(endDate.getTime());
+            }
+            
+            const mes = moduloStartDate.toLocaleDateString('es', { month: 'short' }).toUpperCase().slice(0, 3);
+            const año = moduloStartDate.getFullYear();
+            const moduloCode = `${programa?.code}-M${i}-${mes}-${año}`;
+            
+            modulos.push({
+              name: `Módulo ${i}`,
+              num_modulo: i,
+              code: moduloCode,
+              course_id: newCourse.id,
+              teacher_principal_id: formData.teacher_principal_id,
+              academic_year: formData.academic_year,
+              semester_year: formData.semester,
+              is_active: true,
+              start_date: moduloStartDate.toISOString().split('T')[0],
+              end_date: moduloEndDate.toISOString().split('T')[0],
+            });
+          }
+          
+          const { error: modulosError } = await supabase
+            .from('modulos' as any)
+            .insert(modulos);
+          
+          if (modulosError) {
+            console.error('Error al crear módulos:', modulosError);
+            toast({
+              title: 'Advertencia',
+              description: 'Edición creada pero hubo un error al crear los módulos automáticamente',
+              variant: 'destructive',
+            });
+          }
+        }
 
         toast({
           title: 'Éxito',
-          description: 'Edición creada correctamente. Ahora puede crear los módulos.',
+          description: `Edición creada correctamente con ${formData.numero_modulos} módulo(s).`,
         });
       }
 
@@ -378,35 +447,23 @@ export default function AdminEdicionForm() {
             {/* Período Académico */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="academic_year">Año Académico *</Label>
+                <Label htmlFor="academic_year">Año Académico (auto-generado) *</Label>
                 <Input
                   id="academic_year"
                   type="number"
                   value={formData.academic_year}
-                  onChange={(e) =>
-                    setFormData({ ...formData, academic_year: e.target.value })
-                  }
-                  placeholder="2026"
-                  required
+                  placeholder="Seleccione fecha de inicio"
+                  disabled
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="semester">Semestre *</Label>
-                <Select
+                <Label htmlFor="semester">Semestre (auto-generado) *</Label>
+                <Input
+                  id="semester"
                   value={formData.semester}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, semester: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="I">I</SelectItem>
-                    <SelectItem value="II">II</SelectItem>
-                    <SelectItem value="Verano">Verano</SelectItem>
-                  </SelectContent>
-                </Select>
+                  placeholder="Seleccione fecha de inicio"
+                  disabled
+                />
               </div>
             </div>
 
@@ -455,7 +512,7 @@ export default function AdminEdicionForm() {
                 <Label htmlFor="material">Material Asociado</Label>
                 <Select
                   value={formData.material}
-                  onValueChange={(value: 'book' | 'kit' | 'none') =>
+                  onValueChange={(value: 'book' | 'none') =>
                     setFormData({ ...formData, material: value })
                   }
                 >
@@ -465,7 +522,6 @@ export default function AdminEdicionForm() {
                   <SelectContent>
                     <SelectItem value="none">Ninguno</SelectItem>
                     <SelectItem value="book">Libro</SelectItem>
-                    <SelectItem value="kit">Kit</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
