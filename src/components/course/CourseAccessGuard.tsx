@@ -40,7 +40,12 @@ export const CourseAccessGuard = ({ courseId, children }: CourseAccessGuardProps
       try {
         const { data, error } = await supabase
           .from('course_enrollments')
-          .select('payment_status, id')
+          .select(`
+            id,
+            matricula:matriculas (
+              payment_status
+            )
+          `)
           .eq('student_id', profile.id)
           .eq('modulo_id', courseId)
           .maybeSingle();
@@ -57,7 +62,7 @@ export const CourseAccessGuard = ({ courseId, children }: CourseAccessGuardProps
           setHasAccess(false);
           setPaymentStatus(null);
         } else {
-          const status = (data.payment_status as string) || 'pending';
+          const status = (data.matricula?.payment_status as string) || 'pending';
           setPaymentStatus(status);
           // Solo tiene acceso si el pago está verificado
           setHasAccess(status === 'verified');

@@ -479,7 +479,11 @@ export default function AdminMatriculaForm() {
                     onValueChange={handleEstudianteChange}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccione un estudiante" />
+                      <SelectValue placeholder={
+                        filteredStudents.length === 0 
+                          ? "No se encontraron estudiantes" 
+                          : "Seleccione un estudiante"
+                      } />
                     </SelectTrigger>
                     <SelectContent>
                       {filteredStudents.map((student) => (
@@ -487,11 +491,6 @@ export default function AdminMatriculaForm() {
                           {student.first_name} {student.last_name} - {student.student_code || 'Sin código'}
                         </SelectItem>
                       ))}
-                      {filteredStudents.length === 0 && (
-                        <SelectItem value="" disabled>
-                          No se encontraron estudiantes
-                        </SelectItem>
-                      )}
                     </SelectContent>
                   </Select>
                 </div>

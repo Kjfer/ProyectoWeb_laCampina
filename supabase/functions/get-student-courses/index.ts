@@ -76,7 +76,6 @@ serve(async (req: Request) => {
         .from('course_enrollments')
         .select(`
           enrolled_at,
-          payment_status,
           modulo_id,
           modulo:modulos!course_enrollments_modulo_id_fkey (
             id,
@@ -136,7 +135,6 @@ serve(async (req: Request) => {
           teacher: modulo.teacher,
           enrolled_at: enrollment.enrolled_at,
           enrollment_status: 'enrolled',
-          payment_status: enrollment.payment_status,
           course_id: modulo.course_id // Importante: incluir course_id para agrupar por edición
         }
       }).filter(item => item && item.id) || []
