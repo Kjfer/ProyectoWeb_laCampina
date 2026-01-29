@@ -82,9 +82,9 @@ export function StudentCourses() {
         .from('modulos')
         .select(`
           id,
-          nombre,
-          codigo,
-          horario_semanal,
+          name,
+          code,
+          schedule,
           teacher_principal_id,
           course:courses (
             id,
@@ -146,15 +146,30 @@ export function StudentCourses() {
 
       // Map to courses from modulos
       const coursesWithData = modulosData?.map((modulo: any) => {
+        // El schedule en modulos es un objeto JSONB: { "lunes": "10:00-12:00" }
+        let scheduleArray = [];
+        if (modulo.schedule && typeof modulo.schedule === 'object') {
+          scheduleArray = Object.entries(modulo.schedule).map(([day, horario]: [string, any]) => {
+            let start_time, end_time;
+            if (typeof horario === 'string' && horario.includes('-')) {
+              [start_time, end_time] = horario.split('-');
+            } else if (typeof horario === 'object') {
+              start_time = horario.inicio || horario.start_time;
+              end_time = horario.fin || horario.end_time;
+            }
+            return {
+              day,
+              start_time: start_time || '',
+              end_time: end_time || ''
+            };
+          });
+        }
+        
         return {
           id: modulo.id,
-          name: modulo.nombre,
-          code: modulo.codigo,
-          schedule: modulo.horario_semanal ? Object.keys(modulo.horario_semanal).map(day => ({
-            day,
-            start_time: modulo.horario_semanal[day]?.inicio || '',
-            end_time: modulo.horario_semanal[day]?.fin || ''
-          })) : [],
+          name: modulo.name,
+          code: modulo.code,
+          schedule: scheduleArray,
           teacher: teachersMap.get(modulo.teacher_principal_id),
           pending_assignments: assignmentsByModulo.get(modulo.id) || 0,
           upcoming_exams: examsByModulo.get(modulo.id) || 0,

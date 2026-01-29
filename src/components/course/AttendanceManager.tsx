@@ -65,29 +65,35 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
   // --- 1. FUNCIÓN CORREGIDA PARA OBTENER HORARIO ---
   const fetchCourseSchedule = async () => {
     try {
-      // Pedimos schedule (días) Y las horas de inicio/fin
+      // El schedule ahora está en modulos, no en courses
       const { data, error } = await supabase
-        .from('courses')
-        .select('schedule, start_time, end_time')
+        .from('modulos')
+        .select('schedule')
         .eq('id', courseId)
         .single();
 
       if (error) throw error;
       
-      // Transformamos los datos al formato que necesitamos
-      if (data?.schedule && Array.isArray(data.schedule)) {
-        const processedSchedule = data.schedule.map((dayItem: any) => {
-            // Si el schedule solo tiene el nombre del día (string), le pegamos las horas globales
-            if (typeof dayItem === 'string') {
-                return {
-                    day: dayItem, // Ej: "Wednesday"
-                    start_time: data.start_time, // Ej: "19:00:00"
-                    end_time: data.end_time
-                };
-            }
-            // Si ya fuera un objeto completo (formato antiguo/complejo), lo dejamos igual
-            return dayItem;
+      // El schedule en modulos es un objeto JSONB: { "lunes": "10:00-12:00", "miércoles": "14:00-16:00" }
+      if (data?.schedule && typeof data.schedule === 'object') {
+        const processedSchedule = Object.entries(data.schedule).map(([dia, horario]: [string, any]) => {
+          // horario puede ser string "10:00-12:00" u objeto { inicio, fin }
+          let start_time, end_time;
+          
+          if (typeof horario === 'string' && horario.includes('-')) {
+            [start_time, end_time] = horario.split('-');
+          } else if (typeof horario === 'object') {
+            start_time = horario.inicio || horario.start_time;
+            end_time = horario.fin || horario.end_time;
+          }
+          
+          return {
+            day: dia, // "lunes", "martes", etc.
+            start_time: start_time || '09:00:00',
+            end_time: end_time || '11:00:00'
+          };
         });
+        
         setCourseSchedule(processedSchedule);
       } else {
         setCourseSchedule(null);
