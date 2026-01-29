@@ -49,12 +49,23 @@ interface Profile {
   email: string;
 }
 
+interface ProductoDisponible {
+  codigo: string;
+  descripcion: string;
+  estudiante_id: string;
+  estudiante_nombre: string;
+  monto?: number;
+  moneda?: string;
+}
+
 export default function AdminPagosManagement() {
   const [pagos, setPagos] = useState<PagoWithRelations[]>([]);
   const [students, setStudents] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [productosDisponibles, setProductosDisponibles] = useState<ProductoDisponible[]>([]);
+  const [loadingProductos, setLoadingProductos] = useState(false);
   
   const [filters, setFilters] = useState({
     categoria: 'all',
@@ -133,6 +144,133 @@ export default function AdminPagosManagement() {
     }
   };
 
+  const fetchProductosPorCategoria = async (categoria: string) => {
+    try {
+      setLoadingProductos(true);
+      const productos: ProductoDisponible[] = [];
+
+      if (categoria === 'matricula') {
+        const { data, error } = await supabase
+          .from('matriculas' as any)
+          .select(`
+            id,
+            cod_matricula,
+            precio_final,
+            moneda_monto,
+            estudiante_id,
+            estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name)
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        data?.forEach((mat: any) => {
+          if (mat.estudiante) {
+            productos.push({
+              codigo: mat.cod_matricula,
+              descripcion: `Matrícula ${mat.cod_matricula}`,
+              estudiante_id: mat.estudiante_id,
+              estudiante_nombre: `${mat.estudiante.first_name} ${mat.estudiante.last_name}`,
+              monto: mat.precio_final,
+              moneda: mat.moneda_monto,
+            });
+          }
+        });
+      } else if (categoria === 'material') {
+        const { data, error } = await supabase
+          .from('registro_compra_materiales' as any)
+          .select(`
+            id,
+            nombre,
+            monto,
+            estudiante_id,
+            estudiante:profiles!registro_compra_materiales_estudiante_id_fkey(id, first_name, last_name),
+            course:courses(name)
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        data?.forEach((mat: any) => {
+          if (mat.estudiante) {
+            productos.push({
+              codigo: `MAT-${mat.id.substring(0, 8)}`,
+              descripcion: `${mat.nombre} - ${mat.course?.name || 'Sin curso'}`,
+              estudiante_id: mat.estudiante_id,
+              estudiante_nombre: `${mat.estudiante.first_name} ${mat.estudiante.last_name}`,
+              monto: mat.monto,
+              moneda: 'PEN',
+            });
+          }
+        });
+      } else if (categoria === 'curso_grabado') {
+        const { data, error } = await supabase
+          .from('venta_cursos_grabados' as any)
+          .select(`
+            id,
+            monto,
+            estudiante_id,
+            estudiante:profiles!venta_cursos_grabados_estudiante_id_fkey(id, first_name, last_name),
+            curso_grabado:cursos_grabados(name)
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        data?.forEach((venta: any) => {
+          if (venta.estudiante) {
+            productos.push({
+              codigo: `CG-${venta.id.substring(0, 8)}`,
+              descripcion: `${venta.curso_grabado?.name || 'Curso grabado'}`,
+              estudiante_id: venta.estudiante_id,
+              estudiante_nombre: `${venta.estudiante.first_name} ${venta.estudiante.last_name}`,
+              monto: venta.monto,
+              moneda: 'PEN',
+            });
+          }
+        });
+      }
+
+      setProductosDisponibles(productos);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: `Error al cargar productos: ${error.message}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingProductos(false);
+    }
+  };
+
+  const handleCategoriaChange = (categoria: string) => {
+    setFormData({ 
+      ...formData, 
+      categoria_producto: categoria,
+      codigo_producto: '',
+      estudiante_id: '',
+    });
+    fetchProductosPorCategoria(categoria);
+  };
+
+  const handleProductoChange = (codigo: string) => {
+    const producto = productosDisponibles.find(p => p.codigo === codigo);
+    if (producto) {
+      setFormData({
+        ...formData,
+        codigo_producto: codigo,
+        estudiante_id: producto.estudiante_id,
+        monto_pago: producto.monto || formData.monto_pago,
+        moneda_pago: (producto.moneda as any) || formData.moneda_pago,
+      });
+    } else {
+      setFormData({
+        ...formData,
+        codigo_producto: codigo,
+      });
+    }
+  };
+
   const handleOpenDialog = () => {
     setFormData({
       categoria_producto: 'matricula',
@@ -146,6 +284,8 @@ export default function AdminPagosManagement() {
       comprobante: '',
       observaciones: '',
     });
+    setProductosDisponibles([]);
+    fetchProductosPorCategoria('matricula');
     setDialogOpen(true);
   };
 
@@ -156,10 +296,10 @@ export default function AdminPagosManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.codigo_producto || !formData.monto_pago) {
+    if (!formData.codigo_producto || !formData.monto_pago || !formData.estudiante_id) {
       toast({
         title: 'Error',
-        description: 'Complete todos los campos obligatorios',
+        description: 'Complete todos los campos obligatorios (categoría, código, estudiante y monto)',
         variant: 'destructive',
       });
       return;
@@ -425,53 +565,67 @@ export default function AdminPagosManagement() {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
-              {/* Categoría y Código */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="categoria_producto">Categoría *</Label>
+              {/* Categoría */}
+              <div className="space-y-2">
+                <Label htmlFor="categoria_producto">Categoría *</Label>
+                <Select
+                  value={formData.categoria_producto}
+                  onValueChange={handleCategoriaChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIAS_PRODUCTO.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat === 'matricula' ? 'Matrícula' : 
+                         cat === 'material' ? 'Material (Book/Kit)' : 
+                         'Curso Grabado'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Código del Producto */}
+              <div className="space-y-2">
+                <Label htmlFor="codigo_producto">Código del Producto *</Label>
+                {loadingProductos ? (
+                  <div className="text-sm text-gray-500">Cargando productos...</div>
+                ) : (
                   <Select
-                    value={formData.categoria_producto}
-                    onValueChange={(value: any) =>
-                      setFormData({ ...formData, categoria_producto: value })
-                    }
+                    value={formData.codigo_producto}
+                    onValueChange={handleProductoChange}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Seleccione un producto" />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIAS_PRODUCTO.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat.toUpperCase()}
+                      {productosDisponibles.map((producto) => (
+                        <SelectItem key={producto.codigo} value={producto.codigo}>
+                          {producto.codigo} - {producto.descripcion} ({producto.estudiante_nombre})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="codigo_producto">Código del Producto *</Label>
-                  <Input
-                    id="codigo_producto"
-                    value={formData.codigo_producto}
-                    onChange={(e) =>
-                      setFormData({ ...formData, codigo_producto: e.target.value })
-                    }
-                    placeholder="Ej: MAT-2026-0001"
-                    required
-                  />
-                </div>
+                )}
+                <p className="text-xs text-gray-500">
+                  Seleccione primero la categoría para ver los productos disponibles
+                </p>
               </div>
 
-              {/* Estudiante */}
+              {/* Estudiante (autocompletado, solo lectura) */}
               <div className="space-y-2">
-                <Label htmlFor="estudiante_id">Estudiante (opcional)</Label>
+                <Label htmlFor="estudiante_id">Estudiante *</Label>
                 <Select
                   value={formData.estudiante_id}
                   onValueChange={(value) =>
                     setFormData({ ...formData, estudiante_id: value })
                   }
+                  disabled={!formData.codigo_producto}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccione estudiante" />
+                    <SelectValue placeholder="Se llenará automáticamente al seleccionar el producto" />
                   </SelectTrigger>
                   <SelectContent>
                     {students.map((student) => (
@@ -481,6 +635,11 @@ export default function AdminPagosManagement() {
                     ))}
                   </SelectContent>
                 </Select>
+                {formData.estudiante_id && (
+                  <p className="text-xs text-green-600">
+                    ✓ Estudiante seleccionado automáticamente del producto
+                  </p>
+                )}
               </div>
 
               {/* Monto, Moneda y Fecha */}

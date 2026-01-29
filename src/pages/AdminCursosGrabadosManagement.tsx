@@ -315,10 +315,9 @@ export default function AdminCursosGrabadosManagement() {
                   onValueChange={(value) => setFormData({ ...formData, program_id: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccione un programa (opcional)" />
+                    <SelectValue placeholder="Sin programa - Seleccione si aplica" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin programa</SelectItem>
                     {programas.map((programa) => (
                       <SelectItem key={programa.id} value={programa.id}>
                         {programa.name}
