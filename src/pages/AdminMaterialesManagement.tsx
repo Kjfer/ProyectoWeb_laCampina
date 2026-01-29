@@ -295,7 +295,7 @@ export default function AdminMaterialesManagement() {
                       <TableCell>
                         {material.course?.name || '-'}
                       </TableCell>
-                      <TableCell>S/ {material.monto.toFixed(2)}</TableCell>
+                      <TableCell>S/ {material.monto ? material.monto.toFixed(2) : '0.00'}</TableCell>
                       <TableCell>
                         <Select
                           value={material.estado_pago}

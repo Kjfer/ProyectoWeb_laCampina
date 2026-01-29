@@ -32,7 +32,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Video, Play } from 'lucide-react';
+import { Plus, Edit, Trash2, Video } from 'lucide-react';
 
 interface CursoGrabado {
   id: string;
@@ -66,7 +66,6 @@ export default function AdminCursosGrabadosManagement() {
     name: '',
     description: '',
     program_id: '',
-    video_url: '',
     duration_hours: 0,
     is_active: true,
   });
@@ -118,7 +117,6 @@ export default function AdminCursosGrabadosManagement() {
         name: curso.name,
         description: curso.description || '',
         program_id: curso.program_id || '',
-        video_url: curso.video_url || '',
         duration_hours: curso.duration_hours || 0,
         is_active: curso.is_active,
       });
@@ -128,7 +126,6 @@ export default function AdminCursosGrabadosManagement() {
         name: '',
         description: '',
         program_id: '',
-        video_url: '',
         duration_hours: 0,
         is_active: true,
       });
@@ -247,7 +244,6 @@ export default function AdminCursosGrabadosManagement() {
                     <TableHead>Nombre</TableHead>
                     <TableHead>Programa</TableHead>
                     <TableHead>Duración (hrs)</TableHead>
-                    <TableHead>URL Video</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -258,21 +254,6 @@ export default function AdminCursosGrabadosManagement() {
                       <TableCell className="font-medium">{curso.name}</TableCell>
                       <TableCell>{curso.programa?.name || '-'}</TableCell>
                       <TableCell>{curso.duration_hours || '-'}</TableCell>
-                      <TableCell>
-                        {curso.video_url ? (
-                          <a
-                            href={curso.video_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline flex items-center gap-1"
-                          >
-                            <Play className="h-3 w-3" />
-                            Ver video
-                          </a>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
                       <TableCell>
                         <Badge variant={curso.is_active ? 'default' : 'secondary'}>
                           {curso.is_active ? 'Activo' : 'Inactivo'}
@@ -355,17 +336,6 @@ export default function AdminCursosGrabadosManagement() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Descripción del curso..."
                   rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="video_url">URL del Video</Label>
-                <Input
-                  id="video_url"
-                  type="url"
-                  value={formData.video_url}
-                  onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-                  placeholder="https://..."
                 />
               </div>
 

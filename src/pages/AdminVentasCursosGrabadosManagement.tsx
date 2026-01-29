@@ -398,10 +398,9 @@ export default function AdminVentasCursosGrabadosManagement() {
                   onValueChange={(value) => setFormData({ ...formData, matricula_id: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccione una matrícula" />
+                    <SelectValue placeholder="Sin matrícula - Seleccione si aplica" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin matrícula</SelectItem>
                     {matriculas.map((matricula) => (
                       <SelectItem key={matricula.id} value={matricula.id}>
                         {matricula.cod_matricula}
