@@ -103,47 +103,68 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
     }
   };
 
-  // --- 2. FUNCIÓN CORREGIDA PARA VERIFICAR LA HORA ---
   const checkSchedule = () => {
-    // Si no hay horario, asumimos que NO estamos en clase (o puedes cambiar a true si prefieres modo libre)
+    // Si no hay horario cargado, no hacemos nada
     if (!courseSchedule || courseSchedule.length === 0) {
-        // Opción: setIsWithinSchedule(true) si quieres permitir siempre si no hay horario definido.
-        return;
+       return;
     }
 
     const now = new Date();
-    // Obtenemos día en español minúsculas: "miércoles"
-    const currentDayES = now.toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase();
-    const currentTime = now.toTimeString().slice(0, 5); // "HH:MM"
+    // Obtenemos el día actual como NÚMERO (0 = Domingo, 1 = Lunes ... 4 = Jueves)
+    const currentDayNum = now.getDay(); 
 
-    // Mapa exacto según lo que guarda AdminCourseManagement (Keys en Inglés Capitalizado)
-    const dayMap: Record<string, string> = {
-      'lunes': 'Monday',
-      'martes': 'Tuesday',
-      'miércoles': 'Wednesday',
-      'jueves': 'Thursday',
-      'viernes': 'Friday',
-      'sábado': 'Saturday',
-      'domingo': 'Sunday'
+    // Mapa para convertir el texto de tu BD a número
+    const dayToNumMap: Record<string, number> = {
+      'domingo': 0,
+      'lunes': 1,
+      'martes': 2,
+      'miércoles': 3, 'miercoles': 3,
+      'jueves': 4,
+      'viernes': 5,
+      'sábado': 6, 'sabado': 6
     };
 
-    const currentDayEN = dayMap[currentDayES]; // "Wednesday"
+    // Buscamos el horario comparando NÚMEROS
+    const todaySchedule = courseSchedule.find(s => {
+      // Limpiamos el texto que viene de la BD (quitar mayúsculas y espacios)
+      const dbDayClean = s.day.toLowerCase().trim(); 
+      const dbDayNum = dayToNumMap[dbDayClean];
+      
+      return dbDayNum === currentDayNum;
+    });
     
-    // Buscamos si hoy hay clase
-    const todaySchedule = courseSchedule.find(s => s.day === currentDayEN);
-    
+    // --- DEBUG: Mira la consola (F12) si esto falla ---
+    console.log("--- REVISIÓN DE HORARIO ---");
+    console.log("Día actual (Sistema):", currentDayNum); // Debería ser 4 si es jueves
+    console.log("Horario encontrado en BD:", todaySchedule); 
+
     if (!todaySchedule) {
+      console.log("FALLO: No se encontró coincidencia de día.");
       setIsWithinSchedule(false);
       return;
     }
 
-    // Validamos la hora (HH:MM strings se pueden comparar alfabéticamente)
-    // Cortamos los segundos de la base de datos (19:00:00 -> 19:00)
-    const start = todaySchedule.start_time?.slice(0, 5) || "00:00";
-    const end = todaySchedule.end_time?.slice(0, 5) || "23:59";
+    // --- LÓGICA DE TIEMPO + 30 MINUTOS ---
+    const startStr = todaySchedule.start_time?.slice(0, 5) || "00:00";
+    const endStr = todaySchedule.end_time?.slice(0, 5) || "23:59";
 
-    const isTimeMatch = currentTime >= start && currentTime <= end;
+    const startDate = new Date();
+    const [startH, startM] = startStr.split(':');
+    startDate.setHours(Number(startH), Number(startM), 0, 0);
+
+    const endDate = new Date();
+    const [endH, endM] = endStr.split(':');
+    endDate.setHours(Number(endH), Number(endM), 0, 0);
+
+    // Sumar 30 minutos de tolerancia
+    endDate.setMinutes(endDate.getMinutes() + 30);
+
+    const isTimeMatch = now >= startDate && now <= endDate;
     
+    console.log("Hora actual:", now.toLocaleTimeString());
+    console.log("Cierre con tolerancia:", endDate.toLocaleTimeString());
+    console.log("¿Está en tiempo?:", isTimeMatch);
+
     setIsWithinSchedule(isTimeMatch);
   };
 
@@ -330,6 +351,10 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
                     return (
                       <li key={idx}>
                         • {dayNames[schedule.day] || schedule.day}: {schedule.start_time?.slice(0,5)} - {schedule.end_time?.slice(0,5)}
+                        {/* AGREGAR ESTA LÍNEA PARA QUE SE VEA EL TEXTO: */}
+                        <span className="ml-2 font-bold text-yellow-800 dark:text-yellow-200">
+                          (+30 min de tolerancia)
+                        </span>
                       </li>
                     );
                   })}

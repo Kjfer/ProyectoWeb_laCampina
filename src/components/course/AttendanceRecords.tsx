@@ -39,30 +39,33 @@ export function AttendanceRecords({ courseId }: AttendanceRecordsProps) {
     try {
       setLoading(true);
 
-      // 1. Obtener la sesión actual explícitamente
+      // 1. Obtener sesión
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-      // 2. Verificación de seguridad: Si no hay sesión, detenemos todo.
       if (sessionError || !session) {
         console.error('Error de sesión:', sessionError);
-        toast.error('Tu sesión ha expirado. Por favor, recarga la página o inicia sesión.');
-        return; // Salimos de la función para no hacer el fetch incorrecto
+        toast.error('Tu sesión ha expirado.');
+        return;
       }
 
-      console.log("Token obtenido correctamente, haciendo fetch...");
+      console.log("Token obtenido, haciendo fetch manual...");
 
+      // 2. Fetch Manual CORREGIDO
       const response = await fetch(
         `https://bnbtmubibnupttnnhijr.supabase.co/functions/v1/get-course-attendance?course_id=${courseId}`,
         {
+          method: 'GET',
           headers: {
-            // Asegúrate que haya un espacio después de Bearer
-            Authorization: `Bearer ${session.access_token}`, 
+            // Token del Usuario (Ya lo tenías)
+            Authorization: `Bearer ${session.access_token}`,
+            // >>> ESTO ES LO QUE FALTABA <<<
+            // La Edge Function rechaza la conexión si no envías la API Key pública
+            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
         }
       );
 
       if (!response.ok) {
-        // Si el error persiste aquí, es un problema de permisos en la Edge Function
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `Error ${response.status}: No autorizado`);
       }

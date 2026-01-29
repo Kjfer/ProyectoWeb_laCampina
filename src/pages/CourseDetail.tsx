@@ -84,9 +84,10 @@ export default function CourseDetail() {
     }
   }, [id]);
 
+
   const fetchCourse = async () => {
     try {
-      // Consultar módulo en lugar de curso
+      // 1. AGREGAR 'schedule' AL SELECT
       const { data, error } = await supabase
         .from('modulos')
         .select(`
@@ -95,6 +96,7 @@ export default function CourseDetail() {
           code,
           start_date,
           end_date,
+          schedule,  
           teacher_principal_id,
           course:courses (
             id,
@@ -102,7 +104,7 @@ export default function CourseDetail() {
             academic_year,
             semester
           ),
-          teacher:profiles!modulos_teacher_principal_id_fkey(
+          teacher:profiles!modulos_teacher_principal_id_fkey (
             id,
             first_name,
             last_name
@@ -113,7 +115,24 @@ export default function CourseDetail() {
 
       if (error) throw error;
       
-      // Transformar datos del módulo para que coincidan con la estructura de Course
+      // 2. LÓGICA PARA PROCESAR EL HORARIO (JSON -> Vista)
+      // El admin guarda algo como: { "Lunes": "09:00-11:00", "Miércoles": "09:00-11:00" }
+      const scheduleData = data.schedule || {}; 
+      const days = Object.keys(scheduleData); // ["Lunes", "Miércoles"]
+      
+      // Intentamos sacar la hora del primer día disponible para mostrarla
+      let startTime = '';
+      let endTime = '';
+      
+      if (days.length > 0) {
+        const timeRange = scheduleData[days[0]]; // "09:00-11:00"
+        if (timeRange && timeRange.includes('-')) {
+          const [start, end] = timeRange.split('-');
+          startTime = start.trim();
+          endTime = end.trim();
+        }
+      }
+
       const transformedCourse = {
         id: data.id,
         name: data.name,
@@ -123,9 +142,10 @@ export default function CourseDetail() {
         semester: data.course?.semester || '',
         is_active: true,
         created_at: data.start_date,
-        start_time: '',
-        end_time: '',
-        schedule: [],
+        // 3. ASIGNAR LOS VALORES REALES
+        start_time: startTime, // Ahora sí tiene valor
+        end_time: endTime,     // Ahora sí tiene valor
+        schedule: days,        // Ahora es un array de días ["Lunes", "Martes"]
         teacher: data.teacher
       };
       
