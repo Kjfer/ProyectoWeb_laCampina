@@ -81,7 +81,7 @@ export default function AdminPagosManagement() {
     estudiante_id: '',
     monto_pago: 0,
     fecha_pago: new Date().toISOString().split('T')[0],
-    metodo_pago: 'efectivo',
+    metodo_pago: 'En efectivo',
     moneda_pago: 'PEN',
     estado_pago: 'pago_regular',
     comprobante: '',
@@ -301,7 +301,7 @@ export default function AdminPagosManagement() {
       estudiante_id: '',
       monto_pago: 0,
       fecha_pago: new Date().toISOString().split('T')[0],
-      metodo_pago: 'efectivo',
+      metodo_pago: 'En efectivo',
       moneda_pago: 'PEN',
       estado_pago: 'pago_regular',
       comprobante: '',
@@ -426,7 +426,10 @@ export default function AdminPagosManagement() {
                     <SelectItem value="all">Todas</SelectItem>
                     {CATEGORIAS_PRODUCTO.map((cat) => (
                       <SelectItem key={cat} value={cat}>
-                        {cat.toUpperCase()}
+                        {cat === 'matricula' ? 'Matrícula' : 
+                         cat === 'kits' ? 'Kit' : 
+                         cat === 'books' ? 'Book' :
+                         'Clases Grabadas'}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -611,9 +614,10 @@ export default function AdminPagosManagement() {
                       <SelectContent>
                         {CATEGORIAS_PRODUCTO.map((cat) => (
                           <SelectItem key={cat} value={cat}>
-                            {cat === 'matricula' ? 'Matrícula' : 
-                             cat === 'material' ? 'Material (Book/Kit)' : 
-                             'Curso Grabado'}
+                            {cat === 'matricula' ? 'Pago de Matrícula' : 
+                             cat === 'kits' ? 'Pago de Kit' : 
+                             cat === 'books' ? 'Pago de Book' :
+                             'Pago de Clases Grabadas'}
                           </SelectItem>
                         ))}
                       </SelectContent>

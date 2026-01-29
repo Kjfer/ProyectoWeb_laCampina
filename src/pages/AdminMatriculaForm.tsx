@@ -83,7 +83,7 @@ export default function AdminMatriculaForm() {
     registrar_pago_inicial: false,
     tipo_pago: 'primera_cuota',
     monto_pago: 0,
-    metodo_pago: 'efectivo',
+    metodo_pago: 'En efectivo',
     fecha_pago: new Date().toISOString().split('T')[0],
     comprobante: '',
   });
@@ -117,6 +117,13 @@ export default function AdminMatriculaForm() {
     formData.kit_incluido,
     formData.monto_kit
   ]);
+
+  useEffect(() => {
+    // Si el tipo de pago es "pago_regular", auto-completar con el precio final
+    if (formData.tipo_pago === 'pago_regular' && formData.registrar_pago_inicial) {
+      setFormData(prev => ({ ...prev, monto_pago: precioFinal }));
+    }
+  }, [formData.tipo_pago, precioFinal, formData.registrar_pago_inicial]);
 
   useEffect(() => {
     // Filtrar estudiantes según búsqueda
@@ -320,6 +327,18 @@ export default function AdminMatriculaForm() {
         variant: 'destructive',
       });
       return;
+    }
+
+    // Validar que si es pago_regular, el monto debe ser igual al precio final
+    if (formData.registrar_pago_inicial && formData.tipo_pago === 'pago_regular') {
+      if (Math.abs((formData.monto_pago || 0) - precioFinal) > 0.01) {
+        toast({
+          title: 'Error',
+          description: `Para pago regular, el monto debe ser igual al precio final: ${formData.moneda} ${precioFinal.toFixed(2)}`,
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     let matriculaId: string | null = null;
@@ -1024,7 +1043,12 @@ export default function AdminMatriculaForm() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="monto_pago">Monto del Pago</Label>
+                    <Label htmlFor="monto_pago">
+                      Monto del Pago
+                      {formData.tipo_pago === 'pago_regular' && (
+                        <span className="text-xs text-gray-500 ml-2">(Monto completo)</span>
+                      )}
+                    </Label>
                     <Input
                       id="monto_pago"
                       type="number"
@@ -1034,6 +1058,8 @@ export default function AdminMatriculaForm() {
                       onChange={(e) =>
                         setFormData({ ...formData, monto_pago: parseFloat(e.target.value) || 0 })
                       }
+                      readOnly={formData.tipo_pago === 'pago_regular'}
+                      className={formData.tipo_pago === 'pago_regular' ? 'bg-gray-100' : ''}
                     />
                   </div>
                   <div className="space-y-2">

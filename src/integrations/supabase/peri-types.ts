@@ -142,7 +142,7 @@ export interface Pago {
   comprobante?: string | null;
   monto_pago: number;
   fecha_pago: string;
-  metodo_pago: 'efectivo' | 'transferencia' | 'tarjeta' | 'yape' | 'plin' | 'otro';
+  metodo_pago: 'BCP' | 'Interbank' | 'Banco de la Nación' | 'BBVA' | 'Scotiabank' | 'Yape' | 'Plin' | 'Tarjeta LINK' | 'En efectivo' | 'Paypal';
   moneda_pago: 'PEN' | 'USD' | 'EUR';
   estado_pago: 'primera_cuota' | 'pago_regular' | 'cuotas_restantes';
   usuario_id: string;
@@ -326,7 +326,7 @@ export interface MatriculaFormData {
   registrar_pago_inicial: boolean;
   tipo_pago?: 'primera_cuota' | 'pago_regular' | 'cuotas_restantes';
   monto_pago?: number;
-  metodo_pago?: 'efectivo' | 'transferencia' | 'tarjeta' | 'yape' | 'plin' | 'otro';
+  metodo_pago?: 'BCP' | 'Interbank' | 'Banco de la Nación' | 'BBVA' | 'Scotiabank' | 'Yape' | 'Plin' | 'Tarjeta LINK' | 'En efectivo' | 'Paypal';
   fecha_pago?: string;
   comprobante?: string;
 }
@@ -337,7 +337,7 @@ export interface PagoFormData {
   estudiante_id?: string;
   monto_pago: number;
   fecha_pago: string;
-  metodo_pago: 'efectivo' | 'transferencia' | 'tarjeta' | 'yape' | 'plin' | 'otro';
+  metodo_pago: 'BCP' | 'Interbank' | 'Banco de la Nación' | 'BBVA' | 'Scotiabank' | 'Yape' | 'Plin' | 'Tarjeta LINK' | 'En efectivo' | 'Paypal';
   moneda_pago: 'PEN' | 'USD' | 'EUR';
   estado_pago: 'primera_cuota' | 'pago_regular' | 'cuotas_restantes';
   comprobante?: string;
@@ -390,7 +390,18 @@ export const MONEDAS = [
 ] as const;
 export const TIPOS_MATERIAL = ['book', 'kit'] as const;
 export const ESTADOS_PAGO = ['pendiente', 'pagado', 'cancelado'] as const;
-export const METODOS_PAGO = ['efectivo', 'transferencia', 'tarjeta', 'yape', 'plin', 'otro'] as const;
+export const METODOS_PAGO = [
+  'BCP', 
+  'Interbank', 
+  'Banco de la Nación', 
+  'BBVA', 
+  'Scotiabank',
+  'Yape',
+  'Plin',
+  'Tarjeta LINK', 
+  'En efectivo', 
+  'Paypal'
+] as const;
 export const TIPOS_PAGO = ['primera_cuota', 'pago_regular', 'cuotas_restantes'] as const;
 export const CATEGORIAS_PRODUCTO = ['matricula', 'kits', 'books', 'clases_grabadas'] as const;
 export const TIPOS_ESTUDIANTE = ['nuevo', 'antiguo'] as const;
