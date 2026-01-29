@@ -66,6 +66,8 @@ export default function AdminPagosManagement() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [productosDisponibles, setProductosDisponibles] = useState<ProductoDisponible[]>([]);
   const [loadingProductos, setLoadingProductos] = useState(false);
+  const [searchProducto, setSearchProducto] = useState('');
+  const [showProductoDropdown, setShowProductoDropdown] = useState(false);
   
   const [filters, setFilters] = useState({
     categoria: 'all',
@@ -91,6 +93,24 @@ export default function AdminPagosManagement() {
     fetchPagos();
     fetchStudents();
   }, []);
+
+  useEffect(() => {
+    // Cerrar dropdown al hacer clic fuera
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('#codigo_producto') && !target.closest('.producto-dropdown')) {
+        setShowProductoDropdown(false);
+      }
+    };
+
+    if (showProductoDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProductoDropdown]);
 
   const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -263,12 +283,15 @@ export default function AdminPagosManagement() {
         monto_pago: producto.monto || formData.monto_pago,
         moneda_pago: (producto.moneda as any) || formData.moneda_pago,
       });
+      setSearchProducto(codigo);
     } else {
       setFormData({
         ...formData,
         codigo_producto: codigo,
       });
+      setSearchProducto(codigo);
     }
+    setShowProductoDropdown(false);
   };
 
   const handleOpenDialog = () => {
@@ -284,6 +307,8 @@ export default function AdminPagosManagement() {
       comprobante: '',
       observaciones: '',
     });
+    setSearchProducto('');
+    setShowProductoDropdown(false);
     setProductosDisponibles([]);
     fetchProductosPorCategoria('matricula');
     setDialogOpen(true);
@@ -628,30 +653,84 @@ export default function AdminPagosManagement() {
                   {loadingProductos ? (
                     <div className="text-sm text-gray-500 p-2 bg-gray-50 rounded">Cargando productos...</div>
                   ) : (
-                    <Select
-                      value={formData.codigo_producto}
-                      onValueChange={handleProductoChange}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccione un producto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {productosDisponibles.map((producto) => (
-                          <SelectItem key={producto.codigo} value={producto.codigo}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{producto.codigo}</span>
-                              <span className="text-xs text-gray-500">
-                                {producto.descripcion} - {producto.estudiante_nombre}
-                              </span>
+                    <div className="relative">
+                      <Input
+                        id="codigo_producto"
+                        placeholder="Escriba para buscar código (ej: MAT-2026-00001)..."
+                        value={searchProducto}
+                        onChange={(e) => {
+                          setSearchProducto(e.target.value);
+                          setShowProductoDropdown(true);
+                        }}
+                        onFocus={() => setShowProductoDropdown(true)}
+                        className="pr-10"
+                      />
+                      {searchProducto && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchProducto('');
+                            setFormData({ 
+                              ...formData, 
+                              codigo_producto: '',
+                              estudiante_id: '',
+                            });
+                          }}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
+                      )}
+                      
+                      {/* Dropdown con resultados filtrados */}
+                      {showProductoDropdown && searchProducto && (
+                        <div className="producto-dropdown absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                          {productosDisponibles
+                            .filter(p => 
+                              p.codigo.toLowerCase().includes(searchProducto.toLowerCase()) ||
+                              p.descripcion.toLowerCase().includes(searchProducto.toLowerCase()) ||
+                              p.estudiante_nombre.toLowerCase().includes(searchProducto.toLowerCase())
+                            )
+                            .slice(0, 10)
+                            .map((producto) => (
+                              <div
+                                key={producto.codigo}
+                                onClick={() => handleProductoChange(producto.codigo)}
+                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-sm">{producto.codigo}</span>
+                                  <span className="text-xs text-gray-500">
+                                    {producto.descripcion}
+                                  </span>
+                                  <span className="text-xs text-gray-400">
+                                    {producto.estudiante_nombre}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          }
+                          {productosDisponibles.filter(p => 
+                            p.codigo.toLowerCase().includes(searchProducto.toLowerCase()) ||
+                            p.descripcion.toLowerCase().includes(searchProducto.toLowerCase()) ||
+                            p.estudiante_nombre.toLowerCase().includes(searchProducto.toLowerCase())
+                          ).length === 0 && (
+                            <div className="px-3 py-4 text-center text-sm text-gray-500">
+                              No se encontraron resultados
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                   <p className="text-xs text-gray-500">
                     Seleccione la categoría para ver productos disponibles
                   </p>
+                  {formData.codigo_producto && (
+                    <p className="text-xs text-green-600">
+                      ✓ Producto seleccionado: {formData.codigo_producto}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

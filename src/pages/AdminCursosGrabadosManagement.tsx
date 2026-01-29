@@ -31,8 +31,9 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Video } from 'lucide-react';
+import { Plus, Edit, Trash2, Video, Search, Filter, Clock, CheckCircle2, XCircle } from 'lucide-react';
 
 interface CursoGrabado {
   id: string;
@@ -62,6 +63,9 @@ export default function AdminCursosGrabadosManagement() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCurso, setEditingCurso] = useState<CursoGrabado | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterPrograma, setFilterPrograma] = useState('all');
+  const [filterEstado, setFilterEstado] = useState('all');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -229,74 +233,249 @@ export default function AdminCursosGrabadosManagement() {
     }
   };
 
+  // Filtrar cursos
+  const filteredCursos = cursosGrabados.filter(curso => {
+    const matchSearch = curso.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        curso.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchPrograma = filterPrograma === 'all' || curso.program_id === filterPrograma;
+    const matchEstado = filterEstado === 'all' || 
+                       (filterEstado === 'active' && curso.is_active) ||
+                       (filterEstado === 'inactive' && !curso.is_active);
+    
+    return matchSearch && matchPrograma && matchEstado;
+  });
+
+  // Estadísticas
+  const stats = {
+    total: cursosGrabados.length,
+    activos: cursosGrabados.filter(c => c.is_active).length,
+    inactivos: cursosGrabados.filter(c => !c.is_active).length,
+    totalHoras: cursosGrabados.reduce((sum, c) => sum + (c.duration_hours || 0), 0),
+  };
+
   return (
     <DashboardLayout>
-      <div className="container mx-auto py-8">
+      <div className="container mx-auto py-8 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Video className="h-8 w-8" />
+              Cursos Grabados
+            </h1>
+            <p className="text-gray-500 mt-1">
+              Gestión del catálogo de cursos en formato video
+            </p>
+          </div>
+          <Button onClick={() => handleOpenDialog()} size="lg">
+            <Plus className="mr-2 h-5 w-5" />
+            Nuevo Curso Grabado
+          </Button>
+        </div>
+
+        {/* Estadísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription className="flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                Total Cursos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.total}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                Activos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-600">{stats.activos}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription className="flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-gray-400" />
+                Inactivos
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-gray-400">{stats.inactivos}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-blue-600" />
+                Total Horas
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-blue-600">{stats.totalHoras.toFixed(1)}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabla de cursos */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl flex items-center gap-2">
-                  <Video className="h-6 w-6" />
-                  Cursos Grabados
-                </CardTitle>
-                <CardDescription>
-                  Catálogo de cursos en formato video (clases grabadas)
-                </CardDescription>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl">Listado de Cursos</CardTitle>
+                <Badge variant="outline">{filteredCursos.length} resultado(s)</Badge>
               </div>
-              <Button onClick={() => handleOpenDialog()}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Curso Grabado
-              </Button>
+
+              {/* Búsqueda y Filtros */}
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Búsqueda */}
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Buscar por nombre o descripción..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                {/* Filtros */}
+                <div className="flex gap-2">
+                  <Select value={filterPrograma} onValueChange={setFilterPrograma}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Programa" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los programas</SelectItem>
+                      {programas.map((programa) => (
+                        <SelectItem key={programa.id} value={programa.id}>
+                          {programa.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={filterEstado} onValueChange={setFilterEstado}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="active">Activos</SelectItem>
+                      <SelectItem value="inactive">Inactivos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8">Cargando...</div>
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <p className="mt-2 text-gray-500">Cargando cursos...</p>
+              </div>
+            ) : filteredCursos.length === 0 ? (
+              <div className="text-center py-12">
+                <Video className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No se encontraron cursos grabados</p>
+                {(searchTerm || filterPrograma !== 'all' || filterEstado !== 'all') && (
+                  <Button
+                    variant="link"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterPrograma('all');
+                      setFilterEstado('all');
+                    }}
+                    className="mt-2"
+                  >
+                    Limpiar filtros
+                  </Button>
+                )}
+              </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Programa</TableHead>
-                    <TableHead>Duración (hrs)</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cursosGrabados.map((curso) => (
-                    <TableRow key={curso.id}>
-                      <TableCell className="font-medium">{curso.name}</TableCell>
-                      <TableCell>{curso.programa?.name || '-'}</TableCell>
-                      <TableCell>{curso.duration_hours || '-'}</TableCell>
-                      <TableCell>
-                        <Badge variant={curso.is_active ? 'default' : 'secondary'}>
-                          {curso.is_active ? 'Activo' : 'Inactivo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenDialog(curso)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDelete(curso.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Programa</TableHead>
+                      <TableHead className="text-center">Duración</TableHead>
+                      <TableHead className="text-center">Estado</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCursos.map((curso) => (
+                      <TableRow key={curso.id}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{curso.name}</span>
+                            {curso.description && (
+                              <span className="text-xs text-gray-500 line-clamp-1">
+                                {curso.description}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {curso.programa ? (
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{curso.programa.name}</span>
+                              <span className="text-xs text-gray-500">{curso.programa.code}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">Sin programa</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {curso.duration_hours ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <Clock className="h-3 w-3 text-gray-400" />
+                              <span>{curso.duration_hours} hrs</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={curso.is_active ? 'default' : 'secondary'}>
+                            {curso.is_active ? 'Activo' : 'Inactivo'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenDialog(curso)}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Editar
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDelete(curso.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

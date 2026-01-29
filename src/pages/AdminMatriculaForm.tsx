@@ -60,6 +60,7 @@ export default function AdminMatriculaForm() {
   const [modulos, setModulos] = useState<ModuloConCurso[]>([]);
   const [cursosGrabados, setCursosGrabados] = useState<CursoGrabado[]>([]);
   const [selectedModulos, setSelectedModulos] = useState<string[]>([]);
+  const [modulosYaMatriculados, setModulosYaMatriculados] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const [formData, setFormData] = useState<MatriculaFormData>({
@@ -222,16 +223,50 @@ export default function AdminMatriculaForm() {
     }
   };
 
-  const handleEstudianteChange = (estudianteId: string) => {
+  const handleEstudianteChange = async (estudianteId: string) => {
     const student = students.find(s => s.id === estudianteId);
     setFormData({
       ...formData,
       estudiante_id: estudianteId,
       student_code: student?.student_code || '',
     });
+    
+    // Limpiar módulos seleccionados al cambiar de estudiante
+    setSelectedModulos([]);
+    
+    // Verificar módulos ya matriculados
+    await fetchModulosYaMatriculados(estudianteId);
+  };
+
+  const fetchModulosYaMatriculados = async (estudianteId: string) => {
+    try {
+      const { data: enrollments, error } = await supabase
+        .from('course_enrollments')
+        .select('modulo_id')
+        .eq('student_id', estudianteId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      const modulosIds = enrollments?.map(e => e.modulo_id) || [];
+      setModulosYaMatriculados(modulosIds);
+    } catch (error: any) {
+      console.error('Error al verificar módulos matriculados:', error);
+      setModulosYaMatriculados([]);
+    }
   };
 
   const handleModuloToggle = (moduloId: string) => {
+    // Evitar seleccionar módulos ya matriculados
+    if (modulosYaMatriculados.includes(moduloId)) {
+      toast({
+        title: 'Módulo no disponible',
+        description: 'El estudiante ya está matriculado en este módulo',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const newSelected = selectedModulos.includes(moduloId)
       ? selectedModulos.filter(id => id !== moduloId)
       : [...selectedModulos, moduloId];
@@ -604,6 +639,16 @@ export default function AdminMatriculaForm() {
             {/* 2. SELECCIÓN DE MÓDULOS */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">2. Seleccionar Módulos *</h3>
+              {!formData.estudiante_id && (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                  ℹ️ Seleccione primero un estudiante para ver los módulos disponibles
+                </div>
+              )}
+              {formData.estudiante_id && modulosYaMatriculados.length > 0 && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                  ℹ️ El estudiante ya está matriculado en {modulosYaMatriculados.length} módulo(s). Estos aparecen deshabilitados.
+                </div>
+              )}
               <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4">
                 {modulosPorCurso.map(({ course, modulos: courseModulos }) => (
                   <div key={course.id} className="space-y-2">
@@ -611,24 +656,36 @@ export default function AdminMatriculaForm() {
                       {course.name} ({course.code})
                     </div>
                     <div className="grid grid-cols-2 gap-2 ml-4">
-                      {courseModulos.map((modulo) => (
-                        <div key={modulo.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={modulo.id}
-                            checked={selectedModulos.includes(modulo.id)}
-                            onCheckedChange={() => handleModuloToggle(modulo.id)}
-                          />
-                          <Label
-                            htmlFor={modulo.id}
-                            className="text-sm font-normal cursor-pointer"
+                      {courseModulos.map((modulo) => {
+                        const yaMatriculado = modulosYaMatriculados.includes(modulo.id);
+                        return (
+                          <div 
+                            key={modulo.id} 
+                            className={`flex items-center space-x-2 ${yaMatriculado ? 'opacity-50' : ''}`}
                           >
-                            M{modulo.num_modulo}: {modulo.name}
-                            <span className="text-xs text-gray-500 ml-2">
-                              ({new Date(modulo.start_date).toLocaleDateString()})
-                            </span>
-                          </Label>
-                        </div>
-                      ))}
+                            <Checkbox
+                              id={modulo.id}
+                              checked={selectedModulos.includes(modulo.id)}
+                              onCheckedChange={() => handleModuloToggle(modulo.id)}
+                              disabled={yaMatriculado}
+                            />
+                            <Label
+                              htmlFor={modulo.id}
+                              className={`text-sm font-normal ${yaMatriculado ? 'cursor-not-allowed line-through' : 'cursor-pointer'}`}
+                            >
+                              M{modulo.num_modulo}: {modulo.name}
+                              <span className="text-xs text-gray-500 ml-2">
+                                ({new Date(modulo.start_date).toLocaleDateString()})
+                              </span>
+                              {yaMatriculado && (
+                                <span className="text-xs text-red-600 ml-2 font-medium">
+                                  ✓ Ya matriculado
+                                </span>
+                              )}
+                            </Label>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -709,7 +766,7 @@ export default function AdminMatriculaForm() {
                 </div>
 
                 {formData.incluir_clases_grabadas && (
-                  <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div className="grid grid-cols-3 gap-4 mt-2">
                     <div className="space-y-2">
                       <Label htmlFor="id_clases_grabadas">Curso Grabado</Label>
                       <Select
@@ -742,6 +799,26 @@ export default function AdminMatriculaForm() {
                           setFormData({ ...formData, valor_clase_grabada: parseFloat(e.target.value) || 0 })
                         }
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="moneda_curso_grabado">Moneda</Label>
+                      <Select
+                        value={formData.moneda}
+                        onValueChange={(value: any) =>
+                          setFormData({ ...formData, moneda: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MONEDAS.map((moneda) => (
+                            <SelectItem key={moneda} value={moneda}>
+                              {moneda}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 )}
@@ -816,6 +893,26 @@ export default function AdminMatriculaForm() {
                         {TIPOS_PAGO.map((tipo) => (
                           <SelectItem key={tipo} value={tipo}>
                             {tipo.replace('_', ' ').toUpperCase()}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="moneda_pago">Moneda del Pago</Label>
+                    <Select
+                      value={formData.moneda}
+                      onValueChange={(value: any) =>
+                        setFormData({ ...formData, moneda: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MONEDAS.map((moneda) => (
+                          <SelectItem key={moneda} value={moneda}>
+                            {moneda}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -78,6 +78,7 @@ export default function AdminMaterialesManagement() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
+  const [filterCourse, setFilterCourse] = useState('all');
   const [formData, setFormData] = useState({
     nombre: '',
     tipo_material: 'book' as 'book' | 'kit',
@@ -236,6 +237,20 @@ export default function AdminMaterialesManagement() {
     }
   };
 
+  // Filtrar materiales por curso
+  const filteredMateriales = materiales.filter(material => {
+    if (filterCourse === 'all') return true;
+    return material.course_id === filterCourse;
+  });
+
+  // Estadísticas
+  const stats = {
+    total: filteredMateriales.length,
+    books: filteredMateriales.filter(m => m.tipo_material === 'book').length,
+    kits: filteredMateriales.filter(m => m.tipo_material === 'kit').length,
+    pagados: filteredMateriales.filter(m => m.estado_pago === 'pagado').length,
+  };
+
   return (
     <DashboardLayout>
       <div className="container mx-auto py-8">
@@ -256,6 +271,55 @@ export default function AdminMaterialesManagement() {
                 Registrar Material
               </Button>
             </div>
+            
+            {/* Estadísticas */}
+            <div className="grid grid-cols-4 gap-4 mt-4">
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-xs text-gray-500">Total Materiales</div>
+                <div className="text-2xl font-bold">{stats.total}</div>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <div className="text-xs text-blue-600">Books</div>
+                <div className="text-2xl font-bold text-blue-600">{stats.books}</div>
+              </div>
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <div className="text-xs text-purple-600">Kits</div>
+                <div className="text-2xl font-bold text-purple-600">{stats.kits}</div>
+              </div>
+              <div className="bg-green-50 p-3 rounded-lg">
+                <div className="text-xs text-green-600">Pagados</div>
+                <div className="text-2xl font-bold text-green-600">{stats.pagados}</div>
+              </div>
+            </div>
+
+            {/* Filtro por curso */}
+            <div className="flex items-center gap-4 mt-4">
+              <Label htmlFor="filter-course" className="text-sm font-medium">
+                Filtrar por Curso (Edición):
+              </Label>
+              <Select value={filterCourse} onValueChange={setFilterCourse}>
+                <SelectTrigger id="filter-course" className="w-[300px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los cursos</SelectItem>
+                  {courses.map((course) => (
+                    <SelectItem key={course.id} value={course.id}>
+                      {course.name} ({course.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {filterCourse !== 'all' && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setFilterCourse('all')}
+                >
+                  Limpiar filtro
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -275,7 +339,15 @@ export default function AdminMaterialesManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {materiales.map((material) => (
+                  {filteredMateriales.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                        No se encontraron materiales
+                        {filterCourse !== 'all' && ' para el curso seleccionado'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredMateriales.map((material) => (
                     <TableRow key={material.id}>
                       <TableCell>
                         {material.estudiante
@@ -322,7 +394,8 @@ export default function AdminMaterialesManagement() {
                         )}
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ))
+                  )}
                 </TableBody>
               </Table>
             )}

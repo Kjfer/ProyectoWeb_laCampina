@@ -368,7 +368,20 @@ export interface ModuloCreationData {
 // CONSTANTES
 // ============================================
 
-export const MONEDAS = ['PEN', 'USD', 'EUR'] as const;
+export const MONEDAS = [
+  'PEN', // Perú - Nuevo Sol
+  'USD', // Estados Unidos - Dólar
+  'EUR', // Eurozona - Euro
+  'MXN', // México - Peso Mexicano
+  'CLP', // Chile - Peso Chileno
+  'ARS', // Argentina - Peso Argentino
+  'COP', // Colombia - Peso Colombiano
+  'BRL', // Brasil - Real
+  'UYU', // Uruguay - Peso Uruguayo
+  'BOB', // Bolivia - Boliviano
+  'PYG', // Paraguay - Guaraní
+  'VES', // Venezuela - Bolívar
+] as const;
 export const TIPOS_MATERIAL = ['book', 'kit'] as const;
 export const ESTADOS_PAGO = ['pendiente', 'pagado', 'cancelado'] as const;
 export const METODOS_PAGO = ['efectivo', 'transferencia', 'tarjeta', 'yape', 'plin', 'otro'] as const;

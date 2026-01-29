@@ -79,14 +79,12 @@ export default function AdminVentasCursosGrabadosManagement() {
   const [ventas, setVentas] = useState<VentaCursoGrabado[]>([]);
   const [estudiantes, setEstudiantes] = useState<Profile[]>([]);
   const [cursosGrabados, setCursosGrabados] = useState<CursoGrabado[]>([]);
-  const [matriculas, setMatriculas] = useState<Matricula[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [formData, setFormData] = useState({
     estudiante_id: '',
     curso_grabado_id: '',
-    matricula_id: '',
     fecha_compra: new Date().toISOString().split('T')[0],
     monto: 0,
     estado_pago: 'pendiente',
@@ -138,18 +136,9 @@ export default function AdminVentasCursosGrabadosManagement() {
 
       if (cursosError) throw cursosError;
 
-      // Cargar matrículas
-      const { data: matriculasData, error: matriculasError } = await supabase
-        .from('matriculas' as any)
-        .select('id, cod_matricula')
-        .order('cod_matricula', { ascending: false });
-
-      if (matriculasError) throw matriculasError;
-
       setVentas(ventasData as any || []);
       setEstudiantes(estudiantesData || []);
       setCursosGrabados(cursosData as any || []);
-      setMatriculas(matriculasData as any || []);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -165,7 +154,6 @@ export default function AdminVentasCursosGrabadosManagement() {
     setFormData({
       estudiante_id: '',
       curso_grabado_id: '',
-      matricula_id: '',
       fecha_compra: new Date().toISOString().split('T')[0],
       monto: 0,
       estado_pago: 'pendiente',
@@ -189,7 +177,7 @@ export default function AdminVentasCursosGrabadosManagement() {
     try {
       const dataToSave = {
         ...formData,
-        matricula_id: formData.matricula_id || null,
+        matricula_id: null, // Las ventas independientes no se asocian a matrículas
         fecha_pago: formData.estado_pago === 'pagado' && formData.fecha_pago ? formData.fecha_pago : null,
       };
 
@@ -310,7 +298,7 @@ export default function AdminVentasCursosGrabadosManagement() {
                       <TableCell>
                         {new Date(venta.fecha_compra).toLocaleDateString()}
                       </TableCell>
-                      <TableCell>${venta.monto.toFixed(2)}</TableCell>
+                      <TableCell>${venta.monto ? venta.monto.toFixed(2) : '0.00'}</TableCell>
                       <TableCell>
                         <Select
                           value={venta.estado_pago}
@@ -347,7 +335,7 @@ export default function AdminVentasCursosGrabadosManagement() {
             <DialogHeader>
               <DialogTitle>Nueva Venta de Curso Grabado</DialogTitle>
               <DialogDescription>
-                Registre la venta de un curso grabado a un estudiante
+                Registre la venta de un curso grabado a un estudiante (venta independiente, no asociada a matrícula)
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -389,25 +377,9 @@ export default function AdminVentasCursosGrabadosManagement() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="matricula_id">Matrícula (opcional)</Label>
-                <Select
-                  value={formData.matricula_id}
-                  onValueChange={(value) => setFormData({ ...formData, matricula_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sin matrícula - Seleccione si aplica" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {matriculas.map((matricula) => (
-                      <SelectItem key={matricula.id} value={matricula.id}>
-                        {matricula.cod_matricula}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <p className="text-xs text-gray-500">
+                  💡 Nota: Las ventas asociadas a matrículas se registran automáticamente desde el formulario de matrícula
+                </p>
               </div>
 
               <div className="space-y-2">

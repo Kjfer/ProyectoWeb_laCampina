@@ -214,7 +214,7 @@ export default function AdminMatriculasManagement() {
                           : '-'}
                       </TableCell>
                       <TableCell>
-                        {matricula.student_code || '-'}
+                        {matricula.codigo_estudiante || '-'}
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
