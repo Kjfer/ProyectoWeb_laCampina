@@ -41,6 +41,7 @@ interface Material {
   course_id: string;
   estado_pago: 'pendiente' | 'pagado' | 'cancelado';
   monto: number;
+  moneda_material?: string;
   fecha_registro: string;
   fecha_pago: string | null;
   created_at: string;
@@ -367,21 +368,32 @@ export default function AdminMaterialesManagement() {
                       <TableCell>
                         {material.course?.name || '-'}
                       </TableCell>
-                      <TableCell>S/ {material.monto ? material.monto.toFixed(2) : '0.00'}</TableCell>
                       <TableCell>
-                        <Select
-                          value={material.estado_pago}
-                          onValueChange={(value: any) => handleUpdateEstado(material.id, value)}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pendiente">Pendiente</SelectItem>
-                            <SelectItem value="pagado">Pagado</SelectItem>
-                            <SelectItem value="cancelado">Cancelado</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Badge variant="outline" className="mr-1">
+                          {material.moneda_material || 'PEN'}
+                        </Badge>
+                        {material.monto ? material.monto.toFixed(2) : '0.00'}
+                      </TableCell>
+                      <TableCell>
+                        {material.tipo_material === 'kit' ? (
+                          <Badge variant="default">
+                            Pagado
+                          </Badge>
+                        ) : (
+                          <Select
+                            value={material.estado_pago}
+                            onValueChange={(value: any) => handleUpdateEstado(material.id, value)}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pendiente">Pendiente</SelectItem>
+                              <SelectItem value="pagado">Pagado</SelectItem>
+                              <SelectItem value="cancelado">Cancelado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </TableCell>
                       <TableCell>
                         {new Date(material.fecha_registro).toLocaleDateString()}

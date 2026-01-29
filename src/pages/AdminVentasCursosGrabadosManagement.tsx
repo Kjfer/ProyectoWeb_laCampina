@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { MONEDAS } from '@/integrations/supabase/peri-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,13 +36,13 @@ import { Plus, ShoppingCart } from 'lucide-react';
 interface VentaCursoGrabado {
   id: string;
   estudiante_id: string;
-  curso_grabado_id: string;
+  usuario_id: string;
+  id_clases_grabadas: string;
+  valor_venta: number;
+  moneda_venta?: string;
   matricula_id: string | null;
-  fecha_compra: string;
-  monto: number;
-  estado_pago: string;
-  fecha_pago: string | null;
   created_at: string;
+  updated_at: string;
   estudiante?: {
     id: string;
     first_name: string;
@@ -84,11 +85,10 @@ export default function AdminVentasCursosGrabadosManagement() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [formData, setFormData] = useState({
     estudiante_id: '',
-    curso_grabado_id: '',
-    fecha_compra: new Date().toISOString().split('T')[0],
-    monto: 0,
-    estado_pago: 'pendiente',
-    fecha_pago: '',
+    id_clases_grabadas: '',
+    valor_venta: 0,
+    moneda_venta: 'PEN',
+    usuario_id: '',
   });
 
   useEffect(() => {
@@ -153,11 +153,10 @@ export default function AdminVentasCursosGrabadosManagement() {
   const handleOpenDialog = () => {
     setFormData({
       estudiante_id: '',
-      curso_grabado_id: '',
-      fecha_compra: new Date().toISOString().split('T')[0],
-      monto: 0,
-      estado_pago: 'pendiente',
-      fecha_pago: '',
+      id_clases_grabadas: '',
+      valor_venta: 0,
+      moneda_venta: 'PEN',
+      usuario_id: currentUser?.id || '',
     });
     setDialogOpen(true);
   };
@@ -165,7 +164,7 @@ export default function AdminVentasCursosGrabadosManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.estudiante_id || !formData.curso_grabado_id || !formData.monto) {
+    if (!formData.estudiante_id || !formData.id_clases_grabadas || !formData.valor_venta) {
       toast({
         title: 'Error',
         description: 'Complete todos los campos obligatorios',
@@ -176,9 +175,12 @@ export default function AdminVentasCursosGrabadosManagement() {
 
     try {
       const dataToSave = {
-        ...formData,
-        matricula_id: null, // Las ventas independientes no se asocian a matrículas
-        fecha_pago: formData.estado_pago === 'pagado' && formData.fecha_pago ? formData.fecha_pago : null,
+        estudiante_id: formData.estudiante_id,
+        id_clases_grabadas: formData.id_clases_grabadas,
+        valor_venta: formData.valor_venta,
+        moneda_venta: formData.moneda_venta,
+        usuario_id: currentUser?.id || formData.usuario_id,
+        matricula_id: null,
       };
 
       const { error } = await supabase
@@ -203,52 +205,7 @@ export default function AdminVentasCursosGrabadosManagement() {
     }
   };
 
-  const handleUpdateEstado = async (id: string, nuevoEstado: string) => {
-    try {
-      const updateData: any = {
-        estado_pago: nuevoEstado,
-      };
 
-      if (nuevoEstado === 'pagado' && !ventas.find(v => v.id === id)?.fecha_pago) {
-        updateData.fecha_pago = new Date().toISOString().split('T')[0];
-      } else if (nuevoEstado !== 'pagado') {
-        updateData.fecha_pago = null;
-      }
-
-      const { error } = await supabase
-        .from('venta_cursos_grabados' as any)
-        .update(updateData)
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Éxito',
-        description: 'Estado actualizado correctamente',
-      });
-
-      fetchData();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: `Error al actualizar estado: ${error.message}`,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const getEstadoBadgeVariant = (estado: string) => {
-    switch (estado) {
-      case 'pagado':
-        return 'default';
-      case 'pendiente':
-        return 'secondary';
-      case 'cancelado':
-        return 'destructive';
-      default:
-        return 'outline';
-    }
-  };
 
   return (
     <DashboardLayout>
@@ -282,9 +239,7 @@ export default function AdminVentasCursosGrabadosManagement() {
                     <TableHead>Curso Grabado</TableHead>
                     <TableHead>Matrícula</TableHead>
                     <TableHead>Fecha Compra</TableHead>
-                    <TableHead>Monto</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Fecha Pago</TableHead>
+                    <TableHead>Valor Venta</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -296,30 +251,15 @@ export default function AdminVentasCursosGrabadosManagement() {
                       <TableCell>{venta.curso_grabado?.name || '-'}</TableCell>
                       <TableCell>{venta.matricula?.cod_matricula || '-'}</TableCell>
                       <TableCell>
-                        {new Date(venta.fecha_compra).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>${venta.monto ? venta.monto.toFixed(2) : '0.00'}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={venta.estado_pago}
-                          onValueChange={(value) => handleUpdateEstado(venta.id, value)}
-                        >
-                          <SelectTrigger className="w-32">
-                            <Badge variant={getEstadoBadgeVariant(venta.estado_pago)}>
-                              {venta.estado_pago}
-                            </Badge>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pendiente">Pendiente</SelectItem>
-                            <SelectItem value="pagado">Pagado</SelectItem>
-                            <SelectItem value="cancelado">Cancelado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        {venta.fecha_pago
-                          ? new Date(venta.fecha_pago).toLocaleDateString()
+                        {venta.created_at && !isNaN(new Date(venta.created_at).getTime())
+                          ? new Date(venta.created_at).toLocaleDateString()
                           : '-'}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <Badge variant="outline" className="mr-2">
+                          {venta.moneda_venta || 'PEN'}
+                        </Badge>
+                        {venta.valor_venta ? venta.valor_venta.toFixed(2) : '0.00'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -360,10 +300,10 @@ export default function AdminVentasCursosGrabadosManagement() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="curso_grabado_id">Curso Grabado *</Label>
+                <Label htmlFor="id_clases_grabadas">Curso Grabado *</Label>
                 <Select
-                  value={formData.curso_grabado_id}
-                  onValueChange={(value) => setFormData({ ...formData, curso_grabado_id: value })}
+                  value={formData.id_clases_grabadas}
+                  onValueChange={(value) => setFormData({ ...formData, id_clases_grabadas: value })}
                   required
                 >
                   <SelectTrigger>
@@ -382,58 +322,39 @@ export default function AdminVentasCursosGrabadosManagement() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="fecha_compra">Fecha de Compra *</Label>
-                <Input
-                  id="fecha_compra"
-                  type="date"
-                  value={formData.fecha_compra}
-                  onChange={(e) => setFormData({ ...formData, fecha_compra: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="monto">Monto *</Label>
-                <Input
-                  id="monto"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.monto}
-                  onChange={(e) => setFormData({ ...formData, monto: parseFloat(e.target.value) || 0 })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="estado_pago">Estado de Pago</Label>
-                <Select
-                  value={formData.estado_pago}
-                  onValueChange={(value) => setFormData({ ...formData, estado_pago: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
-                    <SelectItem value="pagado">Pagado</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.estado_pago === 'pagado' && (
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="fecha_pago">Fecha de Pago</Label>
+                  <Label htmlFor="moneda_venta">Moneda *</Label>
+                  <Select
+                    value={formData.moneda_venta}
+                    onValueChange={(value) => setFormData({ ...formData, moneda_venta: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONEDAS.map((moneda) => (
+                        <SelectItem key={moneda} value={moneda}>
+                          {moneda}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="valor_venta">Valor Venta *</Label>
                   <Input
-                    id="fecha_pago"
-                    type="date"
-                    value={formData.fecha_pago}
-                    onChange={(e) => setFormData({ ...formData, fecha_pago: e.target.value })}
+                    id="valor_venta"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.valor_venta}
+                    onChange={(e) => setFormData({ ...formData, valor_venta: parseFloat(e.target.value) || 0 })}
+                    required
                   />
                 </div>
-              )}
+              </div>
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

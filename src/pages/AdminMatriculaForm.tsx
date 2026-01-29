@@ -74,7 +74,11 @@ export default function AdminMatriculaForm() {
     id_clases_grabadas: undefined,
     valor_clase_grabada: 0,
     book_incluido: false,
+    monto_book: 0,
+    moneda_book: 'PEN',
     kit_incluido: false,
+    monto_kit: 0,
+    moneda_kit: 'PEN',
     observaciones: '',
     registrar_pago_inicial: false,
     tipo_pago: 'primera_cuota',
@@ -93,13 +97,26 @@ export default function AdminMatriculaForm() {
 
   useEffect(() => {
     // Calcular precio final cuando cambien los valores
+    const costoClasesGrabadas = formData.incluir_clases_grabadas ? (formData.valor_clase_grabada || 0) : 0;
+    const costoBook = formData.book_incluido ? (formData.monto_book || 0) : 0;
+    const costoKit = formData.kit_incluido ? (formData.monto_kit || 0) : 0;
+    
     const precio = calculatePrecioFinal(
       formData.valor_matricula,
-      formData.incluir_clases_grabadas ? formData.valor_clase_grabada || 0 : 0,
+      costoClasesGrabadas + costoBook + costoKit,
       formData.descuento
     );
     setPrecioFinal(precio);
-  }, [formData.valor_matricula, formData.valor_clase_grabada, formData.descuento, formData.incluir_clases_grabadas]);
+  }, [
+    formData.valor_matricula, 
+    formData.valor_clase_grabada, 
+    formData.descuento, 
+    formData.incluir_clases_grabadas,
+    formData.book_incluido,
+    formData.monto_book,
+    formData.kit_incluido,
+    formData.monto_kit
+  ]);
 
   useEffect(() => {
     // Filtrar estudiantes según búsqueda
@@ -418,14 +435,29 @@ export default function AdminMatriculaForm() {
         // Para books: siempre se registra
         const courseId = modulos.find(m => m.id === selectedModulos[0])?.course_id;
         if (courseId) {
+          // Determinar estado de pago del book basado en el pago inicial
+          let estadoPagoBook: 'pendiente' | 'pagado' | 'cancelado' = 'pendiente';
+          let fechaPagoBook: string | undefined = undefined;
+          
+          if (formData.book_incluido && formData.monto_book) {
+            // Si se incluye book en la matrícula
+            if (formData.registrar_pago_inicial && formData.monto_pago && formData.monto_pago >= formData.monto_book) {
+              // Si hay pago inicial y cubre el precio del book
+              estadoPagoBook = 'pagado';
+              fechaPagoBook = formData.fecha_pago || new Date().toISOString();
+            }
+          }
+
           const bookData: RegistroCompraMaterialInsert = {
             nombre: 'Material de curso',
             tipo_material: 'book',
             usuario_id: currentUser.id,
             estudiante_id: formData.estudiante_id,
             course_id: courseId,
-            estado_pago: formData.book_incluido ? 'pagado' : 'pendiente',
-            fecha_pago: formData.book_incluido ? new Date().toISOString() : undefined,
+            monto: formData.monto_book || 0,
+            moneda_material: formData.moneda_book || 'PEN',
+            estado_pago: estadoPagoBook,
+            fecha_pago: fechaPagoBook,
           };
 
           const { error: bookError } = await supabase
@@ -434,14 +466,16 @@ export default function AdminMatriculaForm() {
 
           if (bookError) throw bookError;
 
-          // Para kits: solo si está incluido
-          if (formData.kit_incluido) {
+          // Para kits: solo si está incluido (sin estado de pago editable)
+          if (formData.kit_incluido && formData.monto_kit) {
             const kitData: RegistroCompraMaterialInsert = {
               nombre: 'Kit de curso',
               tipo_material: 'kit',
               usuario_id: currentUser.id,
               estudiante_id: formData.estudiante_id,
               course_id: courseId,
+              monto: formData.monto_kit,
+              moneda_material: formData.moneda_kit || 'PEN',
               estado_pago: 'pagado',
               fecha_pago: new Date().toISOString(),
             };
@@ -825,7 +859,7 @@ export default function AdminMatriculaForm() {
               </div>
 
               {/* Materiales */}
-              <div className="flex gap-6">
+              <div className="space-y-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="book_incluido"
@@ -836,6 +870,42 @@ export default function AdminMatriculaForm() {
                   />
                   <Label htmlFor="book_incluido">Incluye Libro</Label>
                 </div>
+                
+                {formData.book_incluido && (
+                  <div className="ml-6 grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="moneda_book">Moneda Book *</Label>
+                      <Select
+                        value={formData.moneda_book}
+                        onValueChange={(value) => setFormData({ ...formData, moneda_book: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MONEDAS.map((moneda) => (
+                            <SelectItem key={moneda} value={moneda}>
+                              {moneda}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="monto_book">Precio Book *</Label>
+                      <Input
+                        id="monto_book"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.monto_book || 0}
+                        onChange={(e) => setFormData({ ...formData, monto_book: parseFloat(e.target.value) || 0 })}
+                        required={formData.book_incluido}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="kit_incluido"
@@ -846,6 +916,41 @@ export default function AdminMatriculaForm() {
                   />
                   <Label htmlFor="kit_incluido">Incluye Kit</Label>
                 </div>
+                
+                {formData.kit_incluido && (
+                  <div className="ml-6 grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="moneda_kit">Moneda Kit *</Label>
+                      <Select
+                        value={formData.moneda_kit}
+                        onValueChange={(value) => setFormData({ ...formData, moneda_kit: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MONEDAS.map((moneda) => (
+                            <SelectItem key={moneda} value={moneda}>
+                              {moneda}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="monto_kit">Precio Kit *</Label>
+                      <Input
+                        id="monto_kit"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.monto_kit || 0}
+                        onChange={(e) => setFormData({ ...formData, monto_kit: parseFloat(e.target.value) || 0 })}
+                        required={formData.kit_incluido}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Precio Final */}

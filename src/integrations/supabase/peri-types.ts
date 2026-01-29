@@ -86,6 +86,7 @@ export interface RegistroCompraMaterial {
   course_id: string;
   estado_pago: 'pendiente' | 'pagado' | 'cancelado';
   monto?: number | null;
+  moneda_material?: string;
   fecha_registro: string;
   fecha_pago?: string | null;
   created_at: string;
@@ -128,6 +129,7 @@ export interface VentaCursoGrabado {
   usuario_id: string;
   id_clases_grabadas: string;
   valor_venta: number;
+  moneda_venta?: string;
   matricula_id?: string | null;
   created_at: string;
   updated_at: string;
@@ -314,7 +316,11 @@ export interface MatriculaFormData {
   id_clases_grabadas?: string;
   valor_clase_grabada?: number;
   book_incluido: boolean;
+  monto_book?: number;
+  moneda_book?: string;
   kit_incluido: boolean;
+  monto_kit?: number;
+  moneda_kit?: string;
   observaciones?: string;
   // Datos del pago inicial (opcional)
   registrar_pago_inicial: boolean;
