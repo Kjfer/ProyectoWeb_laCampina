@@ -185,9 +185,9 @@ export default function CourseDetail() {
     try {
       // Obtener profesores adicionales del módulo
       const { data, error } = await supabase
-        .from('modulo_teachers')
+        .from('course_teachers')
         .select(`
-          teacher:profiles!modulo_teachers_teacher_id_fkey(
+          teacher:profiles!course_teachers_teacher_id_fkey(
             id,
             first_name,
             last_name

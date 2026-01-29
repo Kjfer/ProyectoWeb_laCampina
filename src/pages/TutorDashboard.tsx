@@ -142,10 +142,10 @@ export default function TutorDashboard() {
 
       setLoading(true);
 
-      // Fetch modules where user is tutor - check modulo_teachers table
+      // Fetch modules where user is tutor - check course_teachers table
       console.log('📡 Consultando módulos donde el usuario es tutor:', profile.id);
       const { data: coursesData, error: coursesError } = await supabase
-        .from('modulo_teachers')
+        .from('course_teachers')
         .select(`
           modulo_id,
           modulos!inner(
