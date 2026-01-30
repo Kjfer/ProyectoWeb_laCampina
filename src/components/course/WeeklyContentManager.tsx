@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Calendar } from 'lucide-react'; // Quitamos Layers porque ya no se usa
+import { Plus, Calendar } from 'lucide-react'; 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CourseWeeklySection } from './CourseWeeklySection';
 import { SectionForm } from './SectionForm';
 
-// --- Interfaces ---
+// --- NUEVOS IMPORTS (SOLO ESTO SE AGREGA ARRIBA) ---
+import { CourseGeneralResources } from './CourseGeneralResources';
+import { CourseAnnouncements } from './CourseAnnouncements';
+// ----------------------------------------------------
+
+// --- Interfaces (SIN CAMBIOS) ---
 interface WeeklyResource {
   id: string;
   title: string;
@@ -110,10 +115,27 @@ export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManager
 
   return (
     <div className="space-y-8">
-      {/* Header General */}
-      <div className="flex items-center justify-between mb-4">
+      
+      {/* --- INICIO ZONA NUEVA --- */}
+      {/* Aquí insertamos los componentes de Recursos y Avisos ANTES del contenido semanal */}
+      
+      <CourseGeneralResources 
+         courseId={courseId} 
+         canEdit={canEdit} 
+      />
+
+      <CourseAnnouncements
+         courseId={courseId}
+         canEdit={canEdit}
+      />
+      
+      {/* --- FIN ZONA NUEVA --- */}
+
+
+      {/* Header General (SIN CAMBIOS) */}
+      <div className="flex items-center justify-between mb-4 border-t pt-6"> {/* Agregué border-t para separar visualmente */}
         <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Calendar className="h-6 w-6" /> Contenido del Curso
+          <Calendar className="h-6 w-6" /> Contenido Semanal
         </h2>
         {canEdit && (
           <Button onClick={() => setShowSectionForm(true)} className="bg-blue-600 text-white shadow-sm">
@@ -126,11 +148,6 @@ export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManager
         modules.map((module) => (
           <div key={module.id} className="space-y-4">
             
-            {/* --- CAMBIO AQUÍ: ---
-               Eliminamos el div que mostraba el Título del Módulo ("Contenido Principal").
-               Ahora renderizamos las secciones directamente.
-            */}
-
             {/* LISTA DE CLASES */}
             <div className="space-y-3">
               {module.sections.length > 0 ? (
