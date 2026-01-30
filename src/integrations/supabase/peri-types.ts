@@ -322,13 +322,7 @@ export interface MatriculaFormData {
   monto_kit?: number;
   moneda_kit?: string;
   observaciones?: string;
-  // Datos del pago inicial (opcional)
-  registrar_pago_inicial: boolean;
-  tipo_pago?: 'primera_cuota' | 'pago_regular' | 'cuotas_restantes';
-  monto_pago?: number;
-  metodo_pago?: 'BCP' | 'Interbank' | 'Banco de la Nación' | 'BBVA' | 'Scotiabank' | 'Yape' | 'Plin' | 'Tarjeta LINK' | 'En efectivo' | 'Paypal';
-  fecha_pago?: string;
-  comprobante?: string;
+  estado_pago: 'pendiente' | 'pagado' | 'cancelado';
 }
 
 export interface PagoFormData {

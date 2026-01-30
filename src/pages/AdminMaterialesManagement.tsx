@@ -72,28 +72,60 @@ interface Course {
   material: string;
 }
 
+interface Matricula {
+  id: string;
+  cod_matricula: string;
+  modulos_matriculados: any[];
+  course?: {
+    id: string;
+    name: string;
+    code: string;
+  };
+}
+
 export default function AdminMaterialesManagement() {
   const [materiales, setMateriales] = useState<Material[]>([]);
   const [students, setStudents] = useState<Profile[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<Profile[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [filterCourse, setFilterCourse] = useState('all');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [searchType, setSearchType] = useState<'nombre' | 'codigo' | 'dni'>('nombre');
+  const [studentMatriculas, setStudentMatriculas] = useState<Matricula[]>([]);
   const [formData, setFormData] = useState({
-    nombre: '',
     tipo_material: 'book' as 'book' | 'kit',
     estudiante_id: '',
     course_id: '',
-    estado_pago: 'pendiente' as 'pendiente' | 'pagado' | 'cancelado',
     monto: 0,
-    fecha_pago: '',
+    moneda_material: 'PEN' as 'PEN' | 'USD' | 'EUR',
   });
 
   useEffect(() => {
     fetchData();
     getCurrentUser();
   }, []);
+
+  useEffect(() => {
+    if (!studentSearch.trim()) {
+      setFilteredStudents(students);
+      return;
+    }
+
+    const searchLower = studentSearch.toLowerCase();
+    const filtered = students.filter(student => {
+      if (searchType === 'nombre') {
+        return `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchLower);
+      } else if (searchType === 'codigo') {
+        return (student as any).student_code?.toLowerCase().includes(searchLower);
+      } else {
+        return (student as any).document_number?.toLowerCase().includes(searchLower);
+      }
+    });
+    setFilteredStudents(filtered);
+  }, [studentSearch, searchType, students]);
 
   const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -126,7 +158,7 @@ export default function AdminMaterialesManagement() {
       // Cargar estudiantes
       const { data: studentsData, error: studentsError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, student_code, document_number')
         .eq('role', 'student')
         .order('first_name');
 
@@ -143,6 +175,7 @@ export default function AdminMaterialesManagement() {
 
       setMateriales(materialesData as any || []);
       setStudents(studentsData || []);
+      setFilteredStudents(studentsData || []);
       setCourses(coursesData as any || []);
     } catch (error: any) {
       toast({
@@ -155,16 +188,74 @@ export default function AdminMaterialesManagement() {
     }
   };
 
+  const fetchMatriculasEstudiante = async (estudianteId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('matriculas' as any)
+        .select(`
+          id,
+          cod_matricula,
+          modulos_matriculados
+        `)
+        .eq('estudiante_id', estudianteId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Obtener IDs únicos de cursos de las matrículas
+      const courseIds = new Set<string>();
+      data?.forEach((mat: any) => {
+        mat.modulos_matriculados?.forEach((mod: any) => {
+          if (mod.course_id) courseIds.add(mod.course_id);
+        });
+      });
+
+      // Obtener información de los cursos
+      const matriculasConCursos = await Promise.all(
+        (data || []).map(async (mat: any) => {
+          // Obtener el primer módulo para sacar el course_id
+          const firstModulo = mat.modulos_matriculados?.[0];
+          if (firstModulo?.modulo_id) {
+            const { data: moduloData } = await supabase
+              .from('modulos' as any)
+              .select('course_id, course:courses(id, name, code)')
+              .eq('id', firstModulo.modulo_id)
+              .single();
+            
+            return {
+              ...mat,
+              course: moduloData?.course,
+            };
+          }
+          return mat;
+        })
+      );
+
+      setStudentMatriculas(matriculasConCursos);
+    } catch (error: any) {
+      console.error('Error al cargar matrículas:', error);
+      setStudentMatriculas([]);
+    }
+  };
+
+  const handleEstudianteChange = (estudianteId: string) => {
+    setFormData({ ...formData, estudiante_id: estudianteId, course_id: '' });
+    setStudentMatriculas([]);
+    if (estudianteId) {
+      fetchMatriculasEstudiante(estudianteId);
+    }
+  };
+
   const handleOpenDialog = () => {
     setFormData({
-      nombre: '',
       tipo_material: 'book',
       estudiante_id: '',
       course_id: '',
-      estado_pago: 'pendiente',
       monto: 0,
-      fecha_pago: '',
+      moneda_material: 'PEN',
     });
+    setStudentSearch('');
+    setStudentMatriculas([]);
     setDialogOpen(true);
   };
 
@@ -180,11 +271,32 @@ export default function AdminMaterialesManagement() {
       return;
     }
 
+    if (!formData.monto || formData.monto <= 0) {
+      toast({
+        title: 'Error',
+        description: 'Debe ingresar un monto válido (mayor a 0)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
+      // Obtener información del curso
+      const selectedCourse = courses.find(c => c.id === formData.course_id);
+      const materialName = formData.tipo_material === 'book' 
+        ? `Book - ${selectedCourse?.name || 'Material de curso'}`
+        : `Kit - ${selectedCourse?.name || 'Material de curso'}`;
+
       const dataToSave = {
-        ...formData,
+        nombre: materialName,
+        tipo_material: formData.tipo_material,
+        estudiante_id: formData.estudiante_id,
+        course_id: formData.course_id,
+        monto: formData.monto,
+        moneda_material: formData.moneda_material,
         usuario_id: currentUser.id,
-        fecha_pago: formData.estado_pago === 'pagado' && formData.fecha_pago ? formData.fecha_pago : null,
+        estado_pago: 'pendiente',
+        fecha_pago: null,
       };
 
       const { error } = await supabase
@@ -195,7 +307,7 @@ export default function AdminMaterialesManagement() {
 
       toast({
         title: 'Éxito',
-        description: 'Material registrado correctamente',
+        description: 'Material registrado correctamente con estado pendiente',
       });
 
       setDialogOpen(false);
@@ -418,49 +530,83 @@ export default function AdminMaterialesManagement() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Registrar Material</DialogTitle>
+              <DialogTitle>Registrar Compra de Material</DialogTitle>
               <DialogDescription>
-                Registre la compra de un libro o kit para un estudiante
+                Registre la compra posterior de un libro o kit para un estudiante matriculado
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Búsqueda de estudiante */}
               <div className="space-y-2">
-                <Label htmlFor="estudiante_id">Estudiante *</Label>
+                <Label>Buscar Estudiante *</Label>
+                <div className="flex gap-2">
+                  <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nombre">Nombre</SelectItem>
+                      <SelectItem value="codigo">Código</SelectItem>
+                      <SelectItem value="dni">DNI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder={`Buscar por ${searchType}...`}
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estudiante_id">Seleccionar Estudiante *</Label>
                 <Select
                   value={formData.estudiante_id}
-                  onValueChange={(value) => setFormData({ ...formData, estudiante_id: value })}
+                  onValueChange={handleEstudianteChange}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccione un estudiante" />
                   </SelectTrigger>
                   <SelectContent>
-                    {students.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.first_name} {student.last_name}
-                      </SelectItem>
-                    ))}
+                    {filteredStudents.length === 0 ? (
+                      <div className="p-2 text-sm text-gray-500">No se encontraron estudiantes</div>
+                    ) : (
+                      filteredStudents.map((student: any) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.first_name} {student.last_name}
+                          {student.student_code && ` (${student.student_code})`}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="course_id">Curso *</Label>
-                <Select
-                  value={formData.course_id}
-                  onValueChange={(value) => setFormData({ ...formData, course_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione un curso" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course.name} ({course.material})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {formData.estudiante_id && (
+                <div className="space-y-2">
+                  <Label htmlFor="course_id">Edición (según matrículas) *</Label>
+                  <Select
+                    value={formData.course_id}
+                    onValueChange={(value) => setFormData({ ...formData, course_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione una edición" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {studentMatriculas.length === 0 ? (
+                        <div className="p-2 text-sm text-gray-500">El estudiante no tiene matrículas</div>
+                      ) : (
+                        studentMatriculas.map((matricula) => (
+                          <SelectItem key={matricula.id} value={matricula.course?.id || matricula.id}>
+                            {matricula.course?.name || 'Sin nombre'} - {matricula.cod_matricula}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="tipo_material">Tipo de Material *</Label>
@@ -478,58 +624,42 @@ export default function AdminMaterialesManagement() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="nombre">Nombre del Material *</Label>
-                <Input
-                  id="nombre"
-                  value={formData.nombre}
-                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                  placeholder="Ej: English Book Level 3"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="monto">Monto *</Label>
-                <Input
-                  id="monto"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.monto}
-                  onChange={(e) => setFormData({ ...formData, monto: parseFloat(e.target.value) || 0 })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="estado_pago">Estado de Pago *</Label>
-                <Select
-                  value={formData.estado_pago}
-                  onValueChange={(value: any) => setFormData({ ...formData, estado_pago: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
-                    <SelectItem value="pagado">Pagado</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.estado_pago === 'pagado' && (
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="fecha_pago">Fecha de Pago</Label>
+                  <Label htmlFor="moneda_material">Moneda *</Label>
+                  <Select
+                    value={formData.moneda_material}
+                    onValueChange={(value: any) => setFormData({ ...formData, moneda_material: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PEN">PEN</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="monto">Monto *</Label>
                   <Input
-                    id="fecha_pago"
-                    type="date"
-                    value={formData.fecha_pago}
-                    onChange={(e) => setFormData({ ...formData, fecha_pago: e.target.value })}
+                    id="monto"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={formData.monto}
+                    onChange={(e) => setFormData({ ...formData, monto: parseFloat(e.target.value) || 0 })}
+                    required
                   />
                 </div>
-              )}
+              </div>
+
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Estado:</strong> El material se registrará con estado <strong>Pendiente</strong>. Puede actualizarlo posteriormente desde la tabla.
+                </p>
+              </div>
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

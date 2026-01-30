@@ -80,12 +80,7 @@ export default function AdminMatriculaForm() {
     monto_kit: 0,
     moneda_kit: 'PEN',
     observaciones: '',
-    registrar_pago_inicial: false,
-    tipo_pago: 'primera_cuota',
-    monto_pago: 0,
-    metodo_pago: 'En efectivo',
-    fecha_pago: new Date().toISOString().split('T')[0],
-    comprobante: '',
+    estado_pago: 'pendiente',
   });
 
   const [precioFinal, setPrecioFinal] = useState(0);
@@ -97,13 +92,13 @@ export default function AdminMatriculaForm() {
 
   useEffect(() => {
     // Calcular precio final cuando cambien los valores
+    // IMPORTANTE: Book y Kit NO se suman al precio final de la matrícula
+    // Los materiales se gestionan independientemente
     const costoClasesGrabadas = formData.incluir_clases_grabadas ? (formData.valor_clase_grabada || 0) : 0;
-    const costoBook = formData.book_incluido ? (formData.monto_book || 0) : 0;
-    const costoKit = formData.kit_incluido ? (formData.monto_kit || 0) : 0;
     
     const precio = calculatePrecioFinal(
       formData.valor_matricula,
-      costoClasesGrabadas + costoBook + costoKit,
+      costoClasesGrabadas,
       formData.descuento
     );
     setPrecioFinal(precio);
@@ -111,19 +106,8 @@ export default function AdminMatriculaForm() {
     formData.valor_matricula, 
     formData.valor_clase_grabada, 
     formData.descuento, 
-    formData.incluir_clases_grabadas,
-    formData.book_incluido,
-    formData.monto_book,
-    formData.kit_incluido,
-    formData.monto_kit
+    formData.incluir_clases_grabadas
   ]);
-
-  useEffect(() => {
-    // Si el tipo de pago es "pago_regular", auto-completar con el precio final
-    if (formData.tipo_pago === 'pago_regular' && formData.registrar_pago_inicial) {
-      setFormData(prev => ({ ...prev, monto_pago: precioFinal }));
-    }
-  }, [formData.tipo_pago, precioFinal, formData.registrar_pago_inicial]);
 
   useEffect(() => {
     // Filtrar estudiantes según búsqueda
@@ -320,6 +304,15 @@ export default function AdminMatriculaForm() {
       return;
     }
 
+    if (!formData.valor_matricula || formData.valor_matricula <= 0) {
+      toast({
+        title: 'Error',
+        description: 'Debe ingresar un valor de matrícula válido (mayor a 0)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!currentUser) {
       toast({
         title: 'Error',
@@ -327,18 +320,6 @@ export default function AdminMatriculaForm() {
         variant: 'destructive',
       });
       return;
-    }
-
-    // Validar que si es pago_regular, el monto debe ser igual al precio final
-    if (formData.registrar_pago_inicial && formData.tipo_pago === 'pago_regular') {
-      if (Math.abs((formData.monto_pago || 0) - precioFinal) > 0.01) {
-        toast({
-          title: 'Error',
-          description: `Para pago regular, el monto debe ser igual al precio final: ${formData.moneda} ${precioFinal.toFixed(2)}`,
-          variant: 'destructive',
-        });
-        return;
-      }
     }
 
     let matriculaId: string | null = null;
@@ -401,6 +382,7 @@ export default function AdminMatriculaForm() {
         book_incluido: formData.book_incluido,
         kit_incluido: formData.kit_incluido,
         precio_final: precioFinal,
+        estado_pago: formData.estado_pago,
         observaciones: formData.observaciones,
       };
 
@@ -451,41 +433,30 @@ export default function AdminMatriculaForm() {
         }
 
         // 7. Registrar compra de materiales
-        // Para books: siempre se registra
         const courseId = modulos.find(m => m.id === selectedModulos[0])?.course_id;
         if (courseId) {
-          // Determinar estado de pago del book basado en el pago inicial
-          let estadoPagoBook: 'pendiente' | 'pagado' | 'cancelado' = 'pendiente';
-          let fechaPagoBook: string | undefined = undefined;
-          
+          // Para books: solo si está incluido y tiene precio
           if (formData.book_incluido && formData.monto_book) {
-            // Si se incluye book en la matrícula
-            if (formData.registrar_pago_inicial && formData.monto_pago && formData.monto_pago >= formData.monto_book) {
-              // Si hay pago inicial y cubre el precio del book
-              estadoPagoBook = 'pagado';
-              fechaPagoBook = formData.fecha_pago || new Date().toISOString();
-            }
+            const bookData: RegistroCompraMaterialInsert = {
+              nombre: 'Material de curso',
+              tipo_material: 'book',
+              usuario_id: currentUser.id,
+              estudiante_id: formData.estudiante_id,
+              course_id: courseId,
+              monto: formData.monto_book,
+              moneda_material: formData.moneda_book || 'PEN',
+              estado_pago: 'pendiente',
+              fecha_pago: undefined,
+            };
+
+            const { error: bookError } = await supabase
+              .from('registro_compra_materiales')
+              .insert(bookData);
+
+            if (bookError) throw bookError;
           }
 
-          const bookData: RegistroCompraMaterialInsert = {
-            nombre: 'Material de curso',
-            tipo_material: 'book',
-            usuario_id: currentUser.id,
-            estudiante_id: formData.estudiante_id,
-            course_id: courseId,
-            monto: formData.monto_book || 0,
-            moneda_material: formData.moneda_book || 'PEN',
-            estado_pago: estadoPagoBook,
-            fecha_pago: fechaPagoBook,
-          };
-
-          const { error: bookError } = await supabase
-            .from('registro_compra_materiales')
-            .insert(bookData);
-
-          if (bookError) throw bookError;
-
-          // Para kits: solo si está incluido (sin estado de pago editable)
+          // Para kits: solo si está incluido y tiene precio
           if (formData.kit_incluido && formData.monto_kit) {
             const kitData: RegistroCompraMaterialInsert = {
               nombre: 'Kit de curso',
@@ -505,28 +476,6 @@ export default function AdminMatriculaForm() {
 
             if (kitError) throw kitError;
           }
-        }
-
-        // 8. Si se registra pago inicial
-        if (formData.registrar_pago_inicial && formData.monto_pago && formData.monto_pago > 0) {
-          const pagoData: PagoInsert = {
-            codigo_producto: codMatricula,
-            categoria_producto: 'matricula',
-            comprobante: formData.comprobante,
-            monto_pago: formData.monto_pago,
-            fecha_pago: formData.fecha_pago || new Date().toISOString().split('T')[0],
-            metodo_pago: formData.metodo_pago!,
-            moneda_pago: formData.moneda,
-            estado_pago: formData.tipo_pago!,
-            usuario_id: currentUser.id,
-            estudiante_id: formData.estudiante_id,
-          };
-
-          const { error: pagoError } = await supabase
-            .from('pagos' as any)
-            .insert(pagoData);
-
-          if (pagoError) throw pagoError;
         }
       } catch (innerError: any) {
         // Si falla algo después de crear la matrícula, hacer rollback
@@ -975,142 +924,21 @@ export default function AdminMatriculaForm() {
               {/* Precio Final */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-lg font-semibold">Precio Final:</span>
+                  <span className="text-lg font-semibold">Precio Final de Matrícula:</span>
                   <span className="text-2xl font-bold text-blue-600">
                     {formData.moneda} {precioFinal.toFixed(2)}
                   </span>
                 </div>
+                <p className="text-xs text-blue-700 mt-2">
+                  * Incluye: Valor de matrícula{formData.incluir_clases_grabadas && ' + Clases grabadas'}{formData.descuento > 0 && ' - Descuento'}. Los materiales (Book/Kit) se gestionan independientemente.
+                  <br />* La matrícula se registrará con estado de pago <strong>PENDIENTE</strong>.
+                </p>
               </div>
             </div>
 
             <Separator />
 
-            {/* 4. PAGO INICIAL (OPCIONAL) */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="registrar_pago_inicial"
-                  checked={formData.registrar_pago_inicial}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, registrar_pago_inicial: checked })
-                  }
-                />
-                <Label htmlFor="registrar_pago_inicial" className="text-lg font-semibold">
-                  4. Registrar Pago Inicial
-                </Label>
-              </div>
-
-              {formData.registrar_pago_inicial && (
-                <div className="grid grid-cols-2 gap-4 border rounded-lg p-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tipo_pago">Tipo de Pago</Label>
-                    <Select
-                      value={formData.tipo_pago}
-                      onValueChange={(value: any) =>
-                        setFormData({ ...formData, tipo_pago: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TIPOS_PAGO.map((tipo) => (
-                          <SelectItem key={tipo} value={tipo}>
-                            {tipo.replace('_', ' ').toUpperCase()}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="moneda_pago">Moneda del Pago</Label>
-                    <Select
-                      value={formData.moneda}
-                      onValueChange={(value: any) =>
-                        setFormData({ ...formData, moneda: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {MONEDAS.map((moneda) => (
-                          <SelectItem key={moneda} value={moneda}>
-                            {moneda}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="monto_pago">
-                      Monto del Pago
-                      {formData.tipo_pago === 'pago_regular' && (
-                        <span className="text-xs text-gray-500 ml-2">(Monto completo)</span>
-                      )}
-                    </Label>
-                    <Input
-                      id="monto_pago"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.monto_pago}
-                      onChange={(e) =>
-                        setFormData({ ...formData, monto_pago: parseFloat(e.target.value) || 0 })
-                      }
-                      readOnly={formData.tipo_pago === 'pago_regular'}
-                      className={formData.tipo_pago === 'pago_regular' ? 'bg-gray-100' : ''}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="metodo_pago">Método de Pago</Label>
-                    <Select
-                      value={formData.metodo_pago}
-                      onValueChange={(value: any) =>
-                        setFormData({ ...formData, metodo_pago: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {METODOS_PAGO.map((metodo) => (
-                          <SelectItem key={metodo} value={metodo}>
-                            {metodo.toUpperCase()}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fecha_pago">Fecha de Pago</Label>
-                    <Input
-                      id="fecha_pago"
-                      type="date"
-                      value={formData.fecha_pago}
-                      onChange={(e) =>
-                        setFormData({ ...formData, fecha_pago: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="comprobante">Número de Comprobante</Label>
-                    <Input
-                      id="comprobante"
-                      value={formData.comprobante}
-                      onChange={(e) =>
-                        setFormData({ ...formData, comprobante: e.target.value })
-                      }
-                      placeholder="Opcional"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* 5. OBSERVACIONES */}
+            {/* 4. OBSERVACIONES */}
             <div className="space-y-2">
               <Label htmlFor="observaciones">Observaciones</Label>
               <Textarea
