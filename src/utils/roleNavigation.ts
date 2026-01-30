@@ -185,6 +185,12 @@ export const adminNavigationItems: NavItem[] = [
     roles: ['admin']
   },
   {
+    title: 'Gestión de Estudiantes',
+    url: '/admin/students',
+    icon: Users,
+    roles: ['admin']
+  },
+  {
     title: 'Pagos',
     url: '/admin/pagos',
     icon: DollarSign,
@@ -206,12 +212,6 @@ export const adminNavigationItems: NavItem[] = [
     title: 'Ventas de Cursos',
     url: '/admin/ventas-cursos-grabados',
     icon: ShoppingBag,
-    roles: ['admin']
-  },
-  {
-    title: 'Gestión de Estudiantes',
-    url: '/admin/students',
-    icon: Users,
     roles: ['admin']
   },
   {

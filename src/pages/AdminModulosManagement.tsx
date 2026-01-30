@@ -244,7 +244,7 @@ export default function AdminModulosManagement() {
       
       setEditingModulo(null);
       setFormData({
-        name: '',
+        name: `Módulo ${nextNum}`, // Auto-rellenar nombre
         num_modulo: nextNum,
         description: '',
         code: '',
@@ -514,8 +514,7 @@ export default function AdminModulosManagement() {
                       {teacher ? `${teacher.first_name} ${teacher.last_name}` : '-'}
                     </TableCell>
                     <TableCell>
-                      {new Date(modulo.start_date).toLocaleDateString()} - {' '}
-                      {new Date(modulo.end_date).toLocaleDateString()}
+                      {modulo.start_date} - {modulo.end_date}
                     </TableCell>
                     <TableCell>
                       <span
@@ -588,9 +587,14 @@ export default function AdminModulosManagement() {
                     type="number"
                     min="1"
                     value={formData.num_modulo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, num_modulo: parseInt(e.target.value) })
-                    }
+                    onChange={(e) => {
+                      const numModulo = parseInt(e.target.value);
+                      setFormData({ 
+                        ...formData, 
+                        num_modulo: numModulo,
+                        name: `Módulo ${numModulo}` // Actualizar nombre automáticamente
+                      });
+                    }}
                     required
                   />
                 </div>
@@ -602,7 +606,7 @@ export default function AdminModulosManagement() {
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
                     }
-                    placeholder="Ej: Fundamentos de Programación"
+                    placeholder="Ej: Módulo 1"
                     required
                   />
                 </div>

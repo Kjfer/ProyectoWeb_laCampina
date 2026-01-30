@@ -94,6 +94,13 @@ export default function AdminPagosManagement() {
     fetchStudents();
   }, []);
 
+  // Resetear estado_pago a 'pago_regular' si se cambia a categoría diferente de matricula
+  useEffect(() => {
+    if (formData.categoria_producto !== 'matricula' && formData.estado_pago !== 'pago_regular') {
+      setFormData(prev => ({ ...prev, estado_pago: 'pago_regular' }));
+    }
+  }, [formData.categoria_producto]);
+
   useEffect(() => {
     // Cerrar dropdown al hacer clic fuera
     const handleClickOutside = (event: MouseEvent) => {
@@ -180,6 +187,7 @@ export default function AdminPagosManagement() {
             estudiante_id,
             estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name)
           `)
+          .eq('estado_pago', 'pendiente')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -207,6 +215,7 @@ export default function AdminPagosManagement() {
             estudiante:profiles!registro_compra_materiales_estudiante_id_fkey(id, first_name, last_name),
             course:courses(name)
           `)
+          .eq('estado_pago', 'pendiente')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -233,6 +242,7 @@ export default function AdminPagosManagement() {
             estudiante:profiles!venta_cursos_grabados_estudiante_id_fkey(id, first_name, last_name),
             curso_grabado:cursos_grabados(name)
           `)
+          .eq('estado_pago', 'pendiente')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -827,13 +837,24 @@ export default function AdminPagosManagement() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {TIPOS_PAGO.map((tipo) => (
-                          <SelectItem key={tipo} value={tipo}>
-                            {tipo.replace('_', ' ').charAt(0).toUpperCase() + tipo.replace('_', ' ').slice(1)}
-                          </SelectItem>
-                        ))}
+                        {formData.categoria_producto === 'matricula' ? (
+                          // Para matrículas: mostrar todas las opciones de pago
+                          TIPOS_PAGO.map((tipo) => (
+                            <SelectItem key={tipo} value={tipo}>
+                              {tipo.replace('_', ' ').charAt(0).toUpperCase() + tipo.replace('_', ' ').slice(1)}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          // Para materiales y cursos grabados: solo pago regular
+                          <SelectItem value="pago_regular">Pago Regular</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
+                    {formData.categoria_producto !== 'matricula' && (
+                      <p className="text-xs text-muted-foreground">
+                        Los materiales y cursos grabados solo admiten pago regular.
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>

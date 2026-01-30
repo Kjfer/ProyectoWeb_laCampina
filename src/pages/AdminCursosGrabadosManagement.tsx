@@ -166,6 +166,26 @@ export default function AdminCursosGrabadosManagement() {
     }
 
     try {
+      // Verificar si ya existe un curso grabado para este programa (solo al crear)
+      if (!editingCurso && formData.program_id) {
+        const { data: existingCursos, error: checkError } = await supabase
+          .from('cursos_grabados' as any)
+          .select('id, name, programa:programas(name)')
+          .eq('program_id', formData.program_id);
+
+        if (checkError) throw checkError;
+
+        if (existingCursos && existingCursos.length > 0) {
+          const programaNombre = (existingCursos[0] as any).programa?.name || 'este programa';
+          toast({
+            title: 'Curso duplicado',
+            description: `Ya existe un curso grabado registrado para el programa "${programaNombre}". Solo debe haber un curso grabado por programa.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
       const dataToSave = {
         ...formData,
         program_id: formData.program_id || null,

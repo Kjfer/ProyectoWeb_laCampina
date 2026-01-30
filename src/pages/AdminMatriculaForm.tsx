@@ -56,6 +56,7 @@ export default function AdminMatriculaForm() {
   const [filteredStudents, setFilteredStudents] = useState<Profile[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [searchType, setSearchType] = useState<'codigo' | 'dni' | 'codigoMatricula'>('codigo');
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [modulos, setModulos] = useState<ModuloConCurso[]>([]);
   const [cursosGrabados, setCursosGrabados] = useState<CursoGrabado[]>([]);
@@ -498,8 +499,8 @@ export default function AdminMatriculaForm() {
               course_id: courseId,
               monto: formData.monto_kit,
               moneda_material: formData.moneda_kit || 'PEN',
-              estado_pago: 'pagado',
-              fecha_pago: new Date().toISOString(),
+              estado_pago: 'pendiente',
+              fecha_pago: undefined,
               fecha_registro: new Date().toISOString(),
             };
 

@@ -82,6 +82,7 @@ export default function AdminVentasCursosGrabadosManagement() {
   const [filteredStudents, setFilteredStudents] = useState<Profile[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [searchType, setSearchType] = useState<'nombre' | 'codigo' | 'dni'>('nombre');
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [cursosGrabados, setCursosGrabados] = useState<CursoGrabado[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -182,6 +183,7 @@ export default function AdminVentasCursosGrabadosManagement() {
       usuario_id: currentUser?.id || '',
     });
     setStudentSearch('');
+    setShowStudentDropdown(false);
     setDialogOpen(true);
   };
 
@@ -345,12 +347,62 @@ export default function AdminVentasCursosGrabadosManagement() {
                       <SelectItem value="dni">DNI</SelectItem>
                     </SelectContent>
                   </Select>
+                <div className="relative flex-1">
                   <Input
                     placeholder={`Buscar por ${searchType}...`}
                     value={studentSearch}
-                    onChange={(e) => setStudentSearch(e.target.value)}
-                    className="flex-1"
+                    onChange={(e) => {
+                      setStudentSearch(e.target.value);
+                      setShowStudentDropdown(true);
+                    }}
+                    onFocus={() => setShowStudentDropdown(true)}
+                    className="pr-10"
                   />
+                  {studentSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStudentSearch('');
+                        setShowStudentDropdown(false);
+                      }}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  )}
+                  
+                  {/* Dropdown con resultados filtrados */}
+                  {showStudentDropdown && studentSearch && filteredStudents.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                      {filteredStudents.slice(0, 10).map((estudiante: any) => (
+                        <div
+                          key={estudiante.id}
+                          onClick={() => {
+                            setFormData({ ...formData, estudiante_id: estudiante.id });
+                            setShowStudentDropdown(false);
+                          }}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium text-sm">
+                              {estudiante.first_name} {estudiante.last_name}
+                            </span>
+                            {estudiante.student_code && (
+                              <span className="text-xs text-gray-500">
+                                Código: {estudiante.student_code}
+                              </span>
+                            )}
+                            {estudiante.document_number && (
+                              <span className="text-xs text-gray-400">
+                                DNI: {estudiante.document_number}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 </div>
               </div>
 
