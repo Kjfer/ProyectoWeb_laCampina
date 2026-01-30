@@ -263,6 +263,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
         date: dateStr,
         status: record.status,
         notes: record.notes || null,
+        source: 'manual', // Indica que fue registrado manualmente por un profesor
       }));
 
       // Usar upsert para actualizar o insertar registros
