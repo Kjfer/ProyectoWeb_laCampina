@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/lib/dateUtils';
+import { formatDate } from '@/lib/dateUtils.ts';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   MatriculaFormData,

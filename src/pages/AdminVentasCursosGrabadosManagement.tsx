@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/lib/dateUtils';
+import { formatDate } from '@/lib/dateUtils.ts';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MONEDAS } from '@/integrations/supabase/peri-types';
 import { Button } from '@/components/ui/button';
