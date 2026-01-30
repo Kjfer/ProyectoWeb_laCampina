@@ -283,6 +283,28 @@ export default function AdminMatriculaForm() {
     setFormData({ ...formData, modulos_seleccionados: newSelected });
   };
 
+  const handleSelectAllModulosCourse = (courseId: string) => {
+    // Obtener todos los módulos de esta edición
+    const courseModulos = modulos.filter(m => m.course_id === courseId);
+    const modulosDisponibles = courseModulos.filter(m => !modulosYaMatriculados.includes(m.id));
+    const modulosIds = modulosDisponibles.map(m => m.id);
+    
+    // Verificar si todos ya están seleccionados
+    const todosSeleccionados = modulosIds.every(id => selectedModulos.includes(id));
+    
+    let newSelected: string[];
+    if (todosSeleccionados) {
+      // Deseleccionar todos los módulos de esta edición
+      newSelected = selectedModulos.filter(id => !modulosIds.includes(id));
+    } else {
+      // Seleccionar todos los módulos disponibles de esta edición
+      newSelected = [...new Set([...selectedModulos, ...modulosIds])];
+    }
+    
+    setSelectedModulos(newSelected);
+    setFormData({ ...formData, modulos_seleccionados: newSelected });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -435,10 +457,19 @@ export default function AdminMatriculaForm() {
         // 7. Registrar compra de materiales
         const courseId = modulos.find(m => m.id === selectedModulos[0])?.course_id;
         if (courseId) {
+          // Obtener información del curso para nombre uniforme
+          const { data: courseData } = await supabase
+            .from('courses')
+            .select('name')
+            .eq('id', courseId)
+            .single();
+          
+          const courseName = courseData?.name || 'Curso';
+          
           // Para books: solo si está incluido y tiene precio
           if (formData.book_incluido && formData.monto_book) {
             const bookData: RegistroCompraMaterialInsert = {
-              nombre: 'Material de curso',
+              nombre: `Book - ${courseName}`,
               tipo_material: 'book',
               usuario_id: currentUser.id,
               estudiante_id: formData.estudiante_id,
@@ -447,6 +478,7 @@ export default function AdminMatriculaForm() {
               moneda_material: formData.moneda_book || 'PEN',
               estado_pago: 'pendiente',
               fecha_pago: undefined,
+              fecha_registro: new Date().toISOString(),
             };
 
             const { error: bookError } = await supabase
@@ -459,7 +491,7 @@ export default function AdminMatriculaForm() {
           // Para kits: solo si está incluido y tiene precio
           if (formData.kit_incluido && formData.monto_kit) {
             const kitData: RegistroCompraMaterialInsert = {
-              nombre: 'Kit de curso',
+              nombre: `Kit - ${courseName}`,
               tipo_material: 'kit',
               usuario_id: currentUser.id,
               estudiante_id: formData.estudiante_id,
@@ -468,6 +500,7 @@ export default function AdminMatriculaForm() {
               moneda_material: formData.moneda_kit || 'PEN',
               estado_pago: 'pagado',
               fecha_pago: new Date().toISOString(),
+              fecha_registro: new Date().toISOString(),
             };
 
             const { error: kitError } = await supabase
@@ -652,10 +685,32 @@ export default function AdminMatriculaForm() {
                 </div>
               )}
               <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4">
-                {modulosPorCurso.map(({ course, modulos: courseModulos }) => (
+                {modulosPorCurso.map(({ course, modulos: courseModulos }) => {
+                  const modulosDisponibles = courseModulos.filter(m => !modulosYaMatriculados.includes(m.id));
+                  const modulosIds = modulosDisponibles.map(m => m.id);
+                  const todosSeleccionados = modulosIds.length > 0 && modulosIds.every(id => selectedModulos.includes(id));
+                  
+                  return (
                   <div key={course.id} className="space-y-2">
-                    <div className="font-medium text-sm bg-gray-50 p-2 rounded">
-                      {course.name} ({course.code})
+                    <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <div className="font-medium text-sm">
+                        {course.name} ({course.code})
+                      </div>
+                      {modulosDisponibles.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSelectAllModulosCourse(course.id)}
+                          className="text-xs h-7"
+                        >
+                          {todosSeleccionados ? (
+                            <><Minus className="h-3 w-3 mr-1" /> Deseleccionar todos</>
+                          ) : (
+                            <><Plus className="h-3 w-3 mr-1" /> Seleccionar todos</>
+                          )}
+                        </Button>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 ml-4">
                       {courseModulos.map((modulo) => {
@@ -690,7 +745,8 @@ export default function AdminMatriculaForm() {
                       })}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="text-sm text-gray-600">
                 Módulos seleccionados: {selectedModulos.length}

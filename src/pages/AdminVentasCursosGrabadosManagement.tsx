@@ -79,6 +79,9 @@ interface Matricula {
 export default function AdminVentasCursosGrabadosManagement() {
   const [ventas, setVentas] = useState<VentaCursoGrabado[]>([]);
   const [estudiantes, setEstudiantes] = useState<Profile[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<Profile[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [searchType, setSearchType] = useState<'nombre' | 'codigo' | 'dni'>('nombre');
   const [cursosGrabados, setCursosGrabados] = useState<CursoGrabado[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -95,6 +98,25 @@ export default function AdminVentasCursosGrabadosManagement() {
     fetchData();
     getCurrentUser();
   }, []);
+
+  useEffect(() => {
+    if (!studentSearch.trim()) {
+      setFilteredStudents(estudiantes);
+      return;
+    }
+
+    const searchLower = studentSearch.toLowerCase();
+    const filtered = estudiantes.filter((student: any) => {
+      if (searchType === 'nombre') {
+        return `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchLower);
+      } else if (searchType === 'codigo') {
+        return student.student_code?.toLowerCase().includes(searchLower);
+      } else {
+        return student.document_number?.toLowerCase().includes(searchLower);
+      }
+    });
+    setFilteredStudents(filtered);
+  }, [studentSearch, searchType, estudiantes]);
 
   const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -121,7 +143,7 @@ export default function AdminVentasCursosGrabadosManagement() {
       // Cargar estudiantes
       const { data: estudiantesData, error: estudiantesError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
+        .select('id, first_name, last_name, email, student_code, document_number')
         .eq('role', 'student')
         .order('first_name');
 
@@ -138,6 +160,7 @@ export default function AdminVentasCursosGrabadosManagement() {
 
       setVentas(ventasData as any || []);
       setEstudiantes(estudiantesData || []);
+      setFilteredStudents(estudiantesData || []);
       setCursosGrabados(cursosData as any || []);
     } catch (error: any) {
       toast({
@@ -158,6 +181,7 @@ export default function AdminVentasCursosGrabadosManagement() {
       moneda_venta: 'PEN',
       usuario_id: currentUser?.id || '',
     });
+    setStudentSearch('');
     setDialogOpen(true);
   };
 
@@ -173,7 +197,35 @@ export default function AdminVentasCursosGrabadosManagement() {
       return;
     }
 
+    if (formData.valor_venta <= 0) {
+      toast({
+        title: 'Error',
+        description: 'El valor de venta debe ser mayor a 0',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
+      // Verificar si ya existe una venta del mismo curso grabado para este estudiante
+      const { data: existingVentas, error: checkError } = await supabase
+        .from('venta_cursos_grabados' as any)
+        .select('id, curso_grabado:cursos_grabados(name)')
+        .eq('estudiante_id', formData.estudiante_id)
+        .eq('id_clases_grabadas', formData.id_clases_grabadas);
+
+      if (checkError) throw checkError;
+
+      if (existingVentas && existingVentas.length > 0) {
+        const cursoNombre = (existingVentas[0] as any).curso_grabado?.name || 'este curso';
+        toast({
+          title: 'Curso duplicado',
+          description: `El estudiante ya tiene una compra registrada de ${cursoNombre}. No se pueden registrar compras duplicadas del mismo curso grabado.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const dataToSave = {
         estudiante_id: formData.estudiante_id,
         id_clases_grabadas: formData.id_clases_grabadas,
@@ -271,7 +323,7 @@ export default function AdminVentasCursosGrabadosManagement() {
 
         {/* Dialog de formulario */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nueva Venta de Curso Grabado</DialogTitle>
               <DialogDescription>
@@ -279,8 +331,31 @@ export default function AdminVentasCursosGrabadosManagement() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Búsqueda de estudiante */}
               <div className="space-y-2">
-                <Label htmlFor="estudiante_id">Estudiante *</Label>
+                <Label>Buscar Estudiante *</Label>
+                <div className="flex gap-2">
+                  <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nombre">Nombre</SelectItem>
+                      <SelectItem value="codigo">Código</SelectItem>
+                      <SelectItem value="dni">DNI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder={`Buscar por ${searchType}...`}
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="estudiante_id">Seleccionar Estudiante *</Label>
                 <Select
                   value={formData.estudiante_id}
                   onValueChange={(value) => setFormData({ ...formData, estudiante_id: value })}
@@ -290,11 +365,16 @@ export default function AdminVentasCursosGrabadosManagement() {
                     <SelectValue placeholder="Seleccione un estudiante" />
                   </SelectTrigger>
                   <SelectContent>
-                    {estudiantes.map((estudiante) => (
-                      <SelectItem key={estudiante.id} value={estudiante.id}>
-                        {estudiante.first_name} {estudiante.last_name} ({estudiante.email})
-                      </SelectItem>
-                    ))}
+                    {filteredStudents.length === 0 ? (
+                      <div className="p-2 text-sm text-gray-500">No se encontraron estudiantes</div>
+                    ) : (
+                      filteredStudents.map((estudiante: any) => (
+                        <SelectItem key={estudiante.id} value={estudiante.id}>
+                          {estudiante.first_name} {estudiante.last_name}
+                          {estudiante.student_code && ` (${estudiante.student_code})`}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>

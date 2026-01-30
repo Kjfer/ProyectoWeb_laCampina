@@ -281,6 +281,26 @@ export default function AdminMaterialesManagement() {
     }
 
     try {
+      // Verificar si ya existe un registro del mismo tipo de material para este estudiante y edición
+      const { data: existingMaterials, error: checkError } = await supabase
+        .from('registro_compra_materiales' as any)
+        .select('id, tipo_material, nombre')
+        .eq('estudiante_id', formData.estudiante_id)
+        .eq('course_id', formData.course_id)
+        .eq('tipo_material', formData.tipo_material);
+
+      if (checkError) throw checkError;
+
+      if (existingMaterials && existingMaterials.length > 0) {
+        const materialType = formData.tipo_material === 'book' ? 'Book' : 'Kit';
+        toast({
+          title: 'Material duplicado',
+          description: `El estudiante ya tiene un registro de ${materialType} para esta edición. No se pueden registrar materiales duplicados por edición.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // Obtener información del curso
       const selectedCourse = courses.find(c => c.id === formData.course_id);
       const materialName = formData.tipo_material === 'book' 
@@ -528,7 +548,7 @@ export default function AdminMaterialesManagement() {
 
         {/* Dialog de registro */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Registrar Compra de Material</DialogTitle>
               <DialogDescription>
