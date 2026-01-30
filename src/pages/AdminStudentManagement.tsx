@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -731,7 +732,7 @@ const AdminStudentManagement = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {new Date(student.created_at).toLocaleDateString()}
+                      {formatDate(student.created_at)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -842,7 +843,7 @@ const AdminStudentManagement = () => {
                             </div>
                           </TableCell>
                           <TableCell>{enrollment.modulo.code}</TableCell>
-                          <TableCell>{new Date(enrollment.enrolled_at).toLocaleDateString()}</TableCell>
+                          <TableCell>{formatDate(enrollment.enrolled_at)}</TableCell>
                           <TableCell>
                             <Badge 
                               variant={enrollment.tipo_estudiante === 'nuevo' ? 'default' : 'secondary'}

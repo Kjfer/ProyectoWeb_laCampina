@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/lib/dateUtils';
 import { MatriculaWithRelations } from '@/integrations/supabase/peri-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -367,7 +368,7 @@ export function MatriculasTab() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {new Date(matricula.created_at).toLocaleDateString()}
+                        {formatDate(matricula.created_at)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

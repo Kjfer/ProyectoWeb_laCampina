@@ -26,10 +26,17 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 
-interface Course {
+interface Modulo {
   id: string;
   name: string;
   code: string;
+  course_id: string;
+  start_date: string;
+  end_date: string;
+  course?: {
+    name: string;
+    code: string;
+  };
 }
 
 interface AttendanceRecord {
@@ -44,7 +51,7 @@ interface AttendanceRecord {
 }
 
 interface AttendanceReport {
-  course: Course;
+  modulo: Modulo;
   date: string;
   statistics: {
     total_students: number;
@@ -61,75 +68,73 @@ interface AttendanceReport {
 const AdminAttendanceReport = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<string>('');
+  const [modulos, setModulos] = useState<Modulo[]>([]);
+  const [selectedModulo, setSelectedModulo] = useState<string>('');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [report, setReport] = useState<AttendanceReport | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingCourses, setLoadingCourses] = useState(true);
+  const [loadingModulos, setLoadingModulos] = useState(true);
   const [loadingDates, setLoadingDates] = useState(false);
 
   useEffect(() => {
-    fetchCourses();
+    fetchModulos();
   }, []);
 
-  const fetchCourses = async () => {
+  const fetchModulos = async () => {
     try {
       const { data, error } = await supabase
-        .from('courses')
-        .select('id, name, code')
-        .order('name');
+        .from('modulos')
+        .select(`
+          id, 
+          name, 
+          code,
+          course_id,
+          start_date,
+          end_date,
+          course:courses(name, code)
+        `)
+        .eq('is_active', true)
+        .order('start_date', { ascending: false });
 
       if (error) throw error;
-      setCourses(data || []);
+      setModulos(data || []);
     } catch (error) {
-      console.error('Error cargando cursos:', error);
+      console.error('Error cargando módulos:', error);
       toast({
         title: 'Error',
-        description: 'No se pudieron cargar los cursos',
+        description: 'No se pudieron cargar los módulos',
         variant: 'destructive',
       });
     } finally {
-      setLoadingCourses(false);
+      setLoadingModulos(false);
     }
   };
 
-  const fetchClassDates = async (courseId: string) => {
+  const fetchClassDates = async (moduloId: string) => {
     setLoadingDates(true);
     setAvailableDates([]);
     setSelectedDate('');
     setReport(null);
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No hay sesión activa');
-      }
+      // Obtener fechas únicas donde hay asistencia registrada para este módulo
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('date')
+        .eq('modulo_id', moduloId)
+        .order('date', { ascending: false });
 
-      const SUPABASE_URL = "https://bnbtmubibnupttnnhijr.supabase.co";
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/get-course-class-dates?course_id=${courseId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      if (error) throw error;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error cargando fechas');
-      }
+      // Extraer fechas únicas
+      const uniqueDates = [...new Set(data?.map(item => item.date) || [])];
+      setAvailableDates(uniqueDates);
 
-      const data = await response.json();
-      setAvailableDates(data.dates || []);
-
-      if (data.dates && data.dates.length === 0) {
+      if (uniqueDates.length === 0) {
         toast({
           title: 'Sin clases disponibles',
-          description: 'Este curso no tiene clases con asistencia registrada',
+          description: 'Este módulo no tiene asistencia registrada',
           variant: 'default',
         });
       }
@@ -137,7 +142,7 @@ const AdminAttendanceReport = () => {
       console.error('Error cargando fechas:', error);
       toast({
         title: 'Error',
-        description: error.message || 'No se pudieron cargar las fechas de clase',
+        description: 'No se pudieron cargar las fechas de clase',
         variant: 'destructive',
       });
     } finally {
@@ -145,10 +150,10 @@ const AdminAttendanceReport = () => {
     }
   };
 
-  const handleCourseChange = (courseId: string) => {
-    setSelectedCourse(courseId);
-    if (courseId) {
-      fetchClassDates(courseId);
+  const handleModuloChange = (moduloId: string) => {
+    setSelectedModulo(moduloId);
+    if (moduloId) {
+      fetchClassDates(moduloId);
     } else {
       setAvailableDates([]);
       setSelectedDate('');
@@ -157,10 +162,10 @@ const AdminAttendanceReport = () => {
   };
 
   const generateReport = async () => {
-    if (!selectedCourse || !selectedDate) {
+    if (!selectedModulo || !selectedDate) {
       toast({
         title: 'Campos requeridos',
-        description: 'Por favor selecciona un curso y una fecha de clase',
+        description: 'Por favor selecciona un módulo y una fecha de clase',
         variant: 'destructive',
       });
       return;
@@ -168,35 +173,88 @@ const AdminAttendanceReport = () => {
 
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No hay sesión activa');
-      }
+      // Obtener información del módulo
+      const { data: moduloData, error: moduloError } = await supabase
+        .from('modulos')
+        .select(`
+          id,
+          name,
+          code,
+          course_id,
+          start_date,
+          end_date,
+          course:courses(name, code)
+        `)
+        .eq('id', selectedModulo)
+        .single();
 
-      const SUPABASE_URL = "https://bnbtmubibnupttnnhijr.supabase.co";
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/get-attendance-report?course_id=${selectedCourse}&date=${selectedDate}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      if (moduloError) throw moduloError;
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error generando reporte');
-      }
+      // Obtener todos los estudiantes matriculados en este módulo
+      const { data: enrolledStudents, error: enrollmentError } = await supabase
+        .from('course_enrollments')
+        .select(`
+          student_id,
+          student:profiles!course_enrollments_student_id_fkey(
+            id,
+            first_name,
+            last_name,
+            email,
+            phone
+          )
+        `)
+        .eq('modulo_id', selectedModulo);
 
-      const data = await response.json();
-      setReport(data);
+      if (enrollmentError) throw enrollmentError;
+
+      // Obtener registros de asistencia para esta fecha
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('modulo_id', selectedModulo)
+        .eq('date', selectedDate);
+
+      if (attendanceError) throw attendanceError;
+
+      // Construir reporte
+      const allStudents: AttendanceRecord[] = enrolledStudents?.map((enrollment: any) => {
+        const attendance = attendanceData?.find(a => a.student_id === enrollment.student_id);
+        return {
+          student_id: enrollment.student?.id || '',
+          first_name: enrollment.student?.first_name || '',
+          last_name: enrollment.student?.last_name || '',
+          email: enrollment.student?.email || '',
+          phone: enrollment.student?.phone || null,
+          status: attendance?.status || 'not_recorded',
+          notes: attendance?.notes || null,
+          recorded_at: attendance?.created_at || null,
+        };
+      }) || [];
+
+      const statistics = {
+        total_students: allStudents.length,
+        present: allStudents.filter(s => s.status === 'present').length,
+        absent: allStudents.filter(s => s.status === 'absent').length,
+        late: allStudents.filter(s => s.status === 'late').length,
+        excused: allStudents.filter(s => s.status === 'excused').length,
+        not_recorded: allStudents.filter(s => s.status === 'not_recorded').length,
+      };
+
+      const absentStudents = allStudents.filter(s => s.status === 'absent');
+
+      setReport({
+        modulo: moduloData,
+        date: selectedDate,
+        statistics,
+        all_students: allStudents,
+        absent_students: absentStudents,
+      });
 
       toast({
         title: 'Reporte generado',
         description: 'El reporte de asistencia se generó correctamente',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generando reporte:', error);
       toast({
         title: 'Error',
@@ -226,8 +284,9 @@ const AdminAttendanceReport = () => {
     const statsData = [
       ['REPORTE DE ASISTENCIA'],
       [''],
-      ['Curso:', report.course.name],
-      ['Código:', report.course.code],
+      ['Módulo:', report.modulo.name],
+      ['Código:', report.modulo.code],
+      ['Edición:', report.modulo.course?.name || '-'],
       ['Fecha:', format(new Date(report.date), 'dd/MM/yyyy', { locale: es })],
       [''],
       ['ESTADÍSTICAS'],
@@ -265,7 +324,7 @@ const AdminAttendanceReport = () => {
     XLSX.utils.book_append_sheet(wb, wsAbsent, 'Estudiantes Ausentes');
 
     // Generar nombre de archivo
-    const fileName = `Asistencia_${report.course.code}_${format(new Date(report.date), 'yyyy-MM-dd')}.xlsx`;
+    const fileName = `Asistencia_${report.modulo.code}_${format(new Date(report.date), 'yyyy-MM-dd')}.xlsx`;
 
     // Descargar archivo
     XLSX.writeFile(wb, fileName);
@@ -334,26 +393,26 @@ const AdminAttendanceReport = () => {
           <CardHeader>
             <CardTitle>Seleccionar Parámetros</CardTitle>
             <CardDescription>
-              Selecciona un curso y una fecha de clase para generar el reporte
+              Selecciona un módulo y una fecha de clase para generar el reporte
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Selector de Curso */}
+              {/* Selector de Módulo */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Curso</label>
+                <label className="text-sm font-medium">Módulo</label>
                 <Select 
-                  value={selectedCourse} 
-                  onValueChange={handleCourseChange}
-                  disabled={loadingCourses}
+                  value={selectedModulo} 
+                  onValueChange={handleModuloChange}
+                  disabled={loadingModulos}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar curso..." />
+                    <SelectValue placeholder="Seleccionar módulo..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course.code} - {course.name}
+                    {modulos.map((modulo) => (
+                      <SelectItem key={modulo.id} value={modulo.id}>
+                        {modulo.code} - {modulo.name} ({modulo.course?.name || ''})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -366,13 +425,13 @@ const AdminAttendanceReport = () => {
                 <Select 
                   value={selectedDate} 
                   onValueChange={setSelectedDate}
-                  disabled={!selectedCourse || loadingDates || availableDates.length === 0}
+                  disabled={!selectedModulo || loadingDates || availableDates.length === 0}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={
                       loadingDates 
                         ? "Cargando fechas..." 
-                        : availableDates.length === 0 && selectedCourse
+                        : availableDates.length === 0 && selectedModulo
                         ? "Sin clases disponibles"
                         : "Seleccionar fecha de clase..."
                     } />
@@ -385,9 +444,9 @@ const AdminAttendanceReport = () => {
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedCourse && availableDates.length === 0 && !loadingDates && (
+                {selectedModulo && availableDates.length === 0 && !loadingDates && (
                   <p className="text-xs text-gray-500">
-                    Solo se muestran clases pasadas con asistencia registrada
+                    Solo se muestran clases con asistencia registrada
                   </p>
                 )}
               </div>
@@ -397,7 +456,7 @@ const AdminAttendanceReport = () => {
                 <label className="text-sm font-medium invisible">Acción</label>
                 <Button 
                   onClick={generateReport} 
-                  disabled={loading || !selectedCourse || !selectedDate}
+                  disabled={loading || !selectedModulo || !selectedDate}
                   className="w-full"
                 >
                   <Search className="mr-2 h-4 w-4" />
@@ -415,9 +474,9 @@ const AdminAttendanceReport = () => {
             <Card className="mb-6">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>{report.course.name}</CardTitle>
+                  <CardTitle>{report.modulo.name}</CardTitle>
                   <CardDescription>
-                    {report.course.code} - {format(new Date(report.date), 'dd \'de\' MMMM \'de\' yyyy', { locale: es })}
+                    {report.modulo.code} - {format(new Date(report.date), 'dd \'de\' MMMM \'de\' yyyy', { locale: es })}
                   </CardDescription>
                 </div>
                 <Button onClick={exportToExcel} variant="outline">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/lib/dateUtils';
 import { MatriculaWithRelations } from '@/integrations/supabase/peri-types';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -338,8 +339,7 @@ export default function AdminMatriculasManagement() {
                         )}
                         {modulo.start_date && modulo.end_date && (
                           <div className="text-xs text-gray-500">
-                            {new Date(modulo.start_date).toLocaleDateString()} -{' '}
-                            {new Date(modulo.end_date).toLocaleDateString()}
+                            {modulo.start_date} - {modulo.end_date}
                           </div>
                         )}
                       </div>

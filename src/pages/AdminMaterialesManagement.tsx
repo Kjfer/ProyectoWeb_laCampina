@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/lib/dateUtils';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -529,7 +530,7 @@ export default function AdminMaterialesManagement() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {new Date(material.fecha_registro).toLocaleDateString()}
+                        {formatDate(material.fecha_registro)}
                       </TableCell>
                       <TableCell className="text-right">
                         {material.fecha_pago && (
