@@ -35,6 +35,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
   const [attendance, setAttendance] = useState<Record<string, AttendanceRecord>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [courseIdFromModulo, setCourseIdFromModulo] = useState<string | null>(null);
   
   // Estado para el horario procesado
   const [courseSchedule, setCourseSchedule] = useState<Array<{
@@ -68,11 +69,16 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
       // El schedule ahora está en modulos, no en courses
       const { data, error } = await supabase
         .from('modulos')
-        .select('schedule')
+        .select('schedule, course_id')
         .eq('id', courseId)
         .maybeSingle();
 
       if (error) throw error;
+      
+      // Guardar course_id para usarlo en el registro de asistencia
+      if (data?.course_id) {
+        setCourseIdFromModulo(data.course_id);
+      }
       
       // El schedule en modulos es un objeto JSONB: { "lunes": "10:00-12:00", "miércoles": "14:00-16:00" }
       if (data?.schedule && typeof data.schedule === 'object') {
@@ -204,6 +210,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
 
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      // Usar modulo_id que es el identificador correcto
       const { data, error } = await supabase
         .from('attendance')
         .select('student_id, status, notes')
@@ -257,16 +264,18 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
       }
 
       // Preparar registros para upsert con modulo_id
+      // NOTA: Se incluye course_id para satisfacer el constraint attendance_source_check
       const recordsToSave = attendanceRecords.map(record => ({
+        course_id: courseIdFromModulo, // Requerido por constraint attendance_source_check
         modulo_id: courseId,
         student_id: record.student_id,
         date: dateStr,
         status: record.status,
         notes: record.notes || null,
-        source: 'manual', // Indica que fue registrado manualmente por un profesor
       }));
 
       // Usar upsert para actualizar o insertar registros
+      // El constraint único es modulo_id,student_id,date
       const { error } = await supabase
         .from('attendance')
         .upsert(recordsToSave, {

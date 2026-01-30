@@ -45,11 +45,11 @@ export function StudentCourseAttendance({ courseId }: StudentCourseAttendancePro
 
       if (!profile) throw new Error('Perfil no encontrado');
 
-      // Obtener registros de asistencia del curso específico
+      // Obtener registros de asistencia del módulo específico
       const { data: attendanceData, error } = await supabase
         .from('attendance')
         .select('id, date, status, notes')
-        .eq('course_id', courseId)
+        .eq('modulo_id', courseId)
         .eq('student_id', profile.id)
         .order('date', { ascending: false });
 

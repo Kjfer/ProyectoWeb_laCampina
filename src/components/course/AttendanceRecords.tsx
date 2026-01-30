@@ -39,41 +39,48 @@ export function AttendanceRecords({ courseId }: AttendanceRecordsProps) {
     try {
       setLoading(true);
 
-      // 1. Obtener sesión
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Obtener todos los registros de asistencia para este módulo
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance')
+        .select(`
+          id,
+          date,
+          status,
+          notes,
+          student:profiles!attendance_student_id_fkey(
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('modulo_id', courseId)
+        .order('date', { ascending: false });
 
-      if (sessionError || !session) {
-        console.error('Error de sesión:', sessionError);
-        toast.error('Tu sesión ha expirado.');
-        return;
+      if (attendanceError) throw attendanceError;
+
+      setRecords(attendanceData || []);
+
+      // Calcular estadísticas
+      if (attendanceData && attendanceData.length > 0) {
+        const total = attendanceData.length;
+        const present = attendanceData.filter(r => r.status === 'present').length;
+        const late = attendanceData.filter(r => r.status === 'late').length;
+        const absent = attendanceData.filter(r => r.status === 'absent').length;
+        const justified = attendanceData.filter(r => r.status === 'justified').length;
+        const attendance_rate = ((present + late) / total * 100).toFixed(1);
+
+        setStats({
+          total,
+          present,
+          late,
+          absent,
+          justified,
+          attendance_rate,
+        });
+      } else {
+        setStats(null);
       }
-
-      console.log("Token obtenido, haciendo fetch manual...");
-
-      // 2. Fetch Manual CORREGIDO
-      const response = await fetch(
-        `https://bnbtmubibnupttnnhijr.supabase.co/functions/v1/get-course-attendance?course_id=${courseId}`,
-        {
-          method: 'GET',
-          headers: {
-            // Token del Usuario (Ya lo tenías)
-            Authorization: `Bearer ${session.access_token}`,
-            // >>> ESTO ES LO QUE FALTABA <<<
-            // La Edge Function rechaza la conexión si no envías la API Key pública
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Error ${response.status}: No autorizado`);
-      }
-
-      const data = await response.json();
-
-      setRecords(data.records || []);
-      setStats(data.stats || null);
     } catch (error: any) {
       console.error('Error fetching attendance:', error);
       toast.error(error.message || 'Error al cargar la asistencia');
