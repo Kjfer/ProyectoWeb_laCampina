@@ -118,23 +118,78 @@ const AdminAttendanceReport = () => {
     setReport(null);
     
     try {
-      // Obtener fechas únicas donde hay asistencia registrada para este módulo
-      const { data, error } = await supabase
-        .from('attendance')
-        .select('date')
-        .eq('modulo_id', moduloId)
-        .order('date', { ascending: false });
+      // Obtener información del módulo para generar fechas basadas en el horario
+      const { data: moduloData, error: moduloError } = await supabase
+        .from('modulos')
+        .select('start_date, end_date, schedule')
+        .eq('id', moduloId)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (moduloError) throw moduloError;
 
-      // Extraer fechas únicas
-      const uniqueDates = [...new Set(data?.map(item => item.date) || [])];
-      setAvailableDates(uniqueDates);
+      if (!moduloData) {
+        toast({
+          title: 'Error',
+          description: 'No se encontró información del módulo',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-      if (uniqueDates.length === 0) {
+      // Generar todas las fechas de clases basadas en el horario
+      const classDates: string[] = [];
+      
+      if (moduloData.schedule && typeof moduloData.schedule === 'object') {
+        const startDate = new Date(moduloData.start_date + 'T00:00:00');
+        const endDate = new Date(moduloData.end_date + 'T00:00:00');
+        
+        // Mapa de días en español a número
+        const dayToNumMap: Record<string, number> = {
+          'domingo': 0,
+          'lunes': 1,
+          'martes': 2,
+          'miércoles': 3, 'miercoles': 3,
+          'jueves': 4,
+          'viernes': 5,
+          'sábado': 6, 'sabado': 6
+        };
+        
+        // Obtener días de clase del schedule
+        const scheduleDays = Object.keys(moduloData.schedule).map(day => 
+          dayToNumMap[day.toLowerCase()] ?? -1
+        ).filter(d => d !== -1);
+        
+        // Generar todas las fechas desde start_date hasta end_date que coincidan con los días del horario
+        const current = new Date(startDate);
+        while (current <= endDate) {
+          if (scheduleDays.includes(current.getDay())) {
+            classDates.push(format(current, 'yyyy-MM-dd'));
+          }
+          current.setDate(current.getDate() + 1);
+        }
+      } else {
+        // Si no hay horario, usar solo fechas con asistencia registrada (fallback)
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance')
+          .select('date')
+          .eq('modulo_id', moduloId)
+          .order('date', { ascending: false });
+
+        if (attendanceError) throw attendanceError;
+        
+        const uniqueDates = [...new Set(attendanceData?.map(item => item.date) || [])];
+        classDates.push(...uniqueDates);
+      }
+
+      // Ordenar fechas de más reciente a más antigua
+      classDates.sort((a, b) => b.localeCompare(a));
+      
+      setAvailableDates(classDates);
+
+      if (classDates.length === 0) {
         toast({
           title: 'Sin clases disponibles',
-          description: 'Este módulo no tiene asistencia registrada',
+          description: 'Este módulo no tiene clases programadas',
           variant: 'default',
         });
       }
@@ -432,7 +487,7 @@ const AdminAttendanceReport = () => {
                       loadingDates 
                         ? "Cargando fechas..." 
                         : availableDates.length === 0 && selectedModulo
-                        ? "Sin clases disponibles"
+                        ? "Sin clases programadas"
                         : "Seleccionar fecha de clase..."
                     } />
                   </SelectTrigger>
@@ -446,7 +501,7 @@ const AdminAttendanceReport = () => {
                 </Select>
                 {selectedModulo && availableDates.length === 0 && !loadingDates && (
                   <p className="text-xs text-gray-500">
-                    Solo se muestran clases con asistencia registrada
+                    No se encontraron clases programadas para este módulo
                   </p>
                 )}
               </div>

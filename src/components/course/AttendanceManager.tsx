@@ -70,7 +70,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
         .from('modulos')
         .select('schedule')
         .eq('id', courseId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       
@@ -207,7 +207,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
       const { data, error } = await supabase
         .from('attendance')
         .select('student_id, status, notes')
-        .eq('course_id', courseId)
+        .eq('modulo_id', courseId)
         .eq('date', dateStr);
 
       if (error) throw error;
@@ -256,17 +256,27 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
         return;
       }
 
-      const { error } = await supabase.functions.invoke('create-attendance-records', {
-        body: {
-          course_id: courseId,
-          date: dateStr,
-          attendance_records: attendanceRecords,
-        },
-      });
+      // Preparar registros para upsert con modulo_id
+      const recordsToSave = attendanceRecords.map(record => ({
+        modulo_id: courseId,
+        student_id: record.student_id,
+        date: dateStr,
+        status: record.status,
+        notes: record.notes || null,
+      }));
+
+      // Usar upsert para actualizar o insertar registros
+      const { error } = await supabase
+        .from('attendance')
+        .upsert(recordsToSave, {
+          onConflict: 'modulo_id,student_id,date',
+        });
 
       if (error) throw error;
 
       toast.success('Asistencia registrada correctamente');
+      // Recargar para mostrar los cambios actualizados
+      await loadExistingAttendance();
     } catch (error) {
       console.error('Error saving attendance:', error);
       toast.error('Error al guardar la asistencia');
