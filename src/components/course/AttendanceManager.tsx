@@ -255,6 +255,18 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
     try {
       setSaving(true);
 
+      // Obtener el profile_id del usuario actual (profesor)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile) throw new Error('Perfil no encontrado');
+
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const attendanceRecords = Object.values(attendance);
 
@@ -272,6 +284,7 @@ export function AttendanceManager({ courseId }: AttendanceManagerProps) {
         date: dateStr,
         status: record.status,
         notes: record.notes || null,
+        recorded_by: profile.id, // ID del profesor que registra
       }));
 
       // Usar upsert para actualizar o insertar registros

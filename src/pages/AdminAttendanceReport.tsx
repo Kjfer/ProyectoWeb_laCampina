@@ -250,7 +250,7 @@ const AdminAttendanceReport = () => {
         .from('course_enrollments')
         .select(`
           student_id,
-          student:profiles!course_enrollments_student_id_fkey(
+          student:profiles!course_enrollments_student_id_fkey1(
             id,
             first_name,
             last_name,
