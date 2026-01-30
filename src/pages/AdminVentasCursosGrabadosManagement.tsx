@@ -307,7 +307,7 @@ export default function AdminVentasCursosGrabadosManagement() {
                       <TableCell>{venta.matricula?.cod_matricula || '-'}</TableCell>
                       <TableCell>
                         {venta.created_at && !isNaN(new Date(venta.created_at).getTime())
-                          ? new Date(venta.created_at).toLocaleDateString()
+                          ? formatDate(venta.created_at)
                           : '-'}
                       </TableCell>
                       <TableCell className="font-medium">

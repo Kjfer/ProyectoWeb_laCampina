@@ -535,7 +535,7 @@ export default function AdminMaterialesManagement() {
                       <TableCell className="text-right">
                         {material.fecha_pago && (
                           <span className="text-xs text-gray-500">
-                            Pagado: {new Date(material.fecha_pago).toLocaleDateString()}
+                            Pagado: {formatDate(material.fecha_pago)}
                           </span>
                         )}
                       </TableCell>

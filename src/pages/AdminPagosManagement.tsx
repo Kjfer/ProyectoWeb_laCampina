@@ -516,7 +516,7 @@ export default function AdminPagosManagement() {
               <CardContent>
                 <div className="text-sm">
                   {filteredPagos.length > 0
-                    ? new Date(filteredPagos[0].fecha_pago).toLocaleDateString()
+                    ? formatDate(filteredPagos[0].fecha_pago)
                     : '-'}
                 </div>
               </CardContent>
@@ -544,7 +544,7 @@ export default function AdminPagosManagement() {
                 {filteredPagos.map((pago) => (
                   <TableRow key={pago.id}>
                     <TableCell>
-                      {new Date(pago.fecha_pago).toLocaleDateString()}
+                      {formatDate(pago.fecha_pago)}
                     </TableCell>
                     <TableCell className="font-medium">{pago.codigo_producto}</TableCell>
                     <TableCell>

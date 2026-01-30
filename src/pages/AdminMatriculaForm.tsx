@@ -734,7 +734,7 @@ export default function AdminMatriculaForm() {
                             >
                               M{modulo.num_modulo}: {modulo.name}
                               <span className="text-xs text-gray-500 ml-2">
-                                ({new Date(modulo.start_date).toLocaleDateString()})
+                                ({formatDate(modulo.start_date)})
                               </span>
                               {yaMatriculado && (
                                 <span className="text-xs text-red-600 ml-2 font-medium">

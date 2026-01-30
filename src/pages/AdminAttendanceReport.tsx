@@ -25,6 +25,7 @@ import { Download, FileSpreadsheet, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
+import { formatDate, formatDateTime } from '@/lib/dateUtils.ts';
 
 interface Modulo {
   id: string;
@@ -332,7 +333,7 @@ const AdminAttendanceReport = () => {
       'Teléfono': student.phone || 'No registrado',
       'Estado': getStatusLabel(student.status),
       'Notas': student.notes || '',
-      'Registrado': student.recorded_at ? format(new Date(student.recorded_at), 'dd/MM/yyyy HH:mm', { locale: es }) : 'No registrado'
+      'Registrado': student.recorded_at ? formatDateTime(student.recorded_at) : 'No registrado'
     }));
 
     // Crear hoja de estadísticas
@@ -342,7 +343,7 @@ const AdminAttendanceReport = () => {
       ['Módulo:', report.modulo.name],
       ['Código:', report.modulo.code],
       ['Edición:', report.modulo.course?.name || '-'],
-      ['Fecha:', format(new Date(report.date), 'dd/MM/yyyy', { locale: es })],
+      ['Fecha:', formatDate(report.date)],
       [''],
       ['ESTADÍSTICAS'],
       ['Total de estudiantes:', report.statistics.total_students],
@@ -379,7 +380,7 @@ const AdminAttendanceReport = () => {
     XLSX.utils.book_append_sheet(wb, wsAbsent, 'Estudiantes Ausentes');
 
     // Generar nombre de archivo
-    const fileName = `Asistencia_${report.modulo.code}_${format(new Date(report.date), 'yyyy-MM-dd')}.xlsx`;
+    const fileName = `Asistencia_${report.modulo.code}_${report.date}.xlsx`;
 
     // Descargar archivo
     XLSX.writeFile(wb, fileName);
@@ -494,7 +495,7 @@ const AdminAttendanceReport = () => {
                   <SelectContent>
                     {availableDates.map((date) => (
                       <SelectItem key={date} value={date}>
-                        {format(new Date(date + 'T00:00:00'), 'dd/MM/yyyy - EEEE', { locale: es })}
+                        {formatDate(date)} - {format(new Date(date + 'T00:00:00'), 'EEEE', { locale: es })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -531,7 +532,7 @@ const AdminAttendanceReport = () => {
                 <div>
                   <CardTitle>{report.modulo.name}</CardTitle>
                   <CardDescription>
-                    {report.modulo.code} - {format(new Date(report.date), 'dd \'de\' MMMM \'de\' yyyy', { locale: es })}
+                    {report.modulo.code} - {formatDate(report.date)} ({format(new Date(report.date + 'T00:00:00'), 'EEEE', { locale: es })})
                   </CardDescription>
                 </div>
                 <Button onClick={exportToExcel} variant="outline">
@@ -665,7 +666,7 @@ const AdminAttendanceReport = () => {
                         </TableCell>
                         <TableCell className="text-sm text-gray-600">
                           {student.recorded_at 
-                            ? format(new Date(student.recorded_at), 'dd/MM/yyyy HH:mm', { locale: es })
+                            ? formatDateTime(student.recorded_at)
                             : 'No registrado'
                           }
                         </TableCell>

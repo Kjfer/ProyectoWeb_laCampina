@@ -260,7 +260,7 @@ export default function AdminMatriculasManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {new Date(matricula.created_at).toLocaleDateString()}
+                        {formatDate(matricula.created_at)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -420,7 +420,7 @@ export default function AdminMatriculasManagement() {
                       {selectedMatricula.pagos.map((pago: any, idx: number) => (
                         <TableRow key={idx}>
                           <TableCell>
-                            {new Date(pago.fecha_pago).toLocaleDateString()}
+                            {formatDate(pago.fecha_pago)}
                           </TableCell>
                           <TableCell className="font-medium">
                             {selectedMatricula.moneda_monto} {pago.monto_pago.toFixed(2)}

@@ -425,7 +425,7 @@ export function MatriculasTab() {
                 <div>
                   <Label>Fecha de Matrícula</Label>
                   <p className="font-medium">
-                    {new Date(selectedMatricula.created_at).toLocaleDateString()}
+                    {formatDate(selectedMatricula.created_at)}
                   </p>
                 </div>
               </div>
@@ -486,7 +486,7 @@ export function MatriculasTab() {
                       {selectedMatricula.pagos.map((pago) => (
                         <TableRow key={pago.id}>
                           <TableCell>
-                            {new Date(pago.fecha_pago).toLocaleDateString()}
+                            {formatDate(pago.fecha_pago)}
                           </TableCell>
                           <TableCell className="font-medium">
                             {pago.moneda} {pago.monto_pago.toFixed(2)}

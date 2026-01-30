@@ -985,7 +985,7 @@ const AdminStudentManagementHub = () => {
                           <TableRow key={enrollment.id} className={paymentStatus === 'blocked' ? 'bg-red-50 dark:bg-red-950/20' : ''}>
                             <TableCell className="font-medium">{enrollment.modulo?.course?.name || 'N/A'}</TableCell>
                             <TableCell>{enrollment.modulo?.code || 'N/A'}</TableCell>
-                            <TableCell>{new Date(enrollment.enrolled_at).toLocaleDateString()}</TableCell>
+                            <TableCell>{formatDate(enrollment.enrolled_at)}</TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-1">
                                 <Badge 
