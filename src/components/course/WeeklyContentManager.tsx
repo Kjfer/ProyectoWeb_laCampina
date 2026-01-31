@@ -10,6 +10,7 @@ import { SectionForm } from './SectionForm';
 // --- NUEVOS IMPORTS (SOLO ESTO SE AGREGA ARRIBA) ---
 import { CourseGeneralResources } from './CourseGeneralResources';
 import { CourseAnnouncements } from './CourseAnnouncements';
+import { ModuloBookSection } from './ModuloBookSection';
 // ----------------------------------------------------
 
 // --- Interfaces (SIN CAMBIOS) ---
@@ -55,10 +56,27 @@ export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManager
   const [modules, setModules] = useState<CourseModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSectionForm, setShowSectionForm] = useState(false);
+  const [moduloInfo, setModuloInfo] = useState<{ num_modulo: number; course_id: string } | null>(null);
 
   useEffect(() => {
+    fetchModuloInfo();
     fetchModulesAndContent();
   }, [courseId]);
+
+  const fetchModuloInfo = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('modulos')
+        .select('num_modulo, course_id')
+        .eq('id', courseId)
+        .single();
+
+      if (error) throw error;
+      setModuloInfo(data as any);
+    } catch (error) {
+      console.error('Error al obtener info del módulo:', error);
+    }
+  };
 
   const fetchModulesAndContent = async () => {
     try {
@@ -128,6 +146,14 @@ export function WeeklyContentManager({ courseId, canEdit }: WeeklyContentManager
          courseId={courseId}
          canEdit={canEdit}
       />
+
+      {/* Mostrar el Book solo si es Módulo 1 */}
+      {moduloInfo?.num_modulo === 1 && moduloInfo?.course_id && (
+        <ModuloBookSection
+          courseId={moduloInfo.course_id}
+          canEdit={canEdit}
+        />
+      )}
       
       {/* --- FIN ZONA NUEVA --- */}
 

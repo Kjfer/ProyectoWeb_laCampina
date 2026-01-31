@@ -179,17 +179,23 @@ export default function AdminEdicionForm() {
     try {
       setUploadingBook(true);
       const fileExt = bookFile.name.split('.').pop();
-      const fileName = `${formData.code}_book_${Date.now()}.${fileExt}`;
-      const filePath = `books/${fileName}`;
+      const fileName = `book.${fileExt}`;
+      
+      // Usar el courseId que se generará o el id actual si estamos editando
+      const targetCourseId = id || 'temp';
+      const filePath = `${targetCourseId}/${fileName}`;
 
-      const { data, error } = await supabase.storage
-        .from('course-materials')
-        .upload(filePath, bookFile);
+      const { error } = await supabase.storage
+        .from('course-books')
+        .upload(filePath, bookFile, {
+          cacheControl: '3600',
+          upsert: true,
+        });
 
       if (error) throw error;
 
       const { data: urlData } = supabase.storage
-        .from('course-materials')
+        .from('course-books')
         .getPublicUrl(filePath);
 
       return urlData.publicUrl;
@@ -231,19 +237,18 @@ export default function AdminEdicionForm() {
     try {
       setLoading(true);
 
-      // Subir libro si hay uno y material es 'book'
-      let bookUrl = formData.book_url;
-      if (formData.material === 'book' && bookFile) {
-        const uploadedUrl = await uploadBookToStorage();
-        if (uploadedUrl) {
-          bookUrl = uploadedUrl;
-        }
-      }
-
-      const dataToSave = { ...formData, book_url: bookUrl };
-
       if (isEditing) {
-        // Actualizar
+        // Actualizar: primero subir el book si hay uno nuevo
+        let bookUrl = formData.book_url;
+        if (formData.material === 'book' && bookFile) {
+          const uploadedUrl = await uploadBookToStorage();
+          if (uploadedUrl) {
+            bookUrl = uploadedUrl;
+          }
+        }
+
+        const dataToSave = { ...formData, book_url: bookUrl };
+
         const { error } = await supabase
           .from('courses')
           .update(dataToSave)
@@ -256,12 +261,47 @@ export default function AdminEdicionForm() {
           description: 'Edición actualizada correctamente',
         });
       } else {
-        // Crear edición (los módulos se crearán automáticamente mediante trigger)
-        const { error: courseError } = await supabase
+        // Crear: primero crear la edición, luego subir el book
+        const { data: newCourse, error: courseError } = await supabase
           .from('courses')
-          .insert(dataToSave as CourseInsert);
+          .insert(formData as CourseInsert)
+          .select('id')
+          .single();
 
         if (courseError) throw courseError;
+
+        // Si hay un book, subirlo usando el ID del curso recién creado
+        if (formData.material === 'book' && bookFile && newCourse) {
+          const fileExt = bookFile.name.split('.').pop();
+          const fileName = `book.${fileExt}`;
+          const filePath = `${newCourse.id}/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('course-books')
+            .upload(filePath, bookFile, {
+              cacheControl: '3600',
+              upsert: true,
+            });
+
+          if (uploadError) {
+            console.error('Error al subir book:', uploadError);
+            toast({
+              title: 'Advertencia',
+              description: 'Edición creada pero hubo un error al subir el book. Puedes subirlo después.',
+              variant: 'destructive',
+            });
+          } else {
+            // Actualizar la URL del book en la edición
+            const { data: urlData } = supabase.storage
+              .from('course-books')
+              .getPublicUrl(filePath);
+
+            await supabase
+              .from('courses')
+              .update({ book_url: urlData.publicUrl })
+              .eq('id', newCourse.id);
+          }
+        }
 
         toast({
           title: 'Éxito',
