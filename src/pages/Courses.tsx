@@ -130,12 +130,29 @@ const Courses = () => {
           }
           
           acc[courseId].modulos.push(modulo);
-          acc[courseId].total_students += modulo.enrollments?.[0]?.count || 0;
           
           return acc;
         }, {});
         
-        setEdiciones(Object.values(grouped));
+        // Calcular estudiantes únicos por edición
+        const edicionesArray = Object.values(grouped);
+        
+        // Obtener estudiantes únicos por edición usando course_enrollments
+        for (const edicion of edicionesArray) {
+          const moduloIds = edicion.modulos.map(m => m.id);
+          
+          // Contar estudiantes únicos matriculados en cualquier módulo de esta edición
+          const { data: uniqueStudents } = await supabase
+            .from('course_enrollments')
+            .select('student_id')
+            .in('modulo_id', moduloIds);
+          
+          // Usar Set para obtener IDs únicos
+          const uniqueStudentIds = new Set(uniqueStudents?.map(e => e.student_id) || []);
+          edicion.total_students = uniqueStudentIds.size;
+        }
+        
+        setEdiciones(edicionesArray);
       }
 
     } catch (error) {
@@ -227,73 +244,74 @@ const Courses = () => {
         <div className="space-y-8">
           {ediciones.map((edicion) => (
             <div key={edicion.course_id} className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gradient-card rounded-lg border border-border/50">
-                <div>
-                  <h2 className="text-xl font-bold text-foreground">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gradient-card rounded-lg border border-border/50 gap-3">
+                <div className="flex-1">
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground">
                     {edicion.program_name} - {edicion.course_name}
                   </h2>
-                  <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap gap-3 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
+                      <Calendar className="w-3.5 h-3.5" />
                       {edicion.academic_year} - {edicion.semester}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      {edicion.total_students} estudiantes totales
+                      <Users className="w-3.5 h-3.5" />
+                      {edicion.total_students} estudiantes únicos
                     </span>
                     <span className="flex items-center gap-1">
-                      <BookOpen className="w-4 h-4" />
-                      {edicion.modulos.length} módulos
+                      <BookOpen className="w-3.5 h-3.5" />
+                      {edicion.modulos.length} {edicion.modulos.length === 1 ? 'módulo' : 'módulos'}
                     </span>
                   </div>
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pl-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pl-0 md:pl-4">
                 {edicion.modulos.map((modulo) => (
                   <Card key={modulo.id} className="bg-gradient-card shadow-card border-0 hover:shadow-glow transition-all duration-300">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg font-semibold text-foreground mb-1">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base font-semibold text-foreground mb-1 truncate">
                             {modulo.name}
                           </CardTitle>
                           <Badge variant="secondary" className="text-xs">
                             {modulo.code}
                           </Badge>
                         </div>
-                        <BookOpen className="w-6 h-6 text-primary" />
+                        <BookOpen className="w-5 h-5 text-primary flex-shrink-0" />
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                    <CardContent className="pt-0">
+                      <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
                         {modulo.description || 'Sin descripción disponible'}
                       </p>
                       
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Users className="w-4 h-4" />
-                          <span>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Users className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="truncate">
                             Prof. {modulo.teacher?.first_name || 'Sin asignar'} {modulo.teacher?.last_name || ''}
                           </span>
                         </div>
                         
                         {modulo.enrollments && modulo.enrollments[0] && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Users className="w-4 h-4" />
-                            <span>{modulo.enrollments[0].count} estudiantes</span>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Users className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{modulo.enrollments[0].count} estudiantes en este módulo</span>
                           </div>
                         )}
                       </div>
 
-                      <div className="mt-6 pt-4 border-t border-border/50">
+                      <div className="mt-4 pt-3 border-t border-border/50">
                         <Button 
                           className="w-full" 
+                          size="sm"
                           variant="outline"
                           onClick={() => navigate(`/courses/${modulo.id}`)}
                         >
                           Ver Módulo
-                          <ArrowRight className="w-4 h-4 ml-2" />
+                          <ArrowRight className="w-3.5 h-3.5 ml-2" />
                         </Button>
                       </div>
                     </CardContent>

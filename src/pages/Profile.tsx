@@ -182,17 +182,15 @@ export default function Profile() {
             </div>
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className={`grid w-full ${profile.role === 'student' ? 'grid-cols-3' : 'grid-cols-2'}`}>
                 <TabsTrigger value="info">Información Personal</TabsTrigger>
-                          {profile.role === 'student' ? (
-                            <TabsTrigger value="attendance" className="flex items-center gap-2">
-                              <ClipboardCheck className="h-4 w-4" />
-                              Mi Asistencia
-                            </TabsTrigger>
-                          ) : (
-                            <TabsTrigger value="attendance" disabled className="opacity-50">Mi Asistencia</TabsTrigger>
-                          )}
-                          <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
+                {profile.role === 'student' && (
+                  <TabsTrigger value="attendance" className="flex items-center gap-2">
+                    <ClipboardCheck className="h-4 w-4" />
+                    Mi Asistencia
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
               </TabsList>
 
               <TabsContent value="info">
@@ -629,9 +627,11 @@ export default function Profile() {
             </div>
           </TabsContent>
 
-                <TabsContent value="attendance">
-                  {profile.role === 'student' ? <StudentAttendance /> : <div className="p-4 text-muted-foreground">La sección de asistencia está disponible sólo para estudiantes.</div>}
-                </TabsContent>
+                {profile.role === 'student' && (
+                  <TabsContent value="attendance">
+                    <StudentAttendance />
+                  </TabsContent>
+                )}
 
                 <TabsContent value="notifications">
                   <Notifications />

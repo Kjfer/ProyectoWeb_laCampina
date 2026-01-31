@@ -3,16 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Users, BookOpen, FileText, Activity, GraduationCap, UserCheck, ClipboardList } from 'lucide-react';
-import AdminCourseManagement from './AdminCourseManagement';
-import SimpleCourseManagement from './SimpleCourseManagement';
-import AdminStudentManagement from './AdminStudentManagement';
-import TestForm from './TestForm';
+import { Users, BookOpen, FileText, Activity, GraduationCap, UserCheck, ClipboardList, UserPlus, School, BarChart3, Calendar, DollarSign, Video, Award } from 'lucide-react';
 
 interface AdminStats {
   totalUsers: number;
@@ -22,6 +17,13 @@ interface AdminStats {
   totalCourses: number;
   totalAssignments: number;
   activeUsers: number;
+}
+
+interface RecentActivity {
+  id: string;
+  type: 'usuario' | 'curso' | 'matricula' | 'pago';
+  description: string;
+  created_at: string;
 }
 
 const AdminDashboard = () => {
@@ -37,11 +39,13 @@ const AdminDashboard = () => {
     totalAssignments: 0,
     activeUsers: 0
   });
+  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (profile?.role === 'admin') {
       fetchAdminStats();
+      fetchRecentActivities();
     }
   }, [profile]);
 
@@ -87,6 +91,110 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchRecentActivities = async () => {
+    try {
+      const activities: RecentActivity[] = [];
+
+      // Obtener últimos usuarios creados
+      const { data: newUsers } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role, created_at')
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (newUsers) {
+        newUsers.forEach(user => {
+          activities.push({
+            id: user.id,
+            type: 'usuario',
+            description: `Nuevo ${user.role === 'student' ? 'estudiante' : user.role === 'teacher' ? 'profesor' : 'usuario'} registrado: ${user.first_name} ${user.last_name}`,
+            created_at: user.created_at
+          });
+        });
+      }
+
+      // Obtener últimas matrículas
+      const { data: enrollments } = await supabase
+        .from('matriculas')
+        .select(`
+          id, 
+          created_at,
+          student:profiles!matriculas_student_id_fkey(first_name, last_name),
+          edicion:ediciones(nombre)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (enrollments) {
+        enrollments.forEach(enrollment => {
+          activities.push({
+            id: enrollment.id,
+            type: 'matricula',
+            description: `Nueva matrícula: ${enrollment.student?.first_name} ${enrollment.student?.last_name} en ${enrollment.edicion?.nombre}`,
+            created_at: enrollment.created_at
+          });
+        });
+      }
+
+      // Obtener últimos pagos
+      const { data: payments } = await supabase
+        .from('pagos')
+        .select(`
+          id,
+          monto,
+          created_at,
+          matricula:matriculas(
+            student:profiles!matriculas_student_id_fkey(first_name, last_name)
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (payments) {
+        payments.forEach(payment => {
+          activities.push({
+            id: payment.id,
+            type: 'pago',
+            description: `Pago registrado: S/.${payment.monto} de ${payment.matricula?.student?.first_name} ${payment.matricula?.student?.last_name}`,
+            created_at: payment.created_at
+          });
+        });
+      }
+
+      // Ordenar por fecha y tomar las 6 más recientes
+      const sorted = activities
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 6);
+
+      setRecentActivities(sorted);
+    } catch (error) {
+      console.error('Error fetching recent activities:', error);
+    }
+  };
+
+  const getActivityBadgeVariant = (type: string) => {
+    switch (type) {
+      case 'usuario': return 'default';
+      case 'curso': return 'secondary';
+      case 'matricula': return 'outline';
+      case 'pago': return 'default';
+      default: return 'outline';
+    }
+  };
+
+  const getTimeAgo = (date: string) => {
+    const now = new Date();
+    const past = new Date(date);
+    const diffMs = now.getTime() - past.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+    if (diffHours < 24) return `Hace ${diffHours}h`;
+    return `Hace ${diffDays}d`;
   };
 
   // Redirect if not admin
@@ -184,17 +292,8 @@ const AdminDashboard = () => {
         })}
       </div>
 
-      {/* Tabs de gestión */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Resumen</TabsTrigger>
-          <TabsTrigger value="test">Prueba</TabsTrigger>
-          <TabsTrigger value="courses">Cursos</TabsTrigger>
-          <TabsTrigger value="students">Estudiantes</TabsTrigger>
-          <TabsTrigger value="reports">Reportes</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
+      {/* Resumen */}
+      <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
@@ -204,29 +303,25 @@ const AdminDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">Usuario</Badge>
-                      <span className="text-sm">Nuevo estudiante registrado</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Hace 2 horas</span>
+                {recentActivities.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentActivities.map((activity) => (
+                      <div key={activity.id} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Badge variant={getActivityBadgeVariant(activity.type)}>
+                            {activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}
+                          </Badge>
+                          <span className="text-sm">{activity.description}</span>
+                        </div>
+                        <span className="text-xs text-gray-500">{getTimeAgo(activity.created_at)}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">Curso</Badge>
-                      <span className="text-sm">Curso actualizado</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Hace 5 horas</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">Tarea</Badge>
-                      <span className="text-sm">Nueva tarea asignada</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Hace 1 día</span>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">
+                    No hay actividad reciente
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -238,88 +333,58 @@ const AdminDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button className="w-full justify-start" variant="outline">
-                  <Users className="mr-2 h-4 w-4" />
-                  Crear nuevo usuario
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  Crear nuevo curso
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Generar reporte
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate('/admin/users')}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Gestión de Usuarios
                 </Button>
                 <Button 
                   className="w-full justify-start" 
                   variant="outline"
-                  onClick={fetchAdminStats}
+                  onClick={() => navigate('/admin/students')}
                 >
-                  <Activity className="mr-2 h-4 w-4" />
-                  Actualizar estadísticas
+                  <GraduationCap className="mr-2 h-4 w-4" />
+                  Gestión de Estudiantes
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate('/admin/courses')}
+                >
+                  <School className="mr-2 h-4 w-4" />
+                  Gestión de Cursos
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate('/admin/pagos')}
+                >
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Gestión de Pagos
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate('/admin/attendance-report')}
+                >
+                  <ClipboardList className="mr-2 h-4 w-4" />
+                  Reporte de Asistencia
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => navigate('/admin/certificates')}
+                >
+                  <Award className="mr-2 h-4 w-4" />
+                  Certificados
                 </Button>
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="test">
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold">Formulario de Prueba</h2>
-            <p className="text-gray-600">
-              Este es un formulario simple para probar si el problema de input persiste
-            </p>
-            <TestForm />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="courses">
-          <SimpleCourseManagement />
-        </TabsContent>
-
-        <TabsContent value="students">
-          <AdminStudentManagement />
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Reportes del Sistema</CardTitle>
-              <CardDescription>
-                Genera reportes detallados sobre el uso de la plataforma
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Button variant="outline" className="h-20 flex-col">
-                  <Users className="h-6 w-6 mb-2" />
-                  Reporte de Usuarios
-                </Button>
-                <Button variant="outline" className="h-20 flex-col">
-                  <BookOpen className="h-6 w-6 mb-2" />
-                  Reporte de Cursos
-                </Button>
-                <Button variant="outline" className="h-20 flex-col">
-                  <FileText className="h-6 w-6 mb-2" />
-                  Reporte de Tareas
-                </Button>
-                <Button variant="outline" className="h-20 flex-col">
-                  <Activity className="h-6 w-6 mb-2" />
-                  Reporte de Actividad
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-20 flex-col"
-                  onClick={() => navigate('/admin/attendance-report')}
-                >
-                  <ClipboardList className="h-6 w-6 mb-2" />
-                  Reporte de Asistencia
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
       </div>
     </DashboardLayout>
   );

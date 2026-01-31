@@ -91,7 +91,7 @@ export const navigationItems: NavItem[] = [
     title: 'Mensajes',
     url: '/messages',
     icon: MessageSquare,
-    roles: ['admin', 'tutor', 'directivo']
+    roles: ['tutor', 'directivo']
   },
   
   // Dashboard Tutor
@@ -140,6 +140,14 @@ export const navigationItems: NavItem[] = [
     url: '/classmates',
     icon: Users,
     roles: ['student']
+  },
+  
+  // Configuración (todos los roles)
+  {
+    title: 'Configuración',
+    url: '/settings',
+    icon: Settings,
+    roles: ['admin', 'teacher', 'student', 'tutor', 'directivo', 'parent']
   },
 ];
 

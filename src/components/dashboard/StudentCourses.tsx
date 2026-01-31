@@ -25,7 +25,7 @@ interface Course {
   upcoming_exams?: number;
 }
 
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 4;
 
 export function StudentCourses() {
   const { profile } = useAuth();
@@ -434,30 +434,35 @@ export function StudentCourses() {
         </div>
         
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/30">
-            <p className="text-sm text-muted-foreground">
-              Página {currentPage} de {totalPages} ({totalCourses} {profile?.role === 'teacher' ? 'módulos' : 'cursos'} total)
-            </p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1 || loading}
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Anterior
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages || loading}
-              >
-                Siguiente
-                <ChevronRight className="w-4 h-4" />
-              </Button>
+        {totalCourses > ITEMS_PER_PAGE && (
+          <div className="mt-6 pt-4 border-t border-border/30">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalCourses)} de {totalCourses} {profile?.role === 'teacher' ? 'módulos' : 'cursos'}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1 || loading}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span className="hidden sm:inline ml-1">Anterior</span>
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages || loading}
+                >
+                  <span className="hidden sm:inline mr-1">Siguiente</span>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
         )}

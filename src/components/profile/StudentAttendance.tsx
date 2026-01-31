@@ -41,15 +41,7 @@ export function StudentAttendance() {
         throw new Error('No se pudo obtener el perfil del usuario');
       }
 
-      console.log('Fetching attendance for student:', profile.id);
-      console.log('User ID:', profile.user_id);
-
-      // Primero verificar si hay registros totales
-      const { count: totalCount } = await supabase
-        .from('attendance')
-        .select('*', { count: 'exact', head: true });
-      
-      console.log('Total attendance records in database:', totalCount);
+      console.log('Fetching attendance for student ID:', profile.id);
 
       // Obtener todos los registros de asistencia del estudiante actual
       const { data: attendanceData, error: attendanceError } = await supabase

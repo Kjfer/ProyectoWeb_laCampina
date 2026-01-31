@@ -42,6 +42,7 @@ import GradingView from "./pages/GradingView";
 import AdminAttendanceReport from "./pages/AdminAttendanceReport";
 import AdminReports from "./pages/AdminReports";
 import AdminCertificates from "./pages/AdminCertificates";
+import Settings from "./pages/Settings";
 // Peri Institute Model imports
 import AdminProgramasManagement from "./pages/AdminProgramasManagement";
 import AdminMatriculasManagement from "./pages/AdminMatriculasManagement";
@@ -138,6 +139,11 @@ const App = () => (
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             } />
             <Route path="/calendar" element={
