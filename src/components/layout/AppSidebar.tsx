@@ -41,13 +41,17 @@ export function AppSidebar() {
         {/* Logo/Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 px-3">
-            <div className="w-8 h-8 bg-secondary rounded-lg flex items-center justify-center shadow-md">
-              <GraduationCap className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+              <img 
+                src="/peri-logo.svg" 
+                alt="Peri Institute Logo" 
+                className="w-10 h-10"
+              />
             </div>
             {!collapsed && (
               <div>
                 <h2 className="font-semibold text-sidebar-foreground text-sm">Peri Institute</h2>
-                <p className="text-xs text-sidebar-foreground/70">Sistema Educativo</p>
+                <p className="text-xs text-sidebar-foreground/70">Plataforma Intranet</p>
               </div>
             )}
           </div>

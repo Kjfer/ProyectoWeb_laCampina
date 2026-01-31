@@ -16,10 +16,10 @@ interface AttendancePieChartProps {
 }
 
 const COLORS = {
-  present: '#10b981', // Verde vibrante
-  late: '#f59e0b',   // Naranja/Amarillo
-  absent: '#ef4444',  // Rojo
-  justified: '#3b82f6', // Azul
+  present: '#10b981', // Verde vibrante (mantener)
+  late: '#FFD900',   // Amarillo Peri Institute
+  absent: '#C9438C',  // Magenta Peri Institute
+  justified: '#2B3F5C', // Azul marino Peri Institute
 };
 
 const STATUS_CONFIG = {
