@@ -43,9 +43,9 @@ export function AppSidebar() {
           <div className="flex items-center gap-3 px-3">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center">
               <img 
-                src="/peri-logo.svg" 
+                src="/peri-logo.png" 
                 alt="Peri Institute Logo" 
-                className="w-10 h-10"
+                className="w-10 h-10 object-contain"
               />
             </div>
             {!collapsed && (
