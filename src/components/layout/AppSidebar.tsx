@@ -41,11 +41,11 @@ export function AppSidebar() {
         {/* Logo/Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 px-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden bg-white">
               <img 
                 src="/peri-logo.png" 
                 alt="Peri Institute Logo" 
-                className="w-10 h-10 object-contain"
+                className="w-full h-full object-cover"
               />
             </div>
             {!collapsed && (

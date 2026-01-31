@@ -117,13 +117,19 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 via-background to-secondary/20 p-4">
       <Card className="w-full max-w-md bg-gradient-card shadow-glow border-0">
         <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <GraduationCap className="w-8 h-8 text-primary" />
+          <div className="flex flex-col items-center justify-center gap-3 mb-2">
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-white shadow-lg">
+              <img 
+                src="/peri-logo.png" 
+                alt="Peri Institute Logo" 
+                className="w-full h-full object-cover"
+              />
+            </div>
             <CardTitle className="text-2xl font-bold text-foreground">
               Peri Institute
             </CardTitle>
           </div>
-          <p className="text-muted-foreground">Aula Virtual</p>
+          <p className="text-muted-foreground">Plataforma Intranet</p>
         </CardHeader>
         <CardContent>
           {error && (
