@@ -99,7 +99,7 @@ export function Header({ showSidebarTrigger = false }: HeaderProps) {
   };
 
   return (
-    <header className="border-b border-border/50 bg-gradient-card/80 backdrop-blur-sm">
+    <header className="border-b border-border bg-white shadow-sm">
       <div className="flex h-16 items-center px-6 gap-4">
         {/* Search */}
         <div className="flex-1 max-w-sm">
@@ -107,7 +107,7 @@ export function Header({ showSidebarTrigger = false }: HeaderProps) {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
               placeholder="Buscar cursos, tareas..."
-              className="pl-10 bg-background/60 border-border/50 focus:border-primary"
+              className="pl-10 bg-background border-border focus:border-primary focus:ring-primary"
             />
           </div>
         </div>
@@ -117,23 +117,23 @@ export function Header({ showSidebarTrigger = false }: HeaderProps) {
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative hover:bg-primary/10">
-                  <Bell className="w-5 h-5" />
+                <Button variant="ghost" size="icon" className="relative hover:bg-secondary/10">
+                  <Bell className="w-5 h-5 text-primary" />
                   <Badge 
                     variant="destructive" 
-                    className="absolute -top-1 -right-1 h-5 min-w-[1.25rem] flex items-center justify-center px-1 text-xs"
+                    className="absolute -top-1 -right-1 h-5 min-w-[1.25rem] flex items-center justify-center px-1 text-xs bg-secondary"
                     aria-label={`${unreadCount} notificaciones sin leer`}
                   >
                     {unreadCount}
                   </Badge>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-96 p-0" align="end">
+              <DropdownMenuContent className="w-96 p-0 shadow-lg" align="end">
                 <div className="max-h-80 overflow-auto">
                   <Notifications />
                 </div>
                 <DropdownMenuItem asChild>
-                  <a href="/profile?tab=notifications" className="w-full text-center text-sm underline">Ver más</a>
+                  <a href="/profile?tab=notifications" className="w-full text-center text-sm underline text-primary">Ver más</a>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -141,41 +141,41 @@ export function Header({ showSidebarTrigger = false }: HeaderProps) {
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-primary/10">
-                <Avatar className="h-10 w-10">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-secondary/10">
+                <Avatar className="h-10 w-10 ring-2 ring-secondary/20">
                   <AvatarImage src={profile?.avatar_url} alt="Usuario" />
-                  <AvatarFallback className="bg-gradient-primary text-primary-foreground">
+                  <AvatarFallback className="bg-secondary text-white font-semibold">
                     {profile ? getInitials(profile.first_name, profile.last_name) : 'U'}
                   </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 bg-gradient-card border-border/50" align="end" forceMount>
+            <DropdownMenuContent className="w-56 bg-white shadow-lg" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none text-foreground">
+                  <p className="text-sm font-medium leading-none text-primary">
                     {profile ? `${profile.first_name} ${profile.last_name}` : 'Usuario'}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground">
                     {profile?.email}
                   </p>
-                  <Badge variant="secondary" className="text-xs w-fit">{profile ? getRoleLabel(activeRole || profile.role) : 'Usuario'}</Badge>
+                  <Badge variant="secondary" className="text-xs w-fit bg-secondary text-white">{profile ? getRoleLabel(activeRole || profile.role) : 'Usuario'}</Badge>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-border/50" />
-              <DropdownMenuItem className="hover:bg-primary/10 cursor-pointer" asChild>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="hover:bg-secondary/10 cursor-pointer" asChild>
                 <a href="/profile" className="flex items-center w-full">
-                  <User className="mr-2 h-4 w-4" />
+                  <User className="mr-2 h-4 w-4 text-primary" />
                   <span>Perfil</span>
                 </a>
               </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-primary/10 cursor-pointer" asChild>
+              <DropdownMenuItem className="hover:bg-secondary/10 cursor-pointer" asChild>
                 <a href="/settings" className="flex items-center w-full">
-                  <Settings className="mr-2 h-4 w-4" />
+                  <Settings className="mr-2 h-4 w-4 text-primary" />
                   <span>Configuración</span>
                 </a>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border/50" />
+              <DropdownMenuSeparator />
               <DropdownMenuItem 
                 className="hover:bg-destructive/10 text-destructive cursor-pointer"
                 onClick={handleSignOut}

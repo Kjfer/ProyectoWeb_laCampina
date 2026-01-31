@@ -133,22 +133,6 @@ export const navigationItems: NavItem[] = [
     icon: ClipboardList,
     roles: ['teacher', 'student']
   },
-  
-  // Compañeros (solo estudiantes)
-  {
-    title: 'Compañeros',
-    url: '/classmates',
-    icon: Users,
-    roles: ['student']
-  },
-  
-  // Configuración (todos los roles)
-  {
-    title: 'Configuración',
-    url: '/settings',
-    icon: Settings,
-    roles: ['admin', 'teacher', 'student', 'tutor', 'directivo', 'parent']
-  },
 ];
 
 export const adminNavigationItems: NavItem[] = [

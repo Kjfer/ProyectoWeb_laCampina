@@ -36,18 +36,18 @@ export function AppSidebar() {
   );
 
   return (
-    <Sidebar className={`border-r border-border ${collapsed ? "w-16" : "w-64"}`}>
+    <Sidebar className={`border-r border-sidebar-border bg-sidebar ${collapsed ? "w-16" : "w-64"}`}>
       <SidebarContent className="p-4">
         {/* Logo/Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 px-3">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-secondary rounded-lg flex items-center justify-center shadow-md">
               <GraduationCap className="w-5 h-5 text-white" />
             </div>
             {!collapsed && (
               <div>
-                <h2 className="font-semibold text-foreground text-sm">Peri Institute</h2>
-                <p className="text-xs text-muted-foreground">Sistema Educativo</p>
+                <h2 className="font-semibold text-sidebar-foreground text-sm">Peri Institute</h2>
+                <p className="text-xs text-sidebar-foreground/70">Sistema Educativo</p>
               </div>
             )}
           </div>
@@ -55,7 +55,7 @@ export function AppSidebar() {
 
         {/* Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider mb-2">
             {!collapsed && (currentRole === 'admin' ? 'Navegación' : 'Principal')}
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -77,7 +77,7 @@ export function AppSidebar() {
         {/* Admin Panel - Only for admin users */}
         {currentRole === 'admin' && (
           <SidebarGroup className="mt-6">
-            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider mb-2">
               {!collapsed && (
                 <div className="flex items-center gap-2">
                   <Shield className="w-3 h-3" />
@@ -102,17 +102,19 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Settings */}
-        {!collapsed && (
-          <div className="mt-auto pt-6">
-            <SidebarMenuButton asChild isActive={isActive("/settings")}>
-              <Link to="/settings" className="flex items-center gap-3">
-                <Settings className="w-4 h-4" />
-                <span className="text-sm">Configuración</span>
-              </Link>
-            </SidebarMenuButton>
-          </div>
-        )}
+        {/* Settings - Available for all roles */}
+        <div className="mt-auto pt-6">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isActive("/settings")}>
+                <Link to="/settings" className="flex items-center gap-3">
+                  <Settings className="w-4 h-4" />
+                  {!collapsed && <span className="text-sm">Configuración</span>}
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </div>
       </SidebarContent>
     </Sidebar>
   );
