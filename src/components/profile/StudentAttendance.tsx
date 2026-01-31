@@ -41,6 +41,16 @@ export function StudentAttendance() {
         throw new Error('No se pudo obtener el perfil del usuario');
       }
 
+      console.log('Fetching attendance for student:', profile.id);
+      console.log('User ID:', profile.user_id);
+
+      // Primero verificar si hay registros totales
+      const { count: totalCount } = await supabase
+        .from('attendance')
+        .select('*', { count: 'exact', head: true });
+      
+      console.log('Total attendance records in database:', totalCount);
+
       // Obtener todos los registros de asistencia del estudiante actual
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
@@ -49,7 +59,9 @@ export function StudentAttendance() {
           date,
           status,
           notes,
-          modulo:modulos!attendance_modulo_id_fkey(
+          student_id,
+          modulo_id,
+          modulo:modulos(
             id,
             name,
             code
@@ -58,7 +70,17 @@ export function StudentAttendance() {
         .eq('student_id', profile.id)
         .order('date', { ascending: false });
 
-      if (attendanceError) throw attendanceError;
+      console.log('Attendance query result:', { 
+        studentId: profile.id,
+        recordsFound: attendanceData?.length || 0,
+        data: attendanceData, 
+        error: attendanceError 
+      });
+
+      if (attendanceError) {
+        console.error('Supabase error:', attendanceError);
+        throw attendanceError;
+      }
 
       // Transformar los datos para que coincidan con la interfaz esperada
       const transformedRecords = (attendanceData || []).map(record => ({

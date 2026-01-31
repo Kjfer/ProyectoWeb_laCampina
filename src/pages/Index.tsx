@@ -79,11 +79,91 @@ const Index = () => {
     }
   };
 
+  // --- FUNCIÓN PARA PROFESORES ---
+  const fetchTeacherStats = async () => {
+    try {
+      if (!profile?.id) return;
+
+      // Obtener módulos donde el profesor es principal o adicional
+      const { data: modulosData, error: modulosError } = await supabase
+        .from('modulos')
+        .select('id, name, code')
+        .or(`teacher_principal_id.eq.${profile.id},aditional_teachers.cs.{${profile.id}}`);
+
+      if (modulosError) {
+        console.error('Error obteniendo módulos del profesor:', modulosError);
+        setStats({
+          coursesCount: 0,
+          pendingAssignments: 0,
+          upcomingExams: 0,
+          attendanceRate: 0,
+        });
+        return;
+      }
+
+      const moduloIds = modulosData?.map(m => m.id) || [];
+      const coursesCount = moduloIds.length;
+
+      let pendingAssignments = 0;
+      let upcomingExams = 0;
+
+      if (moduloIds.length > 0) {
+        // Obtener tareas pendientes de revisar (con entregas sin calificar)
+        const { data: submissions } = await supabase
+          .from('assignment_submissions')
+          .select('id, assignment:assignments!inner(modulo_id)')
+          .in('assignment.modulo_id', moduloIds)
+          .is('grade', null)
+          .eq('status', 'submitted');
+
+        pendingAssignments = submissions?.length || 0;
+
+        // Obtener exámenes próximos
+        const { count: examsCount } = await supabase
+          .from('exams')
+          .select('*', { count: 'exact', head: true })
+          .in('modulo_id', moduloIds)
+          .eq('is_published', true)
+          .gt('start_time', new Date().toISOString());
+
+        upcomingExams = examsCount || 0;
+      }
+
+      setStats({
+        coursesCount,
+        pendingAssignments,
+        upcomingExams,
+        attendanceRate: 0, // No se usa para profesores
+      });
+
+      sessionStorage.setItem('dashboardStats', JSON.stringify({
+        coursesCount,
+        pendingAssignments,
+        upcomingExams,
+        attendanceRate: 0,
+      }));
+    } catch (error) {
+      console.error('Error fetching teacher stats:', error);
+      setStats({
+        coursesCount: 0,
+        pendingAssignments: 0,
+        upcomingExams: 0,
+        attendanceRate: 0,
+      });
+    }
+  };
+
   const fetchDashboardStats = async () => {
     try {
       setLoadingStats(true);
 
-      // Execute all queries in parallel for better performance
+      // Para profesores, obtener estadísticas diferentes
+      if (profile?.role === 'teacher') {
+        await fetchTeacherStats();
+        return;
+      }
+
+      // Execute all queries in parallel for better performance (ESTUDIANTES)
       const [
         { count: coursesCount },
         { data: enrollments },
@@ -248,30 +328,32 @@ const Index = () => {
             title="Mis Cursos"
             value={loadingStats ? "..." : stats.coursesCount.toString()}
             icon={BookOpen}
-            description="Cursos inscritos"
+            description={profile?.role === 'teacher' ? 'Módulos asignados' : 'Cursos inscritos'}
             color="primary"
           />
           <StatsCard
-            title="Tareas Pendientes"
+            title={profile?.role === 'teacher' ? 'Tareas por Revisar' : 'Tareas Pendientes'}
             value={loadingStats ? "..." : stats.pendingAssignments.toString()}
             icon={FileText}
-            description="Por entregar próximamente"
+            description={profile?.role === 'teacher' ? 'Entregas sin calificar' : 'Por entregar próximamente'}
             color="accent"
           />
           <StatsCard
             title="Exámenes Próximos"
             value={loadingStats ? "..." : stats.upcomingExams.toString()}
             icon={TrendingUp}
-            description="Próximos a rendir"
+            description={profile?.role === 'teacher' ? 'Próximos a tomar' : 'Próximos a rendir'}
             color="secondary"
           />
-          <StatsCard
-            title="Asistencia"
-            value={loadingStats ? "..." : `${stats.attendanceRate}%`}
-            icon={GraduationCap}
-            description="Tasa de asistencia"
-            color="primary"
-          />
+          {profile?.role !== 'teacher' && (
+            <StatsCard
+              title="Asistencia"
+              value={loadingStats ? "..." : `${stats.attendanceRate}%`}
+              icon={GraduationCap}
+              description="Tasa de asistencia"
+              color="primary"
+            />
+          )}
         </div>
 
         {/* Main Content Grid */}

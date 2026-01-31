@@ -44,6 +44,12 @@ export function StudentCourses() {
     try {
       setLoading(true);
 
+      // Para profesores, obtener módulos donde es profesor
+      if (profile?.role === 'teacher') {
+        await fetchTeacherCourses();
+        return;
+      }
+
       // Get total count first - usando course_enrollments (cada registro = un módulo)
       const { count: totalCount, error: countError } = await supabase
         .from('course_enrollments')
@@ -184,6 +190,94 @@ export function StudentCourses() {
     }
   };
 
+  const fetchTeacherCourses = async () => {
+    try {
+      if (!profile?.id) return;
+
+      // Obtener módulos donde el profesor es principal o adicional
+      const { data: modulosData, error: modulosError, count } = await supabase
+        .from('modulos')
+        .select('id, name, code, schedule, teacher_principal_id, course:courses(id, name)', { count: 'exact' })
+        .or(`teacher_principal_id.eq.${profile.id},aditional_teachers.cs.{${profile.id}}`)
+        .order('created_at', { ascending: false })
+        .range((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE - 1);
+
+      if (modulosError) throw modulosError;
+
+      setTotalCourses(count || 0);
+
+      if (!modulosData || modulosData.length === 0) {
+        setCourses([]);
+        setLoading(false);
+        return;
+      }
+
+      const moduloIds = modulosData.map(m => m.id);
+
+      // Obtener entregas pendientes de revisar
+      const { data: submissions } = await supabase
+        .from('assignment_submissions')
+        .select('id, assignment:assignments!inner(modulo_id)')
+        .in('assignment.modulo_id', moduloIds)
+        .is('grade', null)
+        .eq('status', 'submitted');
+
+      // Agrupar por módulo
+      const submissionsByModulo = new Map<string, number>();
+      submissions?.forEach((sub: any) => {
+        const moduloId = sub.assignment?.modulo_id;
+        if (moduloId) {
+          const current = submissionsByModulo.get(moduloId) || 0;
+          submissionsByModulo.set(moduloId, current + 1);
+        }
+      });
+
+      // Obtener exámenes próximos
+      const { data: allExams } = await supabase
+        .from('exams')
+        .select('id, modulo_id')
+        .in('modulo_id', moduloIds)
+        .eq('is_published', true)
+        .gt('start_time', new Date().toISOString());
+
+      const examsByModulo = new Map<string, number>();
+      allExams?.forEach(exam => {
+        const current = examsByModulo.get(exam.modulo_id) || 0;
+        examsByModulo.set(exam.modulo_id, current + 1);
+      });
+
+      // Mapear a cursos
+      const coursesWithData = modulosData.map((modulo: any) => {
+        let scheduleArray = [];
+        if (modulo.schedule && typeof modulo.schedule === 'object') {
+          scheduleArray = Object.entries(modulo.schedule).map(([day, time]) => {
+            const timeStr = String(time);
+            const [start_time, end_time] = timeStr.includes('-') 
+              ? timeStr.split('-').map(t => t.trim())
+              : [timeStr, ''];
+            return { day, start_time, end_time };
+          });
+        }
+
+        return {
+          id: modulo.id,
+          name: modulo.name,
+          code: modulo.code,
+          schedule: scheduleArray,
+          teacher: undefined, // El profesor es el usuario actual
+          pending_assignments: submissionsByModulo.get(modulo.id) || 0,
+          upcoming_exams: examsByModulo.get(modulo.id) || 0,
+        };
+      });
+
+      setCourses(coursesWithData as Course[]);
+    } catch (error) {
+      console.error('Error fetching teacher courses:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const totalPages = Math.ceil(totalCourses / ITEMS_PER_PAGE);
 
   // --- AQUÍ ESTÁ LA CORRECCIÓN CLAVE ---
@@ -261,13 +355,13 @@ export function StudentCourses() {
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
             <BookOpen className="w-5 h-5" />
-            Mis Cursos Activos
+            {profile?.role === 'teacher' ? 'Mis Módulos Asignados' : 'Mis Cursos Activos'}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
             <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p>No estás inscrito en ningún curso</p>
+            <p>{profile?.role === 'teacher' ? 'No tienes módulos asignados' : 'No estás inscrito en ningún curso'}</p>
           </div>
         </CardContent>
       </Card>
@@ -279,7 +373,7 @@ export function StudentCourses() {
       <CardHeader>
         <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
           <BookOpen className="w-5 h-5" />
-          Mis Cursos Activos
+          {profile?.role === 'teacher' ? 'Mis Módulos Asignados' : 'Mis Cursos Activos'}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -298,7 +392,7 @@ export function StudentCourses() {
                     </Badge>
                   </div>
                   
-                  {course.teacher && (
+                  {course.teacher && profile?.role !== 'teacher' && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
                       <User className="w-3 h-3" />
                       Prof. {course.teacher.first_name} {course.teacher.last_name}
@@ -313,7 +407,7 @@ export function StudentCourses() {
 
                 <Link to={`/courses/${course.id}`}>
                   <Button size="sm" variant="outline">
-                    Ver Curso
+                    Ver {profile?.role === 'teacher' ? 'Módulo' : 'Curso'}
                   </Button>
                 </Link>
               </div>
@@ -323,7 +417,8 @@ export function StudentCourses() {
                   {course.pending_assignments! > 0 && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <FileText className="w-3 h-3 text-accent" />
-                      <span className="font-medium text-accent">{course.pending_assignments}</span> tareas pendientes
+                      <span className="font-medium text-accent">{course.pending_assignments}</span> 
+                      {profile?.role === 'teacher' ? ' entregas por revisar' : ' tareas pendientes'}
                     </div>
                   )}
                   {course.upcoming_exams! > 0 && (
@@ -342,7 +437,7 @@ export function StudentCourses() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/30">
             <p className="text-sm text-muted-foreground">
-              Página {currentPage} de {totalPages} ({totalCourses} cursos total)
+              Página {currentPage} de {totalPages} ({totalCourses} {profile?.role === 'teacher' ? 'módulos' : 'cursos'} total)
             </p>
             <div className="flex gap-2">
               <Button

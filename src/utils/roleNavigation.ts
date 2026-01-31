@@ -74,12 +74,6 @@ export const navigationItems: NavItem[] = [
     icon: UserCog,
     roles: ['parent']
   },
-  {
-    title: 'Soporte',
-    url: '/parent/support',
-    icon: HelpCircle,
-    roles: ['parent']
-  },
   // Menú general para otros roles
   {
     title: 'Dashboard',
@@ -97,13 +91,7 @@ export const navigationItems: NavItem[] = [
     title: 'Mensajes',
     url: '/messages',
     icon: MessageSquare,
-    roles: ['admin', 'teacher', 'student', 'tutor', 'directivo']
-  },
-  {
-    title: 'Soporte',
-    url: '/support',
-    icon: HelpCircle,
-    roles: ['admin', 'teacher', 'student', 'tutor', 'directivo']
+    roles: ['admin', 'tutor', 'directivo']
   },
   
   // Dashboard Tutor
@@ -146,18 +134,6 @@ export const navigationItems: NavItem[] = [
     roles: ['teacher', 'student']
   },
   
-  // Calendario (duplicado eliminado)
-  
-  // Biblioteca
-  {
-    title: 'Biblioteca',
-    url: '/library',
-    icon: Library,
-    roles: ['admin', 'teacher', 'student']
-  },
-  
-  // Mensajes (duplicado eliminado)
-  
   // Compañeros (solo estudiantes)
   {
     title: 'Compañeros',
@@ -165,16 +141,6 @@ export const navigationItems: NavItem[] = [
     icon: Users,
     roles: ['student']
   },
-  
-  // Juegos Mentales
-  {
-    title: 'Juegos Mentales',
-    url: '/mental-games',
-    icon: Brain,
-    roles: ['student']
-  },
-  
-  // Soporte (duplicado eliminado)
 ];
 
 export const adminNavigationItems: NavItem[] = [
