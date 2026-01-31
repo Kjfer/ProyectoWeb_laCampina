@@ -205,12 +205,6 @@ export const adminNavigationItems: NavItem[] = [
     url: '/admin/certificates',
     icon: Award,
     roles: ['admin']
-  },
-  {
-    title: 'Configuración',
-    url: '/admin/settings',
-    icon: Settings,
-    roles: ['admin']
   }
 ];
 

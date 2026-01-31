@@ -16,10 +16,10 @@ interface AttendancePieChartProps {
 }
 
 const COLORS = {
-  present: 'hsl(var(--chart-1))',
-  late: 'hsl(var(--chart-2))',
-  absent: 'hsl(var(--chart-3))',
-  justified: 'hsl(var(--chart-4))',
+  present: '#10b981', // Verde vibrante
+  late: '#f59e0b',   // Naranja/Amarillo
+  absent: '#ef4444',  // Rojo
+  justified: '#3b82f6', // Azul
 };
 
 const STATUS_CONFIG = {
