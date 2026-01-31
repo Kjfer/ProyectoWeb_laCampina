@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { 
@@ -21,7 +22,7 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Download, FileSpreadsheet, Search } from 'lucide-react';
+import { Download, FileSpreadsheet, Search, ChevronsUpDown, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
@@ -71,6 +72,7 @@ const AdminAttendanceReport = () => {
   const { toast } = useToast();
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [selectedModulo, setSelectedModulo] = useState<string>('');
+  const [searchModulo, setSearchModulo] = useState<string>('');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [report, setReport] = useState<AttendanceReport | null>(null);
@@ -454,25 +456,93 @@ const AdminAttendanceReport = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Selector de Módulo */}
+              {/* Selector de Módulo con Búsqueda */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Módulo</label>
-                <Select 
-                  value={selectedModulo} 
-                  onValueChange={handleModuloChange}
-                  disabled={loadingModulos}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar módulo..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {modulos.map((modulo) => (
-                      <SelectItem key={modulo.id} value={modulo.id}>
-                        {modulo.code} - {modulo.name} ({modulo.course?.name || ''})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar módulo por código o nombre..."
+                      value={searchModulo}
+                      onChange={(e) => setSearchModulo(e.target.value)}
+                      disabled={loadingModulos}
+                      className="pl-9 pr-9"
+                    />
+                    {searchModulo && (
+                      <button
+                        onClick={() => {
+                          setSearchModulo('');
+                          setSelectedModulo('');
+                          setAvailableDates([]);
+                          setSelectedDate('');
+                          setReport(null);
+                        }}
+                        className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  {searchModulo && (
+                    <div className="absolute z-50 w-full mt-1 max-h-60 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+                      {modulos
+                        .filter(modulo => {
+                          const searchTerm = searchModulo.toLowerCase();
+                          return (
+                            modulo.name.toLowerCase().includes(searchTerm) ||
+                            modulo.code.toLowerCase().includes(searchTerm) ||
+                            modulo.course?.name.toLowerCase().includes(searchTerm)
+                          );
+                        })
+                        .slice(0, 20)
+                        .map((modulo) => (
+                          <div
+                            key={modulo.id}
+                            className={`relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground ${
+                              selectedModulo === modulo.id ? 'bg-accent' : ''
+                            }`}
+                            onClick={() => {
+                              setSelectedModulo(modulo.id);
+                              setSearchModulo(`${modulo.code} - ${modulo.name}`);
+                              handleModuloChange(modulo.id);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                selectedModulo === modulo.id ? 'opacity-100' : 'opacity-0'
+                              }`}
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium">{modulo.code} - {modulo.name}</div>
+                              {modulo.course?.name && (
+                                <div className="text-xs text-muted-foreground">
+                                  Edición: {modulo.course.name}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      {modulos.filter(modulo => {
+                        const searchTerm = searchModulo.toLowerCase();
+                        return (
+                          modulo.name.toLowerCase().includes(searchTerm) ||
+                          modulo.code.toLowerCase().includes(searchTerm) ||
+                          modulo.course?.name.toLowerCase().includes(searchTerm)
+                        );
+                      }).length === 0 && (
+                        <div className="py-6 text-center text-sm text-muted-foreground">
+                          No se encontraron módulos
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {selectedModulo && !searchModulo && (
+                  <p className="text-xs text-muted-foreground">
+                    Módulo seleccionado. Escribe para cambiar.
+                  </p>
+                )}
               </div>
 
               {/* Selector de Fecha de Clase */}

@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, Clock, XCircle, FileCheck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { CheckCircle, Clock, XCircle, FileCheck, Calendar, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -28,12 +31,69 @@ interface AttendanceRecordsProps {
 
 export function AttendanceRecords({ courseId }: AttendanceRecordsProps) {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [filteredRecords, setFilteredRecords] = useState<AttendanceRecord[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   useEffect(() => {
     fetchAttendance();
   }, [courseId]);
+
+  useEffect(() => {
+    applyDateFilter();
+  }, [records, startDate, endDate]);
+
+  const applyDateFilter = () => {
+    let filtered = [...records];
+
+    if (startDate) {
+      filtered = filtered.filter(record => new Date(record.date) >= new Date(startDate));
+    }
+
+    if (endDate) {
+      filtered = filtered.filter(record => new Date(record.date) <= new Date(endDate));
+    }
+
+    setFilteredRecords(filtered);
+
+    // Recalcular estadísticas con los datos filtrados
+    if (filtered.length > 0) {
+      const total = filtered.length;
+      const present = filtered.filter(r => r.status === 'present').length;
+      const late = filtered.filter(r => r.status === 'late').length;
+      const absent = filtered.filter(r => r.status === 'absent').length;
+      const justified = filtered.filter(r => r.status === 'justified').length;
+      const attendance_rate = ((present + late) / total * 100).toFixed(1);
+
+      setStats({
+        total,
+        present,
+        late,
+        absent,
+        justified,
+        attendance_rate,
+      });
+    } else if (records.length > 0) {
+      // Si no hay registros filtrados pero sí hay registros sin filtrar, mostrar estadísticas en 0
+      setStats({
+        total: 0,
+        present: 0,
+        late: 0,
+        absent: 0,
+        justified: 0,
+        attendance_rate: '0.0',
+      });
+    } else {
+      setStats(null);
+    }
+  };
+
+  const clearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+  };
 
   const fetchAttendance = async () => {
     try {
@@ -60,6 +120,7 @@ export function AttendanceRecords({ courseId }: AttendanceRecordsProps) {
       if (attendanceError) throw attendanceError;
 
       setRecords(attendanceData || []);
+      setFilteredRecords(attendanceData || []);
 
       // Calcular estadísticas
       if (attendanceData && attendanceData.length > 0) {
@@ -124,9 +185,59 @@ export function AttendanceRecords({ courseId }: AttendanceRecordsProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Filtro de Fechas */}
+          <div className="mb-6 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-2 mb-3">
+              <Calendar className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-semibold">Filtrar por Fecha</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start-date">Fecha Inicio</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="bg-background"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end-date">Fecha Fin</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="bg-background"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  onClick={clearFilters}
+                  disabled={!startDate && !endDate}
+                  className="w-full"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Limpiar Filtros
+                </Button>
+              </div>
+            </div>
+            {(startDate || endDate) && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Mostrando {filteredRecords.length} de {records.length} registros
+              </p>
+            )}
+          </div>
+
           {records.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No hay registros de asistencia aún
+            </div>
+          ) : filteredRecords.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No se encontraron registros en el rango de fechas seleccionado
             </div>
           ) : (
             <Table>
@@ -139,7 +250,7 @@ export function AttendanceRecords({ courseId }: AttendanceRecordsProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {records.map((record) => (
+                {filteredRecords.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell className="font-medium">
                       {format(new Date(record.date), 'PPP', { locale: es })}

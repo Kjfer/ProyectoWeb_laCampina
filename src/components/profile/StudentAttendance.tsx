@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useAuth } from '@/hooks/useAuth';
 import { AttendanceStats } from '../course/AttendanceStats';
 import { AttendancePieChart } from '../course/AttendancePieChart';
 
@@ -26,6 +27,7 @@ export function StudentAttendance() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { profile } = useAuth();
 
   useEffect(() => {
     fetchAttendance();
@@ -34,22 +36,68 @@ export function StudentAttendance() {
   const fetchAttendance = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('get-student-attendance');
 
-      if (error) throw error;
+      if (!profile?.id) {
+        throw new Error('No se pudo obtener el perfil del usuario');
+      }
 
-      setRecords(data.records || []);
-      // Convert attendance_rate to number if it's a string
-      const stats = data.stats ? {
-        ...data.stats,
-        attendance_rate: typeof data.stats.attendance_rate === 'string' 
-          ? parseFloat(data.stats.attendance_rate) 
-          : data.stats.attendance_rate
-      } : null;
-      setStats(stats);
-    } catch (error) {
+      // Obtener todos los registros de asistencia del estudiante actual
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from('attendance')
+        .select(`
+          id,
+          date,
+          status,
+          notes,
+          modulo:modulos!attendance_modulo_id_fkey(
+            id,
+            name,
+            code
+          )
+        `)
+        .eq('student_id', profile.id)
+        .order('date', { ascending: false });
+
+      if (attendanceError) throw attendanceError;
+
+      // Transformar los datos para que coincidan con la interfaz esperada
+      const transformedRecords = (attendanceData || []).map(record => ({
+        id: record.id,
+        date: record.date,
+        status: record.status,
+        notes: record.notes,
+        course: {
+          id: record.modulo?.id || '',
+          name: record.modulo?.name || 'Curso no disponible',
+          code: record.modulo?.code || '',
+        }
+      }));
+
+      setRecords(transformedRecords);
+
+      // Calcular estadísticas
+      if (transformedRecords.length > 0) {
+        const total = transformedRecords.length;
+        const present = transformedRecords.filter(r => r.status === 'present').length;
+        const late = transformedRecords.filter(r => r.status === 'late').length;
+        const absent = transformedRecords.filter(r => r.status === 'absent').length;
+        const justified = transformedRecords.filter(r => r.status === 'justified').length;
+        const attendance_rate = ((present + late) / total * 100).toFixed(1);
+
+        setStats({
+          total,
+          present,
+          late,
+          absent,
+          justified,
+          attendance_rate: parseFloat(attendance_rate),
+        });
+      } else {
+        setStats(null);
+      }
+    } catch (error: any) {
       console.error('Error fetching attendance:', error);
-      toast.error('Error al cargar tu asistencia');
+      toast.error(error.message || 'Error al cargar tu asistencia');
     } finally {
       setLoading(false);
     }

@@ -12,20 +12,28 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { User, Camera, Mail, Phone, Calendar, Shield, ClipboardCheck } from "lucide-react";
+import { User, Camera, Mail, Phone, Calendar, Shield, ClipboardCheck, FileText, MapPin, GraduationCap, Users } from "lucide-react";
 import { StudentAttendance } from "@/components/profile/StudentAttendance";
 import { Notifications } from "@/components/Notifications";
 import { UserRolesManager } from "@/components/profile/UserRolesManager";
 
+// Schema para campos editables del perfil
 const profileFormSchema = z.object({
   first_name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   last_name: z.string().min(2, "El apellido debe tener al menos 2 caracteres"),
+  paternal_surname: z.string().optional(),
+  maternal_surname: z.string().optional(),
   phone: z.string().optional(),
   avatar_url: z.string().optional(),
+  gender: z.string().optional(),
+  birth_date: z.string().optional(),
+  country: z.string().optional(),
+  education_level: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -40,8 +48,14 @@ export default function Profile() {
     defaultValues: {
       first_name: profile?.first_name || "",
       last_name: profile?.last_name || "",
+      paternal_surname: profile?.paternal_surname || "",
+      maternal_surname: profile?.maternal_surname || "",
       phone: profile?.phone || "",
       avatar_url: profile?.avatar_url || "",
+      gender: profile?.gender || "",
+      birth_date: profile?.birth_date || "",
+      country: profile?.country || "Perú",
+      education_level: profile?.education_level || "",
     },
   });
 
@@ -55,8 +69,15 @@ export default function Profile() {
         .update({
           first_name: data.first_name,
           last_name: data.last_name,
+          paternal_surname: data.paternal_surname,
+          maternal_surname: data.maternal_surname,
           phone: data.phone,
           avatar_url: data.avatar_url,
+          gender: data.gender,
+          birth_date: data.birth_date,
+          country: data.country,
+          education_level: data.education_level,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", profile.id);
 
@@ -66,6 +87,9 @@ export default function Profile() {
         title: "Perfil actualizado",
         description: "Tu información ha sido actualizada correctamente.",
       });
+
+      // Recargar la página para refrescar los datos
+      window.location.reload();
     } catch (error) {
       toast({
         title: "Error",
@@ -158,7 +182,7 @@ export default function Profile() {
             </div>
 
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="info">Información Personal</TabsTrigger>
                           {profile.role === 'student' ? (
                             <TabsTrigger value="attendance" className="flex items-center gap-2">
@@ -168,14 +192,13 @@ export default function Profile() {
                           ) : (
                             <TabsTrigger value="attendance" disabled className="opacity-50">Mi Asistencia</TabsTrigger>
                           )}
-                          <TabsTrigger value="roles">Roles</TabsTrigger>
                           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
               </TabsList>
 
               <TabsContent value="info">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Información del Perfil */}
-                  <div className="lg:col-span-1">
+                  <div className="lg:col-span-1 space-y-4">
                 <Card className="bg-gradient-card border-border/50 shadow-card">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -202,6 +225,51 @@ export default function Profile() {
                       </div>
                     )}
 
+                    {profile.gender && (
+                      <div className="flex items-center gap-3">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Género</p>
+                          <p className="font-medium">{profile.gender}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {profile.birth_date && (
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Fecha de Nacimiento</p>
+                          <p className="font-medium">
+                            {new Date(profile.birth_date).toLocaleDateString('es-ES', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {profile.country && (
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">País</p>
+                          <p className="font-medium">{profile.country}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <Separator />
+                    
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Estado de la cuenta</p>
+                      <Badge variant={profile.is_active ? "default" : "destructive"}>
+                        {profile.is_active ? "Activo" : "Inactivo"}
+                      </Badge>
+                    </div>
+
                     <div className="flex items-center gap-3">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <div>
@@ -215,15 +283,62 @@ export default function Profile() {
                         </p>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <Separator />
-                    
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Estado de la cuenta</p>
-                      <Badge variant={profile.is_active ? "default" : "destructive"}>
-                        {profile.is_active ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </div>
+                {/* Información Académica/Documentación */}
+                <Card className="bg-gradient-card border-border/50 shadow-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-primary" />
+                      Información Adicional
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {profile.document_type && profile.document_number && (
+                      <div className="flex items-center gap-3">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Documento de Identidad</p>
+                          <p className="font-medium">{profile.document_type}: {profile.document_number}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {profile.student_code && (
+                      <div className="flex items-center gap-3">
+                        <GraduationCap className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Código de Estudiante</p>
+                          <p className="font-medium">{profile.student_code}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {profile.education_level && (
+                      <div className="flex items-center gap-3">
+                        <GraduationCap className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Nivel Educativo</p>
+                          <p className="font-medium">{profile.education_level}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {(profile.paternal_surname || profile.maternal_surname) && (
+                      <>
+                        <Separator />
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">Apellidos Completos</p>
+                          {profile.paternal_surname && (
+                            <p className="font-medium">Paterno: {profile.paternal_surname}</p>
+                          )}
+                          {profile.maternal_surname && (
+                            <p className="font-medium">Materno: {profile.maternal_surname}</p>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -234,40 +349,236 @@ export default function Profile() {
                   <CardHeader>
                     <CardTitle>Editar Perfil</CardTitle>
                     <CardDescription>
-                      Actualiza tu información personal. Los cambios se guardarán automáticamente.
+                      Actualiza tu información personal. Los campos como email, código de estudiante y documento de identidad solo pueden ser modificados por un administrador.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        
+                        {/* Información Básica */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <User className="w-5 h-5 text-primary" />
+                            Información Básica
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="first_name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Nombre *</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Tu nombre" 
+                                      {...field}
+                                      className="bg-background/60 border-border/50 focus:border-primary"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="last_name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Apellido *</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Tu apellido" 
+                                      {...field}
+                                      className="bg-background/60 border-border/50 focus:border-primary"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="paternal_surname"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Apellido Paterno</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Apellido paterno" 
+                                      {...field}
+                                      className="bg-background/60 border-border/50 focus:border-primary"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="maternal_surname"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Apellido Materno</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Apellido materno" 
+                                      {...field}
+                                      className="bg-background/60 border-border/50 focus:border-primary"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Información Personal */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <Users className="w-5 h-5 text-primary" />
+                            Datos Personales
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="gender"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Género</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="bg-background/60 border-border/50 focus:border-primary">
+                                        <SelectValue placeholder="Selecciona tu género" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="Masculino">Masculino</SelectItem>
+                                      <SelectItem value="Femenino">Femenino</SelectItem>
+                                      <SelectItem value="Otro">Otro</SelectItem>
+                                      <SelectItem value="Prefiero no decir">Prefiero no decir</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="birth_date"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Fecha de Nacimiento</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      type="date"
+                                      {...field}
+                                      className="bg-background/60 border-border/50 focus:border-primary"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="country"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>País</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="País de residencia" 
+                                      {...field}
+                                      className="bg-background/60 border-border/50 focus:border-primary"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="phone"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Teléfono</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Tu número de teléfono" 
+                                      {...field}
+                                      className="bg-background/60 border-border/50 focus:border-primary"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Información Académica */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <GraduationCap className="w-5 h-5 text-primary" />
+                            Información Académica
+                          </h3>
                           <FormField
                             control={form.control}
-                            name="first_name"
+                            name="education_level"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Nombre</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    placeholder="Tu nombre" 
-                                    {...field}
-                                    className="bg-background/60 border-border/50 focus:border-primary"
-                                  />
-                                </FormControl>
+                                <FormLabel>Nivel Educativo</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="bg-background/60 border-border/50 focus:border-primary">
+                                      <SelectValue placeholder="Selecciona tu nivel educativo" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Primaria">Primaria</SelectItem>
+                                    <SelectItem value="Secundaria">Secundaria</SelectItem>
+                                    <SelectItem value="Técnico">Técnico</SelectItem>
+                                    <SelectItem value="Universitario">Universitario</SelectItem>
+                                    <SelectItem value="Postgrado">Postgrado</SelectItem>
+                                    <SelectItem value="Maestría">Maestría</SelectItem>
+                                    <SelectItem value="Doctorado">Doctorado</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
+                        </div>
 
+                        <Separator />
+
+                        {/* Avatar */}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <Camera className="w-5 h-5 text-primary" />
+                            Imagen de Perfil
+                          </h3>
                           <FormField
                             control={form.control}
-                            name="last_name"
+                            name="avatar_url"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Apellido</FormLabel>
+                                <FormLabel>URL del Avatar</FormLabel>
                                 <FormControl>
                                   <Input 
-                                    placeholder="Tu apellido" 
+                                    placeholder="https://ejemplo.com/mi-avatar.jpg" 
                                     {...field}
                                     className="bg-background/60 border-border/50 focus:border-primary"
                                   />
@@ -278,41 +589,30 @@ export default function Profile() {
                           />
                         </div>
 
-                        <FormField
-                          control={form.control}
-                          name="phone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Teléfono (Opcional)</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  placeholder="Tu número de teléfono" 
-                                  {...field}
-                                  className="bg-background/60 border-border/50 focus:border-primary"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="avatar_url"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>URL del Avatar (Opcional)</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  placeholder="https://ejemplo.com/mi-avatar.jpg" 
-                                  {...field}
-                                  className="bg-background/60 border-border/50 focus:border-primary"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        {/* Campos no editables - Solo información */}
+                        <div className="bg-muted/30 p-4 rounded-lg border border-border/50">
+                          <h4 className="text-sm font-semibold text-muted-foreground mb-2">
+                            Campos no editables (solo administradores)
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Email:</span>
+                              <span className="ml-2 font-medium">{profile.email}</span>
+                            </div>
+                            {profile.document_type && profile.document_number && (
+                              <div>
+                                <span className="text-muted-foreground">Documento:</span>
+                                <span className="ml-2 font-medium">{profile.document_type} {profile.document_number}</span>
+                              </div>
+                            )}
+                            {profile.student_code && (
+                              <div>
+                                <span className="text-muted-foreground">Código:</span>
+                                <span className="ml-2 font-medium">{profile.student_code}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
                         <Button 
                           type="submit" 
@@ -331,10 +631,6 @@ export default function Profile() {
 
                 <TabsContent value="attendance">
                   {profile.role === 'student' ? <StudentAttendance /> : <div className="p-4 text-muted-foreground">La sección de asistencia está disponible sólo para estudiantes.</div>}
-                </TabsContent>
-
-                <TabsContent value="roles">
-                  <UserRolesManager />
                 </TabsContent>
 
                 <TabsContent value="notifications">
