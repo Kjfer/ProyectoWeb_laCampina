@@ -9,6 +9,24 @@ import { useAuth } from "@/hooks/useAuth";
 import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 
+// Helper para parsear fechas sin conversión UTC
+const parseExamDate = (dateString: string): Date => {
+  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss"
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [_, year, month, day, hour, minute, second] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second)
+    );
+  }
+  return new Date(dateString);
+};
+
 interface Activity {
   id: string;
   title: string;
@@ -141,7 +159,7 @@ export function RecentActivity() {
         .limit(3);
 
       upcomingExams?.forEach((exam: any) => {
-        const examDate = new Date(exam.start_time);
+        const examDate = parseExamDate(exam.start_time);
         activities.push({
           id: `exam-${exam.id}`,
           title: `Examen próximo: ${exam.title}`,

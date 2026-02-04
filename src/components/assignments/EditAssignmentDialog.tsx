@@ -43,6 +43,7 @@ export function EditAssignmentDialog({ assignmentId, open, onOpenChange, onSucce
   const [uploading, setUploading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [moduloName, setModuloName] = useState<string>('');
   const [existingFiles, setExistingFiles] = useState<UploadedFile[]>([]);
   const [newFiles, setNewFiles] = useState<UploadedFile[]>([]);
   const [deletedFiles, setDeletedFiles] = useState<string[]>([]);
@@ -74,7 +75,7 @@ export function EditAssignmentDialog({ assignmentId, open, onOpenChange, onSucce
         .from('assignments')
         .select(`
           *,
-          course:courses (
+          modulo:modulos (
             id,
             name,
             code
@@ -87,13 +88,18 @@ export function EditAssignmentDialog({ assignmentId, open, onOpenChange, onSucce
 
       if (assignment) {
         setFormData({
-          course_id: assignment.course_id,
+          course_id: assignment.modulo_id,
           title: assignment.title,
           description: assignment.description || '',
           due_date: new Date(assignment.due_date),
           max_score: assignment.max_score,
           is_published: assignment.is_published
         });
+        
+        // Set modulo name for display
+        if (assignment.modulo) {
+          setModuloName(`${assignment.modulo.code} - ${assignment.modulo.name}`);
+        }
 
         const { data: resource } = await supabase
           .from('course_weekly_resources')
@@ -118,11 +124,11 @@ export function EditAssignmentDialog({ assignmentId, open, onOpenChange, onSucce
     if (!profile?.id) return;
 
     try {
+      // Fetch modulos where the teacher is assigned
       const { data, error } = await supabase
-        .from('courses')
+        .from('modulos')
         .select('id, name, code')
-        .eq('teacher_id', profile.id)
-        .eq('is_active', true)
+        .or(`teacher_principal_id.eq.${profile.id},aditional_teachers.cs.{${profile.id}}`)
         .order('name');
 
       if (error) throw error;
@@ -221,7 +227,6 @@ export function EditAssignmentDialog({ assignmentId, open, onOpenChange, onSucce
       const { error: assignmentError } = await supabase
         .from('assignments')
         .update({
-          course_id: formData.course_id,
           title: formData.title.trim(),
           description: formData.description.trim() || null,
           due_date: formData.due_date.toISOString(),
@@ -325,22 +330,13 @@ export function EditAssignmentDialog({ assignmentId, open, onOpenChange, onSucce
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="course_id">Curso</Label>
-              <Select
-                value={formData.course_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, course_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {courses.map((course) => (
-                    <SelectItem key={course.id} value={course.id}>
-                      {course.code} - {course.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="modulo">Módulo</Label>
+              <Input
+                id="modulo"
+                value={moduloName}
+                disabled
+                className="bg-muted"
+              />
             </div>
 
             <div className="space-y-2">

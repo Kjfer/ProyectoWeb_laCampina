@@ -9,6 +9,24 @@ import { Loader2, Calendar, Clock, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Helper para parsear fechas sin conversión UTC
+const parseExamDate = (dateString: string): Date => {
+  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss"
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [_, year, month, day, hour, minute, second] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second)
+    );
+  }
+  return new Date(dateString);
+};
+
 interface SubmitAssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -132,13 +150,13 @@ export const SubmitAssignmentDialog = ({
             <div className="flex items-center gap-1 text-muted-foreground">
               <Calendar className="w-4 h-4" />
               <span>
-                {format(new Date(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
+                {format(parseExamDate(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
               </span>
             </div>
             <div className="flex items-center gap-1 text-muted-foreground">
               <Clock className="w-4 h-4" />
               <span>
-                {format(new Date(assignment.due_date), "HH:mm")}
+                {format(parseExamDate(assignment.due_date), "HH:mm")}
               </span>
             </div>
             <div className="flex items-center gap-1 text-muted-foreground">

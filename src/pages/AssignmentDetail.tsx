@@ -37,6 +37,24 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+// Helper para parsear fechas sin conversión UTC
+const parseExamDate = (dateString: string): Date => {
+  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss"
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [_, year, month, day, hour, minute, second] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second)
+    );
+  }
+  return new Date(dateString);
+};
+
 interface Assignment {
   id: string;
   title: string;
@@ -476,7 +494,7 @@ const AssignmentDetail = () => {
     }
   };
 
-  const isOverdue = assignment ? isAfter(new Date(), new Date(assignment.due_date)) : false;
+  const isOverdue = assignment ? isAfter(new Date(), parseExamDate(assignment.due_date)) : false;
   const canSubmit = (!submission && !isOverdue) || (isEditingSubmission && !isOverdue);
   const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin';
   const canEditSubmission = submission && submission.score === null && !isOverdue;
@@ -582,7 +600,7 @@ const AssignmentDetail = () => {
                 <div>
                   <p className="text-xs text-muted-foreground">Fecha de entrega</p>
                   <p className="text-sm font-medium text-foreground">
-                    {format(new Date(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
+                    {format(parseExamDate(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
                   </p>
                 </div>
               </div>
@@ -592,7 +610,7 @@ const AssignmentDetail = () => {
                 <div>
                   <p className="text-xs text-muted-foreground">Hora límite</p>
                   <p className="text-sm font-medium text-foreground">
-                    {format(new Date(assignment.due_date), "HH:mm")}
+                    {format(parseExamDate(assignment.due_date), "HH:mm")}
                   </p>
                 </div>
               </div>

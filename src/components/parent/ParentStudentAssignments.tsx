@@ -7,6 +7,24 @@ import { Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Helper para parsear fechas sin conversión UTC
+const parseExamDate = (dateString: string): Date => {
+  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss"
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [_, year, month, day, hour, minute, second] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second)
+    );
+  }
+  return new Date(dateString);
+};
+
 interface Assignment {
   id: string;
   title: string;
@@ -48,7 +66,7 @@ export default function ParentStudentAssignments({ studentId }: ParentStudentAss
 
       const formattedAssignments: Assignment[] = data?.map(assignment => {
         const now = new Date();
-        const dueDate = new Date(assignment.due_date);
+        const dueDate = parseExamDate(assignment.due_date);
         
         return {
           id: assignment.id,
@@ -113,7 +131,7 @@ export default function ParentStudentAssignments({ studentId }: ParentStudentAss
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />
                   <span>
-                    Entrega: {format(new Date(assignment.due_date), 'dd/MM/yyyy', { locale: es })}
+                    Entrega: {format(parseExamDate(assignment.due_date), 'dd/MM/yyyy', { locale: es })}
                   </span>
                 </div>
               </div>

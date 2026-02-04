@@ -23,6 +23,23 @@ interface EditExamDialogProps {
   onEditSuccess: () => void;
 }
 
+// Función helper para parsear fecha de la BD sin conversión de timezone
+const parseExamDate = (dateString: string): Date => {
+  const match = dateString.match(/(\d{4})-(\d{2})-(\d{2})[\sT](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [, year, month, day, hours, minutes, seconds] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hours),
+      parseInt(minutes),
+      parseInt(seconds)
+    );
+  }
+  return new Date(dateString);
+};
+
 export const EditExamDialog = ({ 
   open, 
   onOpenChange, 
@@ -39,9 +56,12 @@ export const EditExamDialog = ({
 
   useEffect(() => {
     if (exam.start_time) {
-      const date = new Date(exam.start_time);
+      // Parsear la fecha sin conversión de timezone
+      const date = parseExamDate(exam.start_time);
       const dateStr = date.toISOString().split('T')[0];
-      const timeStr = date.toTimeString().split(' ')[0].substring(0, 5);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const timeStr = `${hours}:${minutes}`;
       setStartDate(dateStr);
       setStartTime(timeStr);
     }
@@ -71,20 +91,45 @@ export const EditExamDialog = ({
     setIsSubmitting(true);
 
     try {
-      const startTimeStr = `${startDate}T${startTime}:00`;
+      // Guardar la hora tal cual fue ingresada (sin conversión de timezone)
+      const formatDateForDB = (dateStr: string, timeStr: string) => {
+        const [year, month, day] = dateStr.split('-');
+        const [hours, minutes] = timeStr.split(':');
+        return `${year}-${month}-${day} ${hours}:${minutes}:00+00`;
+      };
+
+      const startTimeFormatted = formatDateForDB(startDate, startTime);
       
       const { error } = await supabase
         .from('exams')
         .update({
           title: title.trim(),
           description: description.trim() || null,
-          start_time: startTimeStr,
+          start_time: startTimeFormatted,
           duration_minutes: duration,
           is_published: isPublished,
         })
         .eq('id', exam.id);
 
       if (error) throw error;
+
+      // También actualizar el quiz asociado
+      const { error: quizError } = await supabase
+        .from('quizzes')
+        .update({
+          title: title.trim(),
+          description: description.trim() || null,
+          due_date: startTimeFormatted,
+          time_limit_minutes: duration,
+          is_published: isPublished,
+        })
+        .eq('modulo_id', exam.modulo_id)
+        .eq('title', exam.title);
+
+      if (quizError) {
+        console.error('Error updating quiz:', quizError);
+        // No lanzamos error para no bloquear, pero lo registramos
+      }
 
       toast.success('Examen actualizado correctamente');
       onEditSuccess();

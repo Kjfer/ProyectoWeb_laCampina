@@ -45,6 +45,24 @@ import { EditAssignmentDialog } from '@/components/assignments/EditAssignmentDia
 import { FileUpload } from '@/components/ui/file-upload';
 import PdfAnnotator from '@/components/assignments/PdfAnnotator';
 
+// Helper para parsear fechas sin conversión UTC
+const parseExamDate = (dateString: string): Date => {
+  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss"
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [_, year, month, day, hour, minute, second] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second)
+    );
+  }
+  return new Date(dateString);
+};
+
 const VALID_GRADES = ['AD', 'A', 'B', 'C'] as const;
 type Grade = typeof VALID_GRADES[number];
 
@@ -54,10 +72,11 @@ interface Assignment {
   description: string;
   due_date: string;
   max_score: number;
-  course: {
+  modulo_id: string;
+  modulo: {
     id: string;
     name: string;
-    code: string;
+    course_id: string;
   };
 }
 
@@ -105,6 +124,7 @@ const AssignmentReview = () => {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
 
@@ -126,12 +146,20 @@ const AssignmentReview = () => {
 
   useEffect(() => {
     if (profile?.role !== 'teacher' && profile?.role !== 'admin') {
-      navigate('/assignments');
+      navigate('/');
       return;
     }
     fetchAssignmentData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignmentId, profile]);
+
+  // Manejar navegación cuando hay error (fuera del render)
+  useEffect(() => {
+    if (hasError && !loading) {
+      const timer = setTimeout(() => navigate('/'), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [hasError, loading, navigate]);
 
   const fetchAssignmentData = async () => {
     if (!assignmentId) return;
@@ -143,12 +171,24 @@ const AssignmentReview = () => {
         .from('assignments')
         .select(`
           *,
-          course:courses (id, name, code)
+          modulo:modulos (id, name, course_id)
         `)
         .eq('id', assignmentId)
         .single();
 
-      if (assignmentError) throw assignmentError;
+      if (assignmentError) {
+        console.error('Error loading assignment:', assignmentError);
+        toast.error('No se pudo cargar la tarea. Verifica los permisos.');
+        setHasError(true);
+        return;
+      }
+      
+      if (!assignmentData) {
+        toast.error('Tarea no encontrada');
+        setHasError(true);
+        return;
+      }
+      
       setAssignment(assignmentData);
 
       const { data: submissionsData, error: submissionsError } = await supabase
@@ -166,6 +206,7 @@ const AssignmentReview = () => {
     } catch (error) {
       console.error('Error fetching assignment data:', error);
       toast.error('Error al cargar la información de la tarea');
+      setHasError(true);
     } finally {
       setLoading(false);
     }
@@ -321,7 +362,11 @@ const AssignmentReview = () => {
       const { error } = await supabase.from('assignments').delete().eq('id', assignmentId);
       if (error) throw error;
       toast.success('Tarea eliminada exitosamente');
-      navigate('/assignments');
+      if (assignment?.modulo_id) {
+        navigate(`/courses/${assignment.modulo_id}`);
+      } else {
+        navigate('/');
+      }
     } catch (error) {
       console.error('Error deleting assignment:', error);
       toast.error('Error al eliminar la tarea');
@@ -356,8 +401,15 @@ const AssignmentReview = () => {
           <Card>
             <CardContent className="p-8 text-center">
               <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Tarea no encontrada</h3>
-              <Button onClick={() => navigate('/assignments')}>Volver a Tareas</Button>
+              <h3 className="text-lg font-semibold mb-2">
+                {hasError ? 'Error al cargar la tarea' : 'Tarea no encontrada'}
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {hasError 
+                  ? 'No tienes permisos para ver esta tarea o ha ocurrido un error.' 
+                  : 'La tarea que buscas no existe.'}
+              </p>
+              <Button onClick={() => navigate('/')}>Volver al inicio</Button>
             </CardContent>
           </Card>
         </div>
@@ -380,8 +432,8 @@ const AssignmentReview = () => {
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-foreground">{assignment.title}</h1>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant="secondary">{assignment.course.code}</Badge>
-              <span className="text-sm text-muted-foreground">{assignment.course.name}</span>
+              <Badge variant="secondary">Módulo</Badge>
+              <span className="text-sm text-muted-foreground">{assignment.modulo.name}</span>
             </div>
           </div>
           <div className="flex gap-2">
@@ -405,7 +457,7 @@ const AssignmentReview = () => {
                 <div>
                   <p className="text-xs text-muted-foreground">Fecha de entrega</p>
                   <p className="text-sm font-medium">
-                    {format(new Date(assignment.due_date), "d 'de' MMMM, yyyy HH:mm", { locale: es })}
+                    {format(parseExamDate(assignment.due_date), "d 'de' MMMM, yyyy HH:mm", { locale: es })}
                   </p>
                 </div>
               </div>

@@ -20,20 +20,7 @@ interface CreateAssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-}
-
-interface Course {
-  id: string;
-  name: string;
-  code: string;
-}
-
-interface WeeklySection {
-  id: string;
-  week_number: number;
-  title: string;
-  start_date: string | null;
-  end_date: string | null;
+  moduleId: string; // ID del módulo donde se creará la tarea
 }
 
 interface UploadedFile {
@@ -43,117 +30,27 @@ interface UploadedFile {
   mime_type: string;
 }
 
-export function CreateAssignmentDialog({ open, onOpenChange, onSuccess }: CreateAssignmentDialogProps) {
+export function CreateAssignmentDialog({ open, onOpenChange, onSuccess, moduleId }: CreateAssignmentDialogProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loadingCourses, setLoadingCourses] = useState(true);
-  const [weeks, setWeeks] = useState<WeeklySection[]>([]);
-  const [loadingWeeks, setLoadingWeeks] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   
+  // Inicializar con fecha/hora actual
+  const initializeDateTime = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 0, 0);
+  };
+  
   const [formData, setFormData] = useState({
-    course_id: '',
-    week_id: '',
     title: '',
     description: '',
-    due_date: null as Date | null,
+    due_date: initializeDateTime(),
     max_score: 100,
     is_published: false
   });
 
-  useEffect(() => {
-    if (open && profile) {
-      fetchTeacherCourses();
-    }
-  }, [open, profile]);
-
-  useEffect(() => {
-    if (formData.course_id) {
-      fetchCourseWeeks(formData.course_id);
-    } else {
-      setWeeks([]);
-      setFormData(prev => ({ ...prev, week_id: '' }));
-    }
-  }, [formData.course_id]);
-
-  const fetchTeacherCourses = async () => {
-    if (!profile?.id) return;
-
-    try {
-      setLoadingCourses(true);
-      
-      // Fetch courses where the user is the teacher
-      const { data, error } = await supabase
-        .from('courses')
-        .select('id, name, code')
-        .eq('teacher_id', profile.id)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-
-      setCourses(data || []);
-      
-      // Auto-select if only one course
-      if (data && data.length === 1) {
-        setFormData(prev => ({ ...prev, course_id: data[0].id }));
-      }
-    } catch (error) {
-      console.error('Error fetching courses:', error);
-      toast.error('Error al cargar los cursos');
-    } finally {
-      setLoadingCourses(false);
-    }
-  };
-
-  const fetchCourseWeeks = async (courseId: string) => {
-    try {
-      setLoadingWeeks(true);
-      
-      const { data, error } = await supabase
-        .from('course_weekly_sections')
-        .select('id, week_number, title, start_date, end_date')
-        .eq('course_id', courseId)
-        .order('week_number');
-
-      if (error) throw error;
-
-      setWeeks(data || []);
-      
-      // Auto-select first week if available
-      if (data && data.length > 0) {
-        setFormData(prev => ({ ...prev, week_id: data[0].id }));
-      }
-    } catch (error) {
-      console.error('Error fetching weeks:', error);
-      toast.error('Error al cargar las semanas del curso');
-    } finally {
-      setLoadingWeeks(false);
-    }
-  };
-
-  const getSelectedWeek = (): WeeklySection | null => {
-    return weeks.find(w => w.id === formData.week_id) || null;
-  };
-
-  const isDateWithinWeek = (date: Date | null): boolean => {
-    if (!date) return true;
-    
-    const selectedWeek = getSelectedWeek();
-    if (!selectedWeek) return true;
-    
-    if (selectedWeek.start_date && selectedWeek.end_date) {
-      const weekStart = new Date(selectedWeek.start_date);
-      const weekEnd = new Date(selectedWeek.end_date);
-      weekEnd.setHours(23, 59, 59, 999); // Incluir todo el último día
-      
-      return date >= weekStart && date <= weekEnd;
-    }
-    
-    return true;
-  };
+  // No se necesitan useEffects ni funciones de carga de cursos/semanas
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -199,44 +96,44 @@ export function CreateAssignmentDialog({ open, onOpenChange, onSuccess }: Create
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.course_id) {
-      toast.error('Debes seleccionar un curso');
-      return;
-    }
-
     if (!formData.title.trim()) {
       toast.error('El título es requerido');
-      return;
-    }
-
-    if (!isDateWithinWeek(formData.due_date)) {
-      const selectedWeek = getSelectedWeek();
-      if (selectedWeek?.start_date && selectedWeek?.end_date) {
-        toast.error(
-          `La fecha límite debe estar entre ${format(new Date(selectedWeek.start_date), "d 'de' MMMM", { locale: es })} y ${format(new Date(selectedWeek.end_date), "d 'de' MMMM", { locale: es })}`
-        );
-      } else {
-        toast.error('La fecha límite no está dentro del rango de la semana seleccionada');
-      }
-      return;
-    }
-
-    if (!formData.due_date) {
-      toast.error('Debes seleccionar una fecha límite');
       return;
     }
 
     try {
       setLoading(true);
 
+      // Obtener información del módulo para el course_id (retrocompatibilidad)
+      const { data: moduloData, error: moduloError } = await supabase
+        .from('modulos')
+        .select('course_id')
+        .eq('id', moduleId)
+        .single();
+
+      if (moduloError) throw moduloError;
+
+      // Guardar la hora tal cual fue ingresada (sin conversión de timezone)
+      const formatDateForDB = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}+00`;
+      };
+
       // Create the assignment
       const { data: assignmentData, error: assignmentError } = await supabase
         .from('assignments')
         .insert({
-          course_id: formData.course_id,
+          modulo_id: moduleId,
+          course_id: moduloData.course_id,
           title: formData.title.trim(),
           description: formData.description.trim() || null,
-          due_date: formData.due_date.toISOString(),
+          due_date: formatDateForDB(formData.due_date),
           max_score: formData.max_score,
           is_published: formData.is_published
         })
@@ -245,32 +142,13 @@ export function CreateAssignmentDialog({ open, onOpenChange, onSuccess }: Create
 
       if (assignmentError) throw assignmentError;
 
-      // Create a course_weekly_resource entry linked to the selected week
-      if (assignmentData) {
-        await supabase
-          .from('course_weekly_resources')
-          .insert({
-            section_id: formData.week_id,
-            title: formData.title.trim(),
-            description: formData.description.trim() || null,
-            resource_type: 'assignment',
-            assignment_id: assignmentData.id,
-            assignment_deadline: formData.due_date.toISOString(),
-            is_published: formData.is_published,
-            position: 0,
-            teacher_files: uploadedFiles
-          });
-      }
-
       toast.success('Tarea creada exitosamente');
       
       // Reset form
       setFormData({
-        course_id: '',
-        week_id: '',
         title: '',
         description: '',
-        due_date: null,
+        due_date: initializeDateTime(),
         max_score: 100,
         is_published: false
       });
@@ -305,80 +183,6 @@ export function CreateAssignmentDialog({ open, onOpenChange, onSuccess }: Create
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Course Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="course_id" className="required">Curso</Label>
-            {loadingCourses ? (
-              <div className="h-10 bg-muted rounded animate-pulse" />
-            ) : courses.length === 0 ? (
-              <div className="p-4 bg-muted rounded text-sm text-muted-foreground">
-                No tienes cursos asignados. Contacta al administrador.
-              </div>
-            ) : (
-              <Select
-                value={formData.course_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, course_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un curso" />
-                </SelectTrigger>
-                <SelectContent>
-                  {courses.map((course) => (
-                    <SelectItem key={course.id} value={course.id}>
-                      {course.code} - {course.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          {/* Week Selection */}
-          {formData.course_id && (
-            <div className="space-y-2">
-              <Label htmlFor="week_id" className="required">Semana del Curso</Label>
-              {loadingWeeks ? (
-                <div className="h-10 bg-muted rounded animate-pulse" />
-              ) : weeks.length === 0 ? (
-                <div className="p-4 bg-muted rounded text-sm text-muted-foreground">
-                  Este curso no tiene semanas configuradas. Contacta al administrador.
-                </div>
-              ) : (
-                <>
-                  <Select
-                    value={formData.week_id}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, week_id: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona una semana" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {weeks.map((week) => (
-                        <SelectItem key={week.id} value={week.id}>
-                          Semana {week.week_number}: {week.title}
-                          {week.start_date && week.end_date && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              ({format(new Date(week.start_date), "d MMM", { locale: es })} - {format(new Date(week.end_date), "d MMM", { locale: es })})
-                            </span>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.week_id && getSelectedWeek()?.start_date && getSelectedWeek()?.end_date && (
-                    <p className="text-xs text-muted-foreground">
-                      📅 Esta semana va desde el <strong>{format(new Date(getSelectedWeek()!.start_date!), "d 'de' MMMM", { locale: es })}</strong> hasta el <strong>{format(new Date(getSelectedWeek()!.end_date!), "d 'de' MMMM", { locale: es })}</strong>
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* </Select>
-            )}
-          </div>
-
           {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="title" className="required">Título de la Tarea</Label>
@@ -403,120 +207,139 @@ export function CreateAssignmentDialog({ open, onOpenChange, onSuccess }: Create
             />
           </div>
 
-          {/* Due Date and Max Score */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="required">Fecha y Hora Límite</Label>
-              <p className="text-xs text-muted-foreground mb-2">
-                {formData.week_id && getSelectedWeek()?.start_date && getSelectedWeek()?.end_date
-                  ? `Debe estar entre el ${format(new Date(getSelectedWeek()!.start_date!), "d/MM", { locale: es })} y ${format(new Date(getSelectedWeek()!.end_date!), "d/MM/yyyy", { locale: es })}`
-                  : 'Los estudiantes no podrán entregar después de esta fecha'
-                }
-              </p>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={`w-full justify-start text-left font-normal h-auto py-3 ${
-                      !formData.due_date && 'text-muted-foreground'
-                    } ${formData.due_date && !isDateWithinWeek(formData.due_date) && 'border-destructive'}`}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                    <div className="flex flex-col items-start">
-                      {formData.due_date ? (
-                        <>
-                          <span className="font-semibold">
-                            {format(formData.due_date, "EEEE, d 'de' MMMM", { locale: es })}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {format(formData.due_date, "yyyy 'a las' HH:mm", { locale: es })}
-                          </span>
-                        </>
-                      ) : (
-                        <span>Selecciona fecha y hora</span>
-                      )}
-                    </div>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <div className="p-3 border-b bg-muted/50">
-                    <p className="text-sm font-medium">Selecciona la fecha límite</p>
-                  </div>
-                  <Calendar
-                    mode="single"
-                    selected={formData.due_date || undefined}
-                    defaultMonth={formData.week_id && getSelectedWeek()?.start_date 
-                      ? new Date(getSelectedWeek()!.start_date!) 
-                      : undefined}
-                    onSelect={(date) => {
-                      if (date) {
-                        const newDate = formData.due_date ? new Date(formData.due_date) : new Date();
-                        newDate.setFullYear(date.getFullYear());
-                        newDate.setMonth(date.getMonth());
-                        newDate.setDate(date.getDate());
-                        if (!formData.due_date) {
-                          newDate.setHours(23, 59, 0, 0);
+          {/* Due Date and Time */}
+          <div className="space-y-2">
+            <Label className="required">Fecha y Hora Límite</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Fecha</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(formData.due_date, 'PPP', { locale: es })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.due_date}
+                      onSelect={(date) => {
+                        if (date) {
+                          const hours = formData.due_date.getHours();
+                          const minutes = formData.due_date.getMinutes();
+                          const newDate = new Date(
+                            date.getFullYear(),
+                            date.getMonth(),
+                            date.getDate(),
+                            hours,
+                            minutes,
+                            0,
+                            0
+                          );
+                          setFormData(prev => ({ ...prev, due_date: newDate }));
                         }
-                        setFormData(prev => ({ ...prev, due_date: newDate }));
-                      }
-                    }}
-                    disabled={(date) => {
-                      // Si hay una semana seleccionada, solo permitir fechas dentro del rango de la semana
-                      const selectedWeek = getSelectedWeek();
-                      if (selectedWeek?.start_date && selectedWeek?.end_date) {
-                        const weekStart = new Date(selectedWeek.start_date);
-                        weekStart.setHours(0, 0, 0, 0);
-                        const weekEnd = new Date(selectedWeek.end_date);
-                        weekEnd.setHours(23, 59, 59, 999);
-                        
-                        return date < weekStart || date > weekEnd;
-                      }
-                      
-                      // Si no hay semana seleccionada, no permitir fechas pasadas
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      return date < today;
-                    }}
-                    initialFocus
-                  />
-                  <div className="p-3 border-t bg-muted/50">
-                    <Label className="text-sm font-medium mb-2 block">Hora límite</Label>
-                    <div className="flex gap-2 items-center">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <Input
-                        type="time"
-                        className="flex-1"
-                        value={formData.due_date ? format(formData.due_date, 'HH:mm') : '23:59'}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            const [hours, minutes] = e.target.value.split(':');
-                            const newDate = formData.due_date ? new Date(formData.due_date) : new Date();
-                            newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-                            setFormData(prev => ({ ...prev, due_date: newDate }));
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+                      }}
+                      disabled={(date) => {
+                        const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                        const todayOnly = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+                        return dateOnly < todayOnly;
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="max_score">Puntuación Máxima</Label>
-              <Input
-                id="max_score"
-                type="number"
-                min="1"
-                max="1000"
-                value={formData.max_score}
-                onChange={(e) => setFormData(prev => ({ ...prev, max_score: parseInt(e.target.value) || 100 }))}
-              />
-              <p className="text-xs text-muted-foreground">
-                Esta puntuación es referencial. La calificación final será en escala literal (AD, A, B, C).
-              </p>
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Hora</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Label className="text-xs">Horas (0-23)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="23"
+                      value={formData.due_date.getHours()}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') return;
+                        const hours = parseInt(value);
+                        if (!isNaN(hours) && hours >= 0 && hours <= 23) {
+                          const current = formData.due_date;
+                          const newDate = new Date(
+                            current.getFullYear(),
+                            current.getMonth(),
+                            current.getDate(),
+                            hours,
+                            current.getMinutes(),
+                            0,
+                            0
+                          );
+                          setFormData(prev => ({ ...prev, due_date: newDate }));
+                        }
+                      }}
+                      placeholder="23"
+                    />
+                  </div>
+                  <div className="flex items-end justify-center pb-2">
+                    <span className="text-2xl font-bold">:</span>
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-xs">Minutos (0-59)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="59"
+                      step="5"
+                      value={formData.due_date.getMinutes().toString().padStart(2, '0')}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') return;
+                        const minutes = parseInt(value);
+                        if (!isNaN(minutes) && minutes >= 0 && minutes <= 59) {
+                          const current = formData.due_date;
+                          const newDate = new Date(
+                            current.getFullYear(),
+                            current.getMonth(),
+                            current.getDate(),
+                            current.getHours(),
+                            minutes,
+                            0,
+                            0
+                          );
+                          setFormData(prev => ({ ...prev, due_date: newDate }));
+                        }
+                      }}
+                      placeholder="59"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
+            <div className="text-sm text-muted-foreground bg-muted p-2 rounded-md">
+              <strong>Fecha límite:</strong> {format(formData.due_date, "EEEE, d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}
+            </div>
+          </div>
+
+          {/* Max Score */}
+          <div className="space-y-2">
+            <Label htmlFor="max_score">Puntuación Máxima</Label>
+            <Input
+              id="max_score"
+              type="number"
+              min="1"
+              max="1000"
+              value={formData.max_score}
+              onChange={(e) => setFormData(prev => ({ ...prev, max_score: parseInt(e.target.value) || 100 }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Esta puntuación es referencial. La calificación final será en escala literal (AD, A, B, C).
+            </p>
           </div>
 
           {/* File Upload */}
@@ -597,7 +420,7 @@ export function CreateAssignmentDialog({ open, onOpenChange, onSuccess }: Create
             </Button>
             <Button
               type="submit"
-              disabled={loading || uploading || courses.length === 0 || !formData.week_id}
+              disabled={loading || uploading}
               className="bg-gradient-primary shadow-glow"
             >
               {loading ? 'Creando...' : 'Crear Tarea'}

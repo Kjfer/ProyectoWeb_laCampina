@@ -87,7 +87,7 @@ const App = () => (
             <Route path="/parent/notifications" element={<ProtectedRoute><ParentNotifications /></ProtectedRoute>} />
             <Route path="/parent/profile" element={<ProtectedRoute><ParentProfile /></ProtectedRoute>} />
             <Route path="/parent/documents" element={<ProtectedRoute><ParentDocuments /></ProtectedRoute>} />
-            <Route path="/courses/:courseId/create-exam" element={
+            <Route path="/modulos/:moduloId/create-exam" element={
               <ProtectedRoute>
                 <CreateExam />
               </ProtectedRoute>

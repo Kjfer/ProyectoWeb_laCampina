@@ -15,18 +15,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CreateAssignmentDialog } from '@/components/assignments/CreateAssignmentDialog';
 import { EditAssignmentDialog } from '@/components/assignments/EditAssignmentDialog';
 
+// Helper para parsear fechas sin conversión UTC
+const parseExamDate = (dateString: string): Date => {
+  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss"
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [_, year, month, day, hour, minute, second] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second)
+    );
+  }
+  return new Date(dateString);
+};
+
 interface Assignment {
   id: string;
   title: string;
   description: string;
   due_date: string;
   max_score: number;
-  course_id: string;
+  modulo_id: string;
   source: 'assignment' | 'weekly_resource';
-  course: {
+  modulo: {
     id: string;
     name: string;
-    code: string;
+    course_id: string;
   };
   submissions?: {
     id: string;
@@ -63,10 +81,10 @@ const Assignments = () => {
           .from('assignments')
           .select(`
             *,
-            course:courses!inner (
+            modulo:modulos!inner (
               id,
               name,
-              code
+              course_id
             ),
             submissions:assignment_submissions (
               id,
@@ -75,7 +93,7 @@ const Assignments = () => {
               student_id
             )
           `)
-          .eq('is_published', true)
+          // Teachers see ALL assignments (published and unpublished)
           .order('due_date', { ascending: true });
 
         assignmentsData = data;
@@ -86,10 +104,10 @@ const Assignments = () => {
           .from('assignments')
           .select(`
             *,
-            course:courses (
+            modulo:modulos (
               id,
               name,
-              code
+              course_id
             ),
             submissions:assignment_submissions (
               id,
@@ -113,11 +131,11 @@ const Assignments = () => {
         description: assignment.description || '',
         due_date: assignment.due_date,
         max_score: assignment.max_score,
-        course_id: assignment.course_id,
+        modulo_id: assignment.modulo_id,
         source: 'assignment' as const,
-        course: assignment.course,
+        modulo: assignment.modulo,
         submissions: assignment.submissions
-      })).sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+      })).sort((a, b) => parseExamDate(a.due_date).getTime() - parseExamDate(b.due_date).getTime());
 
       setAssignments(formattedAssignments);
     } catch (error) {
@@ -134,7 +152,7 @@ const Assignments = () => {
 
   const getAssignmentStatus = (assignment: Assignment) => {
     const now = new Date();
-    const dueDate = new Date(assignment.due_date);
+    const dueDate = parseExamDate(assignment.due_date);
     const hasSubmission = assignment.submissions && assignment.submissions.length > 0;
 
     if (hasSubmission) {
@@ -175,17 +193,17 @@ const Assignments = () => {
   };
 
   // Get unique courses for filter
-  const uniqueCourses = Array.from(new Set(assignments.map(a => a.course_id)))
-    .map(courseId => assignments.find(a => a.course_id === courseId)?.course)
+  const uniqueCourses = Array.from(new Set(assignments.map(a => a.modulo_id)))
+    .map(moduloId => assignments.find(a => a.modulo_id === moduloId)?.modulo)
     .filter(Boolean);
 
   // Apply filters
   const filteredAssignments = assignments.filter(assignment => {
     const matchesSearch = assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          assignment.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         assignment.course.name.toLowerCase().includes(searchTerm.toLowerCase());
+                         assignment.modulo.name.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesCourse = courseFilter === 'all' || assignment.course_id === courseFilter;
+    const matchesCourse = courseFilter === 'all' || assignment.modulo_id === courseFilter;
     
     const status = getAssignmentStatus(assignment).status;
     const matchesStatus = statusFilter === 'all' || status === statusFilter;
@@ -261,13 +279,13 @@ const Assignments = () => {
           
           <Select value={courseFilter} onValueChange={setCourseFilter}>
             <SelectTrigger>
-              <SelectValue placeholder="Todos los cursos" />
+              <SelectValue placeholder="Todos los módulos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los cursos</SelectItem>
-              {uniqueCourses.map(course => (
-                <SelectItem key={course!.id} value={course!.id}>
-                  {course!.code} - {course!.name}
+              <SelectItem value="all">Todos los módulos</SelectItem>
+              {uniqueCourses.map(modulo => (
+                <SelectItem key={modulo!.id} value={modulo!.id}>
+                  {modulo!.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -334,9 +352,9 @@ const Assignments = () => {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Badge variant="secondary" className="text-xs">
-                            {assignment.course.code}
+                            Módulo
                           </Badge>
-                          <span>{assignment.course.name}</span>
+                          <span>{assignment.modulo.name}</span>
                         </div>
                       </div>
                       <FileText className="w-6 h-6 text-primary" />
@@ -352,13 +370,13 @@ const Assignments = () => {
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           <span>
-                            {format(new Date(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
+                            {format(parseExamDate(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
                           <span>
-                            {format(new Date(assignment.due_date), "HH:mm")}
+                            {format(parseExamDate(assignment.due_date), "HH:mm")}
                           </span>
                         </div>
                       </div>
@@ -383,8 +401,8 @@ const Assignments = () => {
                         variant="outline"
                         asChild
                       >
-                        <Link to={`/courses/${assignment.course_id}`}>
-                          Ver Curso
+                        <Link to={`/courses/${assignment.modulo_id}`}>
+                          Ver Módulo
                         </Link>
                       </Button>
                       

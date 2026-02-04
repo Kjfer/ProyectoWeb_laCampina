@@ -12,6 +12,7 @@ import { Plus, Trash2, CalendarIcon, ArrowLeft } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,14 +25,22 @@ interface Question {
 }
 
 export default function CreateExam() {
-  const { courseId } = useParams();
+  const { moduloId } = useParams();
   const navigate = useNavigate();
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
+  
+  // Inicializar con fecha/hora actual en zona horaria local
+  const initializeDateTime = () => {
+    const now = new Date();
+    // Crear fecha sin conversión de zona horaria
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0, 0, 0);
+  };
+  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    start_time: null as Date | null,
+    start_time: initializeDateTime(),
     duration_minutes: 60,
     is_published: false
   });
@@ -68,7 +77,7 @@ export default function CreateExam() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!profile?.id || !courseId) {
+    if (!profile?.id || !moduloId) {
       toast.error('No se pudo obtener la información necesaria');
       return;
     }
@@ -83,22 +92,80 @@ export default function CreateExam() {
       return;
     }
 
+    // Validar que la fecha/hora sea futura
+    if (formData.start_time <= new Date()) {
+      toast.error('La fecha y hora del examen debe ser futura');
+      return;
+    }
+
     if (questions.length === 0) {
       toast.error('Debes agregar al menos una pregunta');
       return;
     }
 
+    // Validar que todas las preguntas estén completas
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      
+      if (!q.question_text.trim()) {
+        toast.error(`La pregunta ${i + 1} debe tener texto`);
+        return;
+      }
+
+      if (q.question_type === 'multiple_choice') {
+        if (!q.options || q.options.some(opt => !opt.trim())) {
+          toast.error(`La pregunta ${i + 1} debe tener todas las opciones completadas`);
+          return;
+        }
+        if (!q.correct_answer) {
+          toast.error(`La pregunta ${i + 1} debe tener una respuesta correcta seleccionada`);
+          return;
+        }
+      }
+
+      if (q.question_type === 'true_false' && !q.correct_answer) {
+        toast.error(`La pregunta ${i + 1} debe tener una respuesta correcta (Verdadero/Falso)`);
+        return;
+      }
+    }
+
     try {
       setLoading(true);
+
+      // Primero, obtener información del módulo para el course_id (para tablas relacionadas)
+      const { data: moduloData, error: moduloError } = await supabase
+        .from('modulos')
+        .select('course_id')
+        .eq('id', moduloId)
+        .single();
+
+      if (moduloError) throw moduloError;
+
+      // Guardar la hora tal cual fue ingresada (sin conversión de timezone)
+      // Extraemos los componentes y formateamos como UTC
+      const formatDateForDB = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        // Formato: YYYY-MM-DD HH:MM:SS (PostgreSQL lo interpretará como UTC)
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}+00`;
+      };
+
+      const startTimeFormatted = formatDateForDB(formData.start_time);
 
       // Create the exam
       const { data: examData, error: examError } = await supabase
         .from('exams')
         .insert({
-          course_id: courseId,
+          modulo_id: moduloId,
+          course_id: moduloData.course_id, // Mantener para retrocompatibilidad
           title: formData.title.trim(),
           description: formData.description.trim() || null,
-          start_time: formData.start_time.toISOString(),
+          start_time: startTimeFormatted,
           duration_minutes: formData.duration_minutes,
           is_published: formData.is_published
         })
@@ -111,14 +178,14 @@ export default function CreateExam() {
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
         .insert({
-          course_id: courseId,
+          modulo_id: moduloId,
+          course_id: moduloData.course_id,
           title: formData.title.trim(),
           description: formData.description.trim() || null,
           time_limit_minutes: formData.duration_minutes,
           max_attempts: 1,
-          exam_id: examData.id,
           is_published: formData.is_published,
-          due_date: formData.start_time.toISOString()
+          due_date: startTimeFormatted
         })
         .select()
         .single();
@@ -144,16 +211,17 @@ export default function CreateExam() {
       // Create course event for the exam
       const endTime = new Date(formData.start_time);
       endTime.setMinutes(endTime.getMinutes() + formData.duration_minutes);
+      const endTimeFormatted = formatDateForDB(endTime);
 
       const { error: eventError } = await supabase
         .from('course_events')
         .insert({
-          course_id: courseId,
+          course_id: moduloData.course_id,
           title: `Examen: ${formData.title}`,
           description: formData.description || `Examen de ${formData.duration_minutes} minutos`,
           event_type: 'exam',
-          start_date: formData.start_time.toISOString(),
-          end_date: endTime.toISOString(),
+          start_date: startTimeFormatted,
+          end_date: endTimeFormatted,
           is_published: formData.is_published,
           created_by: profile?.id
         });
@@ -164,7 +232,7 @@ export default function CreateExam() {
       }
 
       toast.success('Examen creado exitosamente');
-      navigate(`/courses/${courseId}`);
+      navigate(`/courses/${moduloId}`);
     } catch (error) {
       console.error('Error creating exam:', error);
       toast.error('Error al crear el examen');
@@ -180,7 +248,7 @@ export default function CreateExam() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate(`/courses/${courseId}`)}
+            onClick={() => navigate(-1)}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -233,48 +301,161 @@ export default function CreateExam() {
 
               <div className="space-y-2">
                 <Label>Fecha y Hora del Examen *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.start_time ? format(formData.start_time, 'PPP p') : <span>Seleccionar fecha y hora</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.start_time || undefined}
-                      onSelect={(date) => {
-                        if (date) {
-                          const newDate = formData.start_time ? new Date(formData.start_time) : new Date();
-                          date.setHours(newDate.getHours(), newDate.getMinutes());
-                          setFormData(prev => ({ ...prev, start_time: date }));
-                        }
-                      }}
-                      initialFocus
-                    />
-                    <div className="p-3 border-t">
-                      <Label className="text-xs">Hora</Label>
-                      <div className="flex gap-2 mt-1">
-                        <Input
-                          type="time"
-                          value={formData.start_time ? format(formData.start_time, 'HH:mm') : ''}
-                          onChange={(e) => {
-                            if (formData.start_time && e.target.value) {
-                              const [hours, minutes] = e.target.value.split(':');
-                              const newDate = new Date(formData.start_time);
-                              newDate.setHours(parseInt(hours), parseInt(minutes));
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Fecha</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {format(formData.start_time, 'PPP', { locale: es })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={formData.start_time}
+                          onSelect={(date) => {
+                            if (date) {
+                              // Crear nueva fecha preservando hora y minuto, sin conversión de zona horaria
+                              const hours = formData.start_time.getHours();
+                              const minutes = formData.start_time.getMinutes();
+                              const newDate = new Date(
+                                date.getFullYear(), 
+                                date.getMonth(), 
+                                date.getDate(), 
+                                hours, 
+                                minutes, 
+                                0, 
+                                0
+                              );
                               setFormData(prev => ({ ...prev, start_time: newDate }));
                             }
                           }}
+                          disabled={(date) => {
+                            // Normalizar ambas fechas a medianoche para comparar solo el día
+                            const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                            const todayOnly = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+                            return dateOnly < todayOnly;
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Hora</Label>
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <Label className="text-xs">Horas (0-23)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="23"
+                          value={formData.start_time.getHours()}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') return;
+                            const hours = parseInt(value);
+                            if (!isNaN(hours) && hours >= 0 && hours <= 23) {
+                              // Crear nueva fecha sin usar new Date() para evitar conversión de zona horaria
+                              const current = formData.start_time;
+                              const newDate = new Date(
+                                current.getFullYear(),
+                                current.getMonth(),
+                                current.getDate(),
+                                hours,
+                                current.getMinutes(),
+                                0,
+                                0
+                              );
+                              setFormData(prev => ({ ...prev, start_time: newDate }));
+                            } else {
+                              toast.error('Las horas deben estar entre 0 y 23');
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              const current = formData.start_time;
+                              const newDate = new Date(
+                                current.getFullYear(),
+                                current.getMonth(),
+                                current.getDate(),
+                                9,
+                                current.getMinutes(),
+                                0,
+                                0
+                              );
+                              setFormData(prev => ({ ...prev, start_time: newDate }));
+                            }
+                          }}
+                          placeholder="09"
+                        />
+                      </div>
+                      <div className="flex items-end justify-center pb-2">
+                        <span className="text-2xl font-bold">:</span>
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs">Minutos (0-59)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="59"
+                          step="5"
+                          value={formData.start_time.getMinutes().toString().padStart(2, '0')}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') return;
+                            const minutes = parseInt(value);
+                            if (!isNaN(minutes) && minutes >= 0 && minutes <= 59) {
+                              // Crear nueva fecha sin usar new Date() para evitar conversión de zona horaria
+                              const current = formData.start_time;
+                              const newDate = new Date(
+                                current.getFullYear(),
+                                current.getMonth(),
+                                current.getDate(),
+                                current.getHours(),
+                                minutes,
+                                0,
+                                0
+                              );
+                              setFormData(prev => ({ ...prev, start_time: newDate }));
+                            } else {
+                              toast.error('Los minutos deben estar entre 0 y 59');
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              const current = formData.start_time;
+                              const newDate = new Date(
+                                current.getFullYear(),
+                                current.getMonth(),
+                                current.getDate(),
+                                current.getHours(),
+                                0,
+                                0,
+                                0
+                              );
+                              setFormData(prev => ({ ...prev, start_time: newDate }));
+                            }
+                          }}
+                          placeholder="00"
                         />
                       </div>
                     </div>
-                  </PopoverContent>
-                </Popover>
+                  </div>
+                </div>
+                {formData.start_time && (
+                  <div className="text-sm text-muted-foreground bg-muted p-2 rounded-md">
+                    <strong>Examen programado para:</strong> {format(formData.start_time, "EEEE, d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center space-x-2">
@@ -429,7 +610,7 @@ export default function CreateExam() {
           </Card>
 
           <div className="flex gap-2 justify-end">
-            <Button type="button" variant="outline" onClick={() => navigate(`/courses/${courseId}`)}>
+            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading} className="bg-gradient-primary shadow-glow">

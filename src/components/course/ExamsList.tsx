@@ -25,6 +25,28 @@ interface ExamsListProps {
   canEdit: boolean;
 }
 
+// Función helper para parsear fecha de la BD sin conversión de timezone
+// La BD guarda en UTC, pero queremos mostrar la hora "tal cual" sin conversión
+const parseExamDate = (dateString: string): Date => {
+  // Extraer la fecha y hora directamente del string sin conversión de zona horaria
+  // Formato esperado: "2026-02-04 11:30:00+00" o "2026-02-04T11:30:00+00:00"
+  const match = dateString.match(/(\d{4})-(\d{2})-(\d{2})[\sT](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [, year, month, day, hours, minutes, seconds] = match;
+    // Crear fecha local sin conversión (como si fuera hora local)
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1, // JavaScript months are 0-indexed
+      parseInt(day),
+      parseInt(hours),
+      parseInt(minutes),
+      parseInt(seconds)
+    );
+  }
+  // Fallback: usar conversión normal
+  return new Date(dateString);
+};
+
 export function ExamsList({ courseId, canEdit }: ExamsListProps) {
   const navigate = useNavigate();
   const [exams, setExams] = useState<Exam[]>([]);
@@ -40,7 +62,7 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
       const { data, error } = await supabase
         .from('exams')
         .select('*')
-        .eq('course_id', courseId)
+        .eq('modulo_id', courseId)
         .order('start_time', { ascending: true });
 
       if (error) throw error;
@@ -61,7 +83,7 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
 
   const getExamStatus = (exam: Exam) => {
     const now = new Date();
-    const startTime = new Date(exam.start_time);
+    const startTime = parseExamDate(exam.start_time);
     const endTime = addMinutes(startTime, exam.duration_minutes);
 
     if (isAfter(now, endTime)) {
@@ -168,13 +190,13 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       <span>
-                        {format(new Date(exam.start_time), "d 'de' MMMM, yyyy", { locale: es })}
+                        {format(parseExamDate(exam.start_time), "d 'de' MMMM, yyyy", { locale: es })}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
                       <span>
-                        {format(new Date(exam.start_time), "HH:mm")} ({exam.duration_minutes} min)
+                        {format(parseExamDate(exam.start_time), "HH:mm")} ({exam.duration_minutes} min)
                       </span>
                     </div>
                   </div>
@@ -188,7 +210,7 @@ export function ExamsList({ courseId, canEdit }: ExamsListProps) {
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20 mb-4">
                     <AlertCircle className="w-4 h-4 text-primary" />
                     <span className="text-sm text-primary font-medium">
-                      Programado para {format(new Date(exam.start_time), "d 'de' MMMM 'a las' HH:mm", { locale: es })}
+                      Programado para {format(parseExamDate(exam.start_time), "d 'de' MMMM 'a las' HH:mm", { locale: es })}
                     </span>
                   </div>
                 )}

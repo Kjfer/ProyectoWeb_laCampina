@@ -21,6 +21,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// Helper para parsear fechas sin conversión UTC
+const parseExamDate = (dateString: string): Date => {
+  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss"
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [_, year, month, day, hour, minute, second] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second)
+    );
+  }
+  return new Date(dateString);
+};
+
 interface Exam {
   id: string;
   title: string;
@@ -28,12 +46,12 @@ interface Exam {
   start_time: string;
   duration_minutes: number;
   max_score: number;
-  course_id: string;
+  modulo_id: string;
   source: 'exam' | 'weekly_resource';
-  course: {
+  modulo: {
     id: string;
     name: string;
-    code: string;
+    course_id: string;
   };
   submission?: {
     score: string;  // Ahora es texto (AD, A, B, C)
@@ -60,14 +78,14 @@ const Exams = () => {
     userId: profile?.id || '',
   });
 
-  const checkExamSubmission = async (examId: string, quizTitle: string, courseId: string) => {
+  const checkExamSubmission = async (examId: string, quizTitle: string, moduloId: string) => {
     if (!profile?.id) return null;
 
     // Find quiz by exam title
     const { data: quizData } = await supabase
       .from('quizzes')
       .select('id')
-      .eq('course_id', courseId)
+      .eq('modulo_id', moduloId)
       .eq('title', quizTitle)
       .maybeSingle();
 
@@ -97,10 +115,10 @@ const Exams = () => {
         .from('exams')
         .select(`
           *,
-          course:courses (
+          modulo:modulos (
             id,
             name,
-            code
+            course_id
           )
         `)
         .eq('is_published', true)
@@ -108,30 +126,11 @@ const Exams = () => {
 
       if (examsError) throw examsError;
 
-      // Fetch from weekly resources (exam type)
-      const { data: weeklyExams, error: weeklyError } = await supabase
-        .from('course_weekly_resources')
-        .select(`
-          *,
-          section:course_weekly_sections!inner (
-            course:courses (
-              id,
-              name,
-              code
-            )
-          )
-        `)
-        .eq('resource_type', 'exam')
-        .eq('is_published', true)
-        .order('assignment_deadline', { ascending: true });
-
-      if (weeklyError) throw weeklyError;
-
-      // Combine both sources and check submissions for students
+      // Combine exams and check submissions for students
       const combinedExams: Exam[] = await Promise.all([
         ...(examsData || []).map(async exam => {
           const submission = profile?.role === 'student' 
-            ? await checkExamSubmission(exam.id, exam.title, exam.course_id)
+            ? await checkExamSubmission(exam.id, exam.title, exam.modulo_id)
             : null;
           
           return {
@@ -141,34 +140,16 @@ const Exams = () => {
             start_time: exam.start_time,
             duration_minutes: exam.duration_minutes,
             max_score: exam.max_score,
-            course_id: exam.course_id,
+            modulo_id: exam.modulo_id,
             source: 'exam' as const,
-            course: exam.course,
-            submission
-          };
-        }),
-        ...(weeklyExams || []).map(async resource => {
-          const submission = profile?.role === 'student'
-            ? await checkExamSubmission(resource.id, resource.title, resource.section.course.id)
-            : null;
-          
-          return {
-            id: resource.id,
-            title: resource.title,
-            description: resource.description || '',
-            start_time: resource.assignment_deadline || new Date().toISOString(),
-            duration_minutes: 60, // Default duration
-            max_score: resource.max_score || 100,
-            course_id: resource.section.course.id,
-            source: 'weekly_resource' as const,
-            course: resource.section.course,
+            modulo: exam.modulo,
             submission
           };
         })
       ]);
 
       const sortedExams = combinedExams.sort((a, b) => 
-        new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+        parseExamDate(a.start_time).getTime() - parseExamDate(b.start_time).getTime()
       );
 
       setExams(sortedExams);
@@ -186,7 +167,7 @@ const Exams = () => {
 
   const getExamStatus = (exam: Exam) => {
     const now = new Date();
-    const startTime = new Date(exam.start_time);
+    const startTime = parseExamDate(exam.start_time);
     const endTime = addMinutes(startTime, exam.duration_minutes);
 
     if (isAfter(now, endTime)) {
@@ -288,9 +269,9 @@ const Exams = () => {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Badge variant="secondary" className="text-xs">
-                            {exam.course.code}
+                            Módulo
                           </Badge>
-                          <span>{exam.course.name}</span>
+                          <span>{exam.modulo.name}</span>
                         </div>
                       </div>
                       <ClipboardList className="w-6 h-6 text-primary" />
@@ -306,13 +287,13 @@ const Exams = () => {
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           <span>
-                            {format(new Date(exam.start_time), "d 'de' MMMM, yyyy", { locale: es })}
+                            {format(parseExamDate(exam.start_time), "d 'de' MMMM, yyyy", { locale: es })}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
                           <span>
-                            {format(new Date(exam.start_time), "HH:mm")} ({exam.duration_minutes} min)
+                            {format(parseExamDate(exam.start_time), "HH:mm")} ({exam.duration_minutes} min)
                           </span>
                         </div>
                       </div>
@@ -337,8 +318,8 @@ const Exams = () => {
                         variant="outline"
                         asChild
                       >
-                        <Link to={`/courses/${exam.course_id}`}>
-                          Ver Curso
+                        <Link to={`/courses/${exam.modulo_id}`}>
+                          Ver Módulo
                         </Link>
                       </Button>
                       
@@ -375,15 +356,26 @@ const Exams = () => {
                                 );
                               })()}
                             </div>
-                          ) : status.status === 'in-progress' && (
-                            <Button 
-                              className="bg-gradient-primary shadow-glow flex-1"
-                              asChild
-                            >
-                              <Link to={`/exams/${exam.id}/take`}>
-                                Iniciar Examen
-                              </Link>
-                            </Button>
+                          ) : (
+                            <>
+                              {isBefore(new Date(), parseExamDate(exam.start_time)) ? (
+                                <div className="flex-1 p-3 rounded-lg bg-muted/50 border border-muted text-center">
+                                  <Clock className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
+                                  <p className="text-sm font-medium text-muted-foreground">
+                                    Disponible: {format(parseExamDate(exam.start_time), "d MMM, HH:mm", { locale: es })}
+                                  </p>
+                                </div>
+                              ) : (
+                                <Button 
+                                  className="bg-gradient-primary shadow-glow flex-1"
+                                  asChild
+                                >
+                                  <Link to={`/exams/${exam.id}/take`}>
+                                    {status.status === 'in-progress' ? 'Iniciar Examen' : 'Ver Examen'}
+                                  </Link>
+                                </Button>
+                              )}
+                            </>
                           )}
                         </>
                       )}

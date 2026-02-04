@@ -411,8 +411,8 @@ export default function CourseDetail() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle>Exámenes del Curso</CardTitle>
-                      <Button onClick={() => navigate(`/courses/${course.id}/create-exam`)} className="bg-gradient-primary shadow-glow">
+                      <CardTitle>Exámenes del Módulo</CardTitle>
+                      <Button onClick={() => navigate(`/modulos/${course.id}/create-exam`)} className="bg-gradient-primary shadow-glow">
                         <Plus className="h-4 w-4 mr-2" />
                         Crear Examen
                       </Button>

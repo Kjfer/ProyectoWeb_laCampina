@@ -40,7 +40,7 @@ interface ExamData {
   start_time: string;
   duration_minutes: number;
   max_score: number;
-  course_id: string;
+  modulo_id: string;
   quiz_id: string;
 }
 
@@ -75,8 +75,9 @@ const ExamTaking = () => {
 
   useEffect(() => {
     if (exam) {
-      const startTime = new Date(exam.start_time);
-      const endTime = new Date(startTime.getTime() + exam.duration_minutes * 60000);
+      // Calcular el tiempo de finalización basado en AHORA + duración
+      // No basarse en start_time porque puede ser en el pasado
+      const endTime = new Date(Date.now() + exam.duration_minutes * 60000);
       
       const timer = setInterval(() => {
         const now = new Date();
@@ -105,15 +106,30 @@ const ExamTaking = () => {
 
       if (examError) throw examError;
 
+      if (!examData) {
+        toast.error('Examen no encontrado');
+        navigate('/exams');
+        return;
+      }
+
       // Find associated quiz
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
         .select('id')
-        .eq('course_id', examData.course_id)
+        .eq('modulo_id', examData.modulo_id)
         .eq('title', examData.title)
-        .single();
+        .maybeSingle();
 
-      if (quizError) throw quizError;
+      if (quizError) {
+        console.error('Error fetching quiz:', quizError);
+        throw quizError;
+      }
+
+      if (!quizData) {
+        toast.error('Este examen no tiene un cuestionario asociado. Por favor contacta al profesor.');
+        navigate('/exams');
+        return;
+      }
 
       setExam({ ...examData, quiz_id: quizData.id });
 
@@ -121,12 +137,12 @@ const ExamTaking = () => {
       const { data: enrollment } = await supabase
         .from('course_enrollments')
         .select('id')
-        .eq('course_id', examData.course_id)
+        .eq('modulo_id', examData.modulo_id)
         .eq('student_id', profile.id)
-        .single();
+        .maybeSingle();
 
       if (!enrollment) {
-        toast.error('No estás inscrito en este curso');
+        toast.error('No estás inscrito en este módulo');
         navigate('/exams');
         return;
       }
@@ -185,9 +201,11 @@ const ExamTaking = () => {
 
       // Calculate score and prepare answers
       let totalScore = 0;
+      let maxPossibleScore = 0;
       const answersData: Record<string, any> = {};
 
       questions.forEach(question => {
+        maxPossibleScore += question.points;
         const studentAnswer = answers[question.id] || '';
         let isCorrect = false;
         let pointsEarned = 0;
@@ -211,10 +229,12 @@ const ExamTaking = () => {
         };
       });
 
-      // Convertir puntaje numérico a letra
-      const finalLetterGrade = totalScore >= 18 ? 'AD' : 
-                                totalScore >= 15 ? 'A' : 
-                                totalScore >= 12 ? 'B' : 'C';
+      // Calcular porcentaje y convertir a letra
+      const percentage = maxPossibleScore > 0 ? (totalScore / maxPossibleScore) * 100 : 0;
+      const finalLetterGrade = percentage >= 90 ? 'AD' :   // 90-100%
+                                percentage >= 75 ? 'A' :    // 75-89%
+                                percentage >= 60 ? 'B' :    // 60-74%
+                                'C';                        // 0-59%
 
       // Submit to database
       const { error } = await supabase
@@ -327,15 +347,18 @@ const ExamTaking = () => {
                     value={answers[question.id] || ''}
                     onValueChange={(value) => handleAnswerChange(question.id, value)}
                   >
-                    {question.options.map((option, optIndex) => (
-                      <div key={optIndex} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-colors">
-                        <RadioGroupItem value={option} id={`q${question.id}-opt${optIndex}`} className="mt-0.5" />
-                        <Label htmlFor={`q${question.id}-opt${optIndex}`} className="cursor-pointer flex-1 text-sm sm:text-base leading-relaxed">
-                          <span className="font-semibold mr-2">{String.fromCharCode(65 + optIndex)}.</span>
-                          {option}
-                        </Label>
-                      </div>
-                    ))}
+                    {question.options.map((option, optIndex) => {
+                      const optionLetter = String.fromCharCode(65 + optIndex); // A, B, C, D
+                      return (
+                        <div key={optIndex} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-colors">
+                          <RadioGroupItem value={optionLetter} id={`q${question.id}-opt${optIndex}`} className="mt-0.5" />
+                          <Label htmlFor={`q${question.id}-opt${optIndex}`} className="cursor-pointer flex-1 text-sm sm:text-base leading-relaxed">
+                            <span className="font-semibold mr-2">{optionLetter}.</span>
+                            {option}
+                          </Label>
+                        </div>
+                      );
+                    })}
                   </RadioGroup>
                 )}
 
@@ -345,11 +368,11 @@ const ExamTaking = () => {
                     onValueChange={(value) => handleAnswerChange(question.id, value)}
                   >
                     <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-colors">
-                      <RadioGroupItem value="true" id={`q${question.id}-true`} />
+                      <RadioGroupItem value="V" id={`q${question.id}-true`} />
                       <Label htmlFor={`q${question.id}-true`} className="cursor-pointer text-sm sm:text-base">Verdadero</Label>
                     </div>
                     <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-colors">
-                      <RadioGroupItem value="false" id={`q${question.id}-false`} />
+                      <RadioGroupItem value="F" id={`q${question.id}-false`} />
                       <Label htmlFor={`q${question.id}-false`} className="cursor-pointer text-sm sm:text-base">Falso</Label>
                     </div>
                   </RadioGroup>

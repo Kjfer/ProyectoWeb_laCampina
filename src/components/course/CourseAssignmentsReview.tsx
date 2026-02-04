@@ -5,10 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Calendar, Clock, Users, Eye } from 'lucide-react';
+import { FileText, Calendar, Clock, Users, Eye, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { CreateAssignmentDialog } from '@/components/assignments/CreateAssignmentDialog';
 
 interface Assignment {
   id: string;
@@ -25,11 +26,29 @@ interface CourseAssignmentsReviewProps {
   courseId: string;
 }
 
+// Función helper para parsear fechas sin conversión de timezone
+const parseAssignmentDate = (dateString: string): Date => {
+  const match = dateString.match(/(\d{4})-(\d{2})-(\d{2})[\sT](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [, year, month, day, hours, minutes, seconds] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hours),
+      parseInt(minutes),
+      parseInt(seconds)
+    );
+  }
+  return new Date(dateString);
+};
+
 export function CourseAssignmentsReview({ courseId }: CourseAssignmentsReviewProps) {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchAssignments();
@@ -39,11 +58,11 @@ export function CourseAssignmentsReview({ courseId }: CourseAssignmentsReviewPro
     try {
       setLoading(true);
 
-      // Fetch assignments for this course
-      const { data: assignmentsData, error: assignmentsError } = await supabase
+      // Fetch assignments for this course/module
+      const { data: assignmentsData, error: assignmentsError} = await supabase
         .from('assignments')
         .select('id, title, description, due_date, max_score, created_at')
-        .eq('course_id', courseId)
+        .eq('modulo_id', courseId)
         .order('created_at', { ascending: false });
 
       if (assignmentsError) throw assignmentsError;
@@ -108,25 +127,63 @@ export function CourseAssignmentsReview({ courseId }: CourseAssignmentsReviewPro
 
   if (assignments.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-12 text-center">
-          <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4 opacity-50" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            No hay tareas aún
-          </h3>
-          <p className="text-muted-foreground">
-            Las tareas del curso aparecerán aquí cuando se creen.
-          </p>
-        </CardContent>
-      </Card>
+      <>
+        <CreateAssignmentDialog
+          open={isCreateDialogOpen}
+          onOpenChange={setIsCreateDialogOpen}
+          onSuccess={fetchAssignments}
+          moduleId={courseId}
+        />
+        
+        <div className="flex justify-end mb-4">
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="bg-gradient-primary shadow-glow"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Crear Tarea
+          </Button>
+        </div>
+        
+        <Card>
+          <CardContent className="p-12 text-center">
+            <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4 opacity-50" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              No hay tareas aún
+            </h3>
+            <p className="text-muted-foreground">
+              Haz clic en "Crear Tarea" para agregar la primera tarea.
+            </p>
+          </CardContent>
+        </Card>
+      </>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {assignments.map((assignment) => {
-        const pendingCount = (assignment.submissions_count || 0) - (assignment.graded_count || 0);
-        const isOverdue = new Date(assignment.due_date) < new Date();
+    <>
+      <CreateAssignmentDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSuccess={fetchAssignments}
+        moduleId={courseId}
+      />
+      
+      <div className="flex justify-end mb-4">
+        <Button
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="bg-gradient-primary shadow-glow"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Crear Tarea
+        </Button>
+      </div>
+      
+      <div className="space-y-4">
+        {assignments.map((assignment) => {
+          const pendingCount = (assignment.submissions_count || 0) - (assignment.graded_count || 0);
+          const dueDate = parseAssignmentDate(assignment.due_date);
+          const isOverdue = dueDate < new Date();
 
         return (
           <Card key={assignment.id} className="bg-gradient-card shadow-card border-0">
@@ -143,13 +200,13 @@ export function CourseAssignmentsReview({ courseId }: CourseAssignmentsReviewPro
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <Calendar className="w-4 h-4" />
                       <span>
-                        Vence: {format(new Date(assignment.due_date), "d 'de' MMMM, yyyy", { locale: es })}
+                        Vence: {format(dueDate, "d 'de' MMMM, yyyy", { locale: es })}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <Clock className="w-4 h-4" />
                       <span>
-                        {format(new Date(assignment.due_date), "HH:mm", { locale: es })}
+                        {format(dueDate, "HH:mm", { locale: es })}
                       </span>
                     </div>
                     {isOverdue && (
@@ -193,6 +250,7 @@ export function CourseAssignmentsReview({ courseId }: CourseAssignmentsReviewPro
           </Card>
         );
       })}
-    </div>
+      </div>
+    </>
   );
 }

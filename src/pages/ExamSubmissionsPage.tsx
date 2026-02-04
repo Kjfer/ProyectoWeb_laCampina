@@ -65,7 +65,7 @@ const ExamSubmissionsPage = () => {
       // Get exam info
       const { data: examData, error: examError } = await supabase
         .from('exams')
-        .select('title, max_score, course_id')
+        .select('title, max_score, modulo_id, course_id')
         .eq('id', examId)
         .single();
 
@@ -77,7 +77,7 @@ const ExamSubmissionsPage = () => {
       const { data: quizData, error: quizError } = await supabase
         .from('quizzes')
         .select('id')
-        .eq('course_id', examData.course_id)
+        .eq('modulo_id', examData.modulo_id)
         .eq('title', examData.title)
         .maybeSingle();
 
@@ -88,18 +88,18 @@ const ExamSubmissionsPage = () => {
         .from('course_enrollments')
         .select(`
           student_id,
-          profiles!inner(
+          profiles!course_enrollments_student_id_fkey1(
             id,
             first_name,
             last_name,
             email
           )
         `)
-        .eq('course_id', courseId);
+        .eq('modulo_id', courseId);
 
       if (enrollError) throw enrollError;
       
-      const students = (enrollments || []).map((e: any) => e.student).filter(Boolean);
+      const students = (enrollments || []).map((e: any) => e.profiles).filter(Boolean);
       setEnrolledStudents(students);
 
       // Get submissions if quiz exists
