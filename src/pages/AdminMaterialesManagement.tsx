@@ -35,6 +35,7 @@ import { Plus, BookOpen, Package } from 'lucide-react';
 
 interface Material {
   id: string;
+  codigo_material: string;
   nombre: string;
   tipo_material: 'book' | 'kit';
   usuario_id: string;
@@ -463,6 +464,7 @@ export default function AdminMaterialesManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Código</TableHead>
                     <TableHead>Estudiante</TableHead>
                     <TableHead>Material</TableHead>
                     <TableHead>Tipo</TableHead>
@@ -476,7 +478,7 @@ export default function AdminMaterialesManagement() {
                 <TableBody>
                   {filteredMateriales.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                         No se encontraron materiales
                         {filterCourse !== 'all' && ' para el curso seleccionado'}
                       </TableCell>
@@ -484,6 +486,9 @@ export default function AdminMaterialesManagement() {
                   ) : (
                     filteredMateriales.map((material) => (
                     <TableRow key={material.id}>
+                      <TableCell className="font-mono text-xs">
+                        {material.codigo_material || '-'}
+                      </TableCell>
                       <TableCell>
                         {material.estudiante
                           ? `${material.estudiante.first_name} ${material.estudiante.last_name}`
@@ -509,25 +514,12 @@ export default function AdminMaterialesManagement() {
                         {material.monto ? material.monto.toFixed(2) : '0.00'}
                       </TableCell>
                       <TableCell>
-                        {material.tipo_material === 'kit' ? (
-                          <Badge variant="default">
-                            Pagado
-                          </Badge>
-                        ) : (
-                          <Select
-                            value={material.estado_pago}
-                            onValueChange={(value: any) => handleUpdateEstado(material.id, value)}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pendiente">Pendiente</SelectItem>
-                              <SelectItem value="pagado">Pagado</SelectItem>
-                              <SelectItem value="cancelado">Cancelado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
+                        <Badge 
+                          variant={material.estado_pago === 'pagado' ? 'default' : material.estado_pago === 'pendiente' ? 'secondary' : 'destructive'}
+                          className={material.estado_pago === 'pagado' ? 'bg-green-500 hover:bg-green-600' : ''}
+                        >
+                          {material.estado_pago === 'pagado' ? 'Pagado' : material.estado_pago === 'pendiente' ? 'Pendiente' : 'Cancelado'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         {formatDate(material.fecha_registro)}

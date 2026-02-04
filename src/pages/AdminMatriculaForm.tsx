@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/lib/dateUtils.ts';
+import { formatDate, getTodayInPeru } from '@/lib/dateUtils.ts';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   MatriculaFormData,
@@ -13,8 +13,14 @@ import {
   RegistroCompraMaterialInsert,
   VentaCursoGrabadoInsert,
   PagoInsert,
+  PlanCuotasMatriculaInsert,
+  CuotaMatriculaInsert,
+  CuotaCalculada,
   generateMatriculaCode,
   calculatePrecioFinal,
+  calcularTipoPlanCuotas,
+  calcularCuotas,
+  validarNumeroCuotasPermitido,
   MONEDAS,
   METODOS_PAGO,
   TIPOS_PAGO,
@@ -64,6 +70,12 @@ export default function AdminMatriculaForm() {
   const [selectedModulos, setSelectedModulos] = useState<string[]>([]);
   const [modulosYaMatriculados, setModulosYaMatriculados] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [programCode, setProgramCode] = useState<string>('');
+  
+  // Estados para sistema de cuotas
+  const [numeroCuotas, setNumeroCuotas] = useState<number>(1);
+  const [cuotasCalculadas, setCuotasCalculadas] = useState<CuotaCalculada[]>([]);
+  const [fechaPrimerPago, setFechaPrimerPago] = useState<string>(getTodayInPeru());
 
   const [formData, setFormData] = useState<MatriculaFormData>({
     estudiante_id: '',
@@ -110,6 +122,44 @@ export default function AdminMatriculaForm() {
     formData.descuento, 
     formData.incluir_clases_grabadas
   ]);
+
+  useEffect(() => {
+    // Obtener código del programa desde el primer módulo seleccionado
+    if (selectedModulos.length > 0) {
+      const primerModulo = modulos.find(m => m.id === selectedModulos[0]);
+      if (primerModulo && primerModulo.course) {
+        const { data: programaData } = supabase
+          .from('programas')
+          .select('code')
+          .eq('id', primerModulo.course.program_id)
+          .single()
+          .then(({ data }) => {
+            if (data) {
+              setProgramCode(data.code);
+            }
+          });
+      }
+    }
+  }, [selectedModulos, modulos]);
+
+  useEffect(() => {
+    // Recalcular cuotas cuando cambian los parámetros
+    if (precioFinal > 0 && numeroCuotas > 0 && fechaPrimerPago) {
+      const tipoPlan = calcularTipoPlanCuotas(numeroCuotas, programCode || '');
+      
+      // Parsear fecha como fecha local, no UTC
+      const [year, month, day] = fechaPrimerPago.split('-').map(Number);
+      const fechaLocal = new Date(year, month - 1, day);
+      
+      const cuotas = calcularCuotas(
+        precioFinal,
+        numeroCuotas,
+        fechaLocal,
+        tipoPlan
+      );
+      setCuotasCalculadas(cuotas);
+    }
+  }, [precioFinal, numeroCuotas, fechaPrimerPago, programCode]);
 
   useEffect(() => {
     // Filtrar estudiantes según búsqueda
@@ -337,6 +387,26 @@ export default function AdminMatriculaForm() {
       return;
     }
 
+    if (formData.incluir_clases_grabadas) {
+      if (!formData.id_clases_grabadas) {
+        toast({
+          title: 'Error',
+          description: 'Debe seleccionar un curso grabado',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if (!formData.valor_clase_grabada || formData.valor_clase_grabada <= 0) {
+        toast({
+          title: 'Error',
+          description: 'El valor del curso grabado debe ser mayor a 0',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     if (!currentUser) {
       toast({
         title: 'Error',
@@ -439,22 +509,9 @@ export default function AdminMatriculaForm() {
           if (enrollError) throw enrollError;
         }
 
-        // 6. Si incluye clases grabadas, registrar venta
-        if (formData.incluir_clases_grabadas && formData.id_clases_grabadas) {
-          const ventaData: VentaCursoGrabadoInsert = {
-            estudiante_id: formData.estudiante_id,
-            usuario_id: currentUser.id,
-            id_clases_grabadas: formData.id_clases_grabadas,
-            valor_venta: formData.valor_clase_grabada || 0,
-            matricula_id: newMatricula.id,
-          };
-
-          const { error: ventaError } = await supabase
-            .from('venta_cursos_grabados')
-            .insert(ventaData);
-
-          if (ventaError) throw ventaError;
-        }
+        // 6. Si incluye clases grabadas como promoción, ya están registradas en la matrícula
+        // NO se registra en venta_cursos_grabados porque es parte de la promoción de matrícula
+        // Los datos quedan en: matriculas.id_clases_grabadas y matriculas.valor_clase_grabada
 
         // 7. Registrar compra de materiales
         const courseId = modulos.find(m => m.id === selectedModulos[0])?.course_id;
@@ -480,7 +537,7 @@ export default function AdminMatriculaForm() {
               moneda_material: formData.moneda_book || 'PEN',
               estado_pago: 'pendiente',
               fecha_pago: undefined,
-              fecha_registro: new Date().toISOString(),
+              // fecha_registro usa DEFAULT NOW() de la base de datos
             };
 
             const { error: bookError } = await supabase
@@ -502,7 +559,7 @@ export default function AdminMatriculaForm() {
               moneda_material: formData.moneda_kit || 'PEN',
               estado_pago: 'pendiente',
               fecha_pago: undefined,
-              fecha_registro: new Date().toISOString(),
+              // fecha_registro usa DEFAULT NOW() de la base de datos
             };
 
             const { error: kitError } = await supabase
@@ -512,6 +569,46 @@ export default function AdminMatriculaForm() {
             if (kitError) throw kitError;
           }
         }
+
+        // 8. Crear plan de cuotas para la matrícula
+        if (numeroCuotas > 0 && cuotasCalculadas.length > 0) {
+          const tipoPlan = calcularTipoPlanCuotas(numeroCuotas, programCode || '');
+          const montoPorCuota = precioFinal / numeroCuotas;
+
+          const planCuotasData: PlanCuotasMatriculaInsert = {
+            matricula_id: newMatricula.id,
+            numero_cuotas: numeroCuotas,
+            tipo_plan: tipoPlan,
+            monto_total: precioFinal,
+            monto_por_cuota: Math.round(montoPorCuota * 100) / 100,
+            fecha_primer_pago: fechaPrimerPago,
+          };
+
+          const { data: newPlanCuotas, error: planError } = await supabase
+            .from('plan_cuotas_matricula' as any)
+            .insert(planCuotasData)
+            .select()
+            .single();
+
+          if (planError) throw planError;
+
+          // 9. Crear las cuotas individuales
+          const cuotasInsert: CuotaMatriculaInsert[] = cuotasCalculadas.map(cuota => ({
+            plan_cuotas_id: newPlanCuotas.id,
+            numero_cuota: cuota.numero_cuota,
+            monto_cuota: cuota.monto_cuota,
+            fecha_vencimiento: cuota.fecha_vencimiento,
+            estado: 'pendiente',
+            monto_pagado: 0,
+          }));
+
+          const { error: cuotasError } = await supabase
+            .from('cuotas_matricula' as any)
+            .insert(cuotasInsert);
+
+          if (cuotasError) throw cuotasError;
+        }
+
       } catch (innerError: any) {
         // Si falla algo después de crear la matrícula, hacer rollback
         if (matriculaId) {
@@ -523,11 +620,8 @@ export default function AdminMatriculaForm() {
             .delete()
             .eq('matricula_id', matriculaId);
           
-          // Eliminar ventas de cursos grabados
-          await supabase
-            .from('venta_cursos_grabados')
-            .delete()
-            .eq('matricula_id', matriculaId);
+          // NO eliminar ventas de cursos grabados porque ya no se registran en esa tabla
+          // cuando son parte de una promoción de matrícula
           
           // Eliminar registros de materiales
           await supabase
@@ -848,17 +942,23 @@ export default function AdminMatriculaForm() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="valor_clase_grabada">Valor (opcional)</Label>
+                      <Label htmlFor="valor_clase_grabada">
+                        Valor <span className="text-red-500">*</span>
+                      </Label>
                       <Input
                         id="valor_clase_grabada"
                         type="number"
                         step="0.01"
-                        min="0"
+                        min="0.01"
                         value={formData.valor_clase_grabada}
                         onChange={(e) =>
                           setFormData({ ...formData, valor_clase_grabada: parseFloat(e.target.value) || 0 })
                         }
+                        required
                       />
+                      <p className="text-xs text-muted-foreground">
+                        El valor del curso grabado es obligatorio
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="moneda_curso_grabado">Moneda</Label>
@@ -996,7 +1096,117 @@ export default function AdminMatriculaForm() {
 
             <Separator />
 
-            {/* 4. OBSERVACIONES */}
+            {/* 4. PLAN DE CUOTAS */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Plan de Cuotas</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="numeroCuotas">Número de Cuotas</Label>
+                  <Select
+                    value={numeroCuotas.toString()}
+                    onValueChange={(value) => {
+                      const num = parseInt(value);
+                      if (validarNumeroCuotasPermitido(num, programCode || '')) {
+                        setNumeroCuotas(num);
+                      } else {
+                        toast({
+                          title: 'Número de cuotas no permitido',
+                          description: `Para este programa, solo se permiten ${programCode === 'P013' ? '1-12' : '1-4'} cuotas`,
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="numeroCuotas">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Pago Único</SelectItem>
+                      <SelectItem value="2">2 Cuotas (Quincenal)</SelectItem>
+                      {programCode !== 'P013' && (
+                        <>
+                          <SelectItem value="3">3 Cuotas (Semanal)</SelectItem>
+                          <SelectItem value="4">4 Cuotas (Semanal)</SelectItem>
+                        </>
+                      )}
+                      {programCode === 'P013' && (
+                        <>
+                          <SelectItem value="3">3 Cuotas (Mensual)</SelectItem>
+                          <SelectItem value="4">4 Cuotas (Mensual)</SelectItem>
+                          <SelectItem value="5">5 Cuotas (Mensual)</SelectItem>
+                          <SelectItem value="6">6 Cuotas (Mensual)</SelectItem>
+                          <SelectItem value="7">7 Cuotas (Mensual)</SelectItem>
+                          <SelectItem value="8">8 Cuotas (Mensual)</SelectItem>
+                          <SelectItem value="9">9 Cuotas (Mensual)</SelectItem>
+                          <SelectItem value="10">10 Cuotas (Mensual)</SelectItem>
+                          <SelectItem value="11">11 Cuotas (Mensual)</SelectItem>
+                          <SelectItem value="12">12 Cuotas (Mensual)</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {programCode === 'P013' 
+                      ? 'Programa P013: Permite pago único, 2 cuotas o hasta 12 cuotas mensuales'
+                      : 'Otros programas: Máximo 4 cuotas dentro del primer mes'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fechaPrimerPago">Fecha Primer Pago</Label>
+                  <Input
+                    id="fechaPrimerPago"
+                    type="date"
+                    value={fechaPrimerPago}
+                    onChange={(e) => setFechaPrimerPago(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Fecha de vencimiento de la primera cuota
+                  </p>
+                </div>
+              </div>
+
+              {/* Preview de cuotas */}
+              {cuotasCalculadas.length > 0 && (
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Calendario de Pagos
+                  </h4>
+                  <div className="space-y-2">
+                    {cuotasCalculadas.map((cuota, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center p-2 bg-white rounded border"
+                      >
+                        <div>
+                          <span className="font-medium">Cuota {cuota.numero_cuota}</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            Vence: {formatDate(cuota.fecha_vencimiento)}
+                          </span>
+                        </div>
+                        <span className="font-semibold text-blue-600">
+                          {formData.moneda} {cuota.monto_cuota.toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 pt-3 border-t">
+                    <div className="flex justify-between font-bold">
+                      <span>Total:</span>
+                      <span className="text-blue-600">
+                        {formData.moneda} {precioFinal.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* 5. OBSERVACIONES */}
             <div className="space-y-2">
               <Label htmlFor="observaciones">Observaciones</Label>
               <Textarea

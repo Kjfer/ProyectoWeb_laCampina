@@ -36,12 +36,14 @@ import { Plus, ShoppingCart } from 'lucide-react';
 
 interface VentaCursoGrabado {
   id: string;
+  codigo_venta: string;
   estudiante_id: string;
   usuario_id: string;
   id_clases_grabadas: string;
   valor_venta: number;
   moneda_venta?: string;
   matricula_id: string | null;
+  estado_pago: 'pendiente' | 'pagado' | 'cancelado';
   created_at: string;
   updated_at: string;
   estudiante?: {
@@ -122,7 +124,14 @@ export default function AdminVentasCursosGrabadosManagement() {
 
   const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    setCurrentUser(user);
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      setCurrentUser(profile);
+    }
   };
 
   const fetchData = async () => {
@@ -209,6 +218,15 @@ export default function AdminVentasCursosGrabadosManagement() {
       return;
     }
 
+    if (!currentUser?.id) {
+      toast({
+        title: 'Error',
+        description: 'No se pudo identificar el usuario actual',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       // Verificar si ya existe una venta del mismo curso grabado para este estudiante
       const { data: existingVentas, error: checkError } = await supabase
@@ -234,8 +252,9 @@ export default function AdminVentasCursosGrabadosManagement() {
         id_clases_grabadas: formData.id_clases_grabadas,
         valor_venta: formData.valor_venta,
         moneda_venta: formData.moneda_venta,
-        usuario_id: currentUser?.id || formData.usuario_id,
+        usuario_id: currentUser.id,
         matricula_id: null,
+        estado_pago: 'pendiente' as const,
       };
 
       const { error } = await supabase
@@ -290,16 +309,21 @@ export default function AdminVentasCursosGrabadosManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Código</TableHead>
                     <TableHead>Estudiante</TableHead>
                     <TableHead>Curso Grabado</TableHead>
                     <TableHead>Matrícula</TableHead>
                     <TableHead>Fecha Compra</TableHead>
                     <TableHead>Valor Venta</TableHead>
+                    <TableHead>Estado Pago</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {ventas.map((venta) => (
                     <TableRow key={venta.id}>
+                      <TableCell className="font-mono text-xs">
+                        {venta.codigo_venta || '-'}
+                      </TableCell>
                       <TableCell className="font-medium">
                         {venta.estudiante ? `${venta.estudiante.first_name} ${venta.estudiante.last_name}` : '-'}
                       </TableCell>
@@ -315,6 +339,14 @@ export default function AdminVentasCursosGrabadosManagement() {
                           {venta.moneda_venta || 'PEN'}
                         </Badge>
                         {venta.valor_venta ? venta.valor_venta.toFixed(2) : '0.00'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={venta.estado_pago === 'pagado' ? 'default' : venta.estado_pago === 'pendiente' ? 'secondary' : 'destructive'}
+                          className={venta.estado_pago === 'pagado' ? 'bg-green-500 hover:bg-green-600' : ''}
+                        >
+                          {venta.estado_pago === 'pagado' ? 'Pagado' : venta.estado_pago === 'pendiente' ? 'Pendiente' : 'Cancelado'}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   ))}

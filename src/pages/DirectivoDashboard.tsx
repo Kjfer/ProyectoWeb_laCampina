@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { formatDate } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1073,9 +1074,7 @@ const DirectivoDashboard = () => {
                           {teacher.last_grading_date ? (
                             <>
                               <div className="font-medium">
-                                {new Date(
-                                  teacher.last_grading_date
-                                ).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
+                                {formatDate(teacher.last_grading_date)}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {Math.floor((Date.now() - new Date(teacher.last_grading_date).getTime()) / (1000 * 60 * 60 * 24))} días

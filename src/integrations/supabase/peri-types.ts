@@ -79,6 +79,7 @@ export interface CursoGrabado {
 
 export interface RegistroCompraMaterial {
   id: string;
+  codigo_material: string; // Código único (MAT-XXXXXX)
   nombre: string;
   tipo_material: 'book' | 'kit';
   usuario_id: string; // Quien registró la compra
@@ -125,12 +126,14 @@ export interface ModuloMatriculado {
 
 export interface VentaCursoGrabado {
   id: string;
+  codigo_venta: string; // Código único (VCG-XXXXXX)
   estudiante_id: string;
   usuario_id: string;
   id_clases_grabadas: string;
   valor_venta: number;
   moneda_venta?: string;
   matricula_id?: string | null;
+  estado_pago: 'pendiente' | 'pagado' | 'cancelado';
   created_at: string;
   updated_at: string;
 }
@@ -147,7 +150,32 @@ export interface Pago {
   estado_pago: 'primera_cuota' | 'pago_regular' | 'cuotas_restantes';
   usuario_id: string;
   estudiante_id?: string | null;
+  cuota_id?: string | null;
   observaciones?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanCuotasMatricula {
+  id: string;
+  matricula_id: string;
+  numero_cuotas: number;
+  tipo_plan: 'pago_unico' | 'cuotas_mensuales' | 'cuotas_quincenales' | 'cuotas_semanales';
+  monto_total: number;
+  monto_por_cuota: number;
+  fecha_primer_pago: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CuotaMatricula {
+  id: string;
+  plan_cuotas_id: string;
+  numero_cuota: number;
+  monto_cuota: number;
+  fecha_vencimiento: string;
+  estado: 'pendiente' | 'pagado' | 'parcial' | 'vencido';
+  monto_pagado: number;
   created_at: string;
   updated_at: string;
 }
@@ -221,6 +249,17 @@ export interface PagoWithRelations extends Pago {
     first_name: string;
     last_name: string;
   };
+  cuota?: CuotaMatricula;
+}
+
+export interface PlanCuotasMatriculaWithRelations extends PlanCuotasMatricula {
+  cuotas?: CuotaMatricula[];
+  matricula?: Matricula;
+}
+
+export interface CuotaMatriculaWithRelations extends CuotaMatricula {
+  plan?: PlanCuotasMatricula;
+  pagos?: Pago[];
 }
 
 export interface EnrollmentWithRelations extends CourseEnrollment {
@@ -268,10 +307,12 @@ export type PagoInsert = Omit<Pago, 'id' | 'created_at' | 'updated_at'> & {
   updated_at?: string;
 };
 
-export type RegistroCompraMaterialInsert = Omit<RegistroCompraMaterial, 'id' | 'created_at' | 'updated_at'> & {
+export type RegistroCompraMaterialInsert = Omit<RegistroCompraMaterial, 'id' | 'created_at' | 'updated_at' | 'fecha_registro' | 'codigo_material'> & {
   id?: string;
   created_at?: string;
   updated_at?: string;
+  fecha_registro?: string; // Opcional, usa DEFAULT NOW() en la BD
+  codigo_material?: string; // Generado automáticamente por trigger
 };
 
 export type CursoGrabadoInsert = Omit<CursoGrabado, 'id' | 'created_at' | 'updated_at'> & {
@@ -289,6 +330,18 @@ export type VentaCursoGrabadoInsert = Omit<VentaCursoGrabado, 'id' | 'created_at
 export type CourseEnrollmentInsert = Omit<CourseEnrollment, 'id' | 'enrolled_at'> & {
   id?: string;
   enrolled_at?: string;
+};
+
+export type PlanCuotasMatriculaInsert = Omit<PlanCuotasMatricula, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CuotaMatriculaInsert = Omit<CuotaMatricula, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 // ============================================
@@ -399,6 +452,8 @@ export const METODOS_PAGO = [
 export const TIPOS_PAGO = ['primera_cuota', 'pago_regular', 'cuotas_restantes'] as const;
 export const CATEGORIAS_PRODUCTO = ['matricula', 'kits', 'books', 'clases_grabadas'] as const;
 export const TIPOS_ESTUDIANTE = ['nuevo', 'antiguo'] as const;
+export const TIPOS_PLAN_CUOTAS = ['pago_unico', 'cuotas_mensuales', 'cuotas_quincenales', 'cuotas_semanales'] as const;
+export const ESTADOS_CUOTA = ['pendiente', 'pagado', 'parcial', 'vencido'] as const;
 
 // ============================================
 // HELPERS DE GENERACIÓN DE CÓDIGOS
@@ -429,4 +484,105 @@ export const calculatePrecioFinal = (
   descuento: number
 ): number => {
   return valorMatricula + valorClaseGrabada - descuento;
+};
+// ============================================
+// HELPERS PARA SISTEMA DE CUOTAS
+// ============================================
+
+export const calcularTipoPlanCuotas = (
+  numeroCuotas: number,
+  programCode: string
+): 'pago_unico' | 'cuotas_mensuales' | 'cuotas_quincenales' | 'cuotas_semanales' => {
+  if (numeroCuotas === 1) {
+    return 'pago_unico';
+  }
+  
+  // Programa P013 permite cuotas mensuales
+  if (programCode === 'P013' && numeroCuotas > 2) {
+    return 'cuotas_mensuales';
+  }
+  
+  // Para 2 cuotas: quincenal
+  if (numeroCuotas === 2) {
+    return 'cuotas_quincenales';
+  }
+  
+  // Para 3 o 4 cuotas: semanal
+  return 'cuotas_semanales';
+};
+
+export const calcularDiasEntreCuotas = (
+  tipoPlan: 'pago_unico' | 'cuotas_mensuales' | 'cuotas_quincenales' | 'cuotas_semanales'
+): number => {
+  switch (tipoPlan) {
+    case 'pago_unico':
+      return 0;
+    case 'cuotas_mensuales':
+      return 30;
+    case 'cuotas_quincenales':
+      return 15;
+    case 'cuotas_semanales':
+      return 7;
+    default:
+      return 0;
+  }
+};
+
+export interface CuotaCalculada {
+  numero_cuota: number;
+  monto_cuota: number;
+  fecha_vencimiento: string;
+}
+
+export const calcularCuotas = (
+  montoTotal: number,
+  numeroCuotas: number,
+  fechaPrimerPago: Date,
+  tipoPlan: 'pago_unico' | 'cuotas_mensuales' | 'cuotas_quincenales' | 'cuotas_semanales'
+): CuotaCalculada[] => {
+  const cuotas: CuotaCalculada[] = [];
+  const montoPorCuota = Math.round((montoTotal / numeroCuotas) * 100) / 100;
+  const diasEntreCuotas = calcularDiasEntreCuotas(tipoPlan);
+  
+  // Obtener año, mes y día de la fecha inicial
+  const yearInicial = fechaPrimerPago.getFullYear();
+  const monthInicial = fechaPrimerPago.getMonth();
+  const dayInicial = fechaPrimerPago.getDate();
+  
+  for (let i = 0; i < numeroCuotas; i++) {
+    // Crear una nueva fecha a partir de los componentes, no de otra Date
+    const fechaVencimiento = new Date(yearInicial, monthInicial, dayInicial + (i * diasEntreCuotas));
+    
+    // La última cuota ajusta el redondeo
+    const monto = i === numeroCuotas - 1 
+      ? Math.round((montoTotal - (montoPorCuota * (numeroCuotas - 1))) * 100) / 100
+      : montoPorCuota;
+    
+    // Usar fecha local sin conversión UTC
+    const year = fechaVencimiento.getFullYear();
+    const month = String(fechaVencimiento.getMonth() + 1).padStart(2, '0');
+    const day = String(fechaVencimiento.getDate()).padStart(2, '0');
+    const fechaString = `${year}-${month}-${day}`;
+    
+    cuotas.push({
+      numero_cuota: i + 1,
+      monto_cuota: monto,
+      fecha_vencimiento: fechaString
+    });
+  }
+  
+  return cuotas;
+};
+
+export const validarNumeroCuotasPermitido = (numeroCuotas: number, programCode: string): boolean => {
+  // Pago único siempre permitido
+  if (numeroCuotas === 1) return true;
+  
+  // Programa P013 permite 1, 2 o hasta 12 cuotas mensuales
+  if (programCode === 'P013') {
+    return numeroCuotas >= 1 && numeroCuotas <= 12;
+  }
+  
+  // Otros programas: solo 1, 2, 3 o 4 cuotas
+  return numeroCuotas >= 1 && numeroCuotas <= 4;
 };

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/lib/dateUtils.ts';
+import { formatDate, formatDateTime } from '@/lib/dateUtils.ts';
 import { MatriculaWithRelations } from '@/integrations/supabase/peri-types';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -52,7 +52,7 @@ export default function AdminMatriculasManagement() {
           usuario:profiles!matriculas_usuario_id_fkey(id, first_name, last_name),
           curso_grabado:cursos_grabados(id, name)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false});
 
       if (matriculasError) throw matriculasError;
 
@@ -62,13 +62,30 @@ export default function AdminMatriculasManagement() {
         .select('*')
         .eq('categoria_producto', 'matricula');
 
-      // Asociar pagos con matrículas
-      const matriculasConPagos = (matriculasData || []).map((mat: any) => ({
-        ...mat,
-        pagos: (pagosData || []).filter((pago: any) => pago.codigo_producto === mat.cod_matricula)
-      }));
+      // Cargar planes de cuotas
+      const { data: planesData } = await supabase
+        .from('plan_cuotas_matricula' as any)
+        .select('*');
 
-      setMatriculas(matriculasConPagos as any);
+      // Cargar cuotas individuales
+      const { data: cuotasData } = await supabase
+        .from('cuotas_matricula' as any)
+        .select('*');
+
+      // Asociar pagos, plan de cuotas y cuotas con matrículas
+      const matriculasConDatos = (matriculasData || []).map((mat: any) => {
+        const plan = planesData?.find((p: any) => p.matricula_id === mat.id);
+        const cuotas = plan ? (cuotasData || []).filter((c: any) => c.plan_cuotas_id === plan.id) : [];
+        
+        return {
+          ...mat,
+          pagos: (pagosData || []).filter((pago: any) => pago.codigo_producto === mat.cod_matricula),
+          plan_cuotas: plan || null,
+          cuotas: cuotas
+        };
+      });
+
+      setMatriculas(matriculasConDatos as any);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -400,6 +417,86 @@ export default function AdminMatriculasManagement() {
                 </div>
               </div>
 
+              {/* Plan de Cuotas */}
+              {selectedMatricula.plan_cuotas && selectedMatricula.cuotas && (
+                <div>
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Plan de Cuotas
+                  </h3>
+                  <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Número de Cuotas:</span>
+                        <p className="font-medium">{selectedMatricula.plan_cuotas.numero_cuotas}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Tipo de Plan:</span>
+                        <p className="font-medium capitalize">
+                          {selectedMatricula.plan_cuotas.tipo_plan.replace('_', ' ')}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Monto por Cuota:</span>
+                        <p className="font-medium">
+                          {selectedMatricula.moneda_monto} {selectedMatricula.plan_cuotas.monto_por_cuota.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {selectedMatricula.cuotas.map((cuota: any) => {
+                      const saldoPendiente = cuota.monto_cuota - cuota.monto_pagado;
+                      return (
+                        <div
+                          key={cuota.id}
+                          className={`p-3 border rounded-lg ${
+                            cuota.estado === 'pagado' ? 'bg-green-50 border-green-200' :
+                            cuota.estado === 'parcial' ? 'bg-yellow-50 border-yellow-200' :
+                            cuota.estado === 'vencido' ? 'bg-red-50 border-red-200' :
+                            'bg-white border-gray-200'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">Cuota {cuota.numero_cuota}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  cuota.estado === 'pagado' ? 'bg-green-100 text-green-700' :
+                                  cuota.estado === 'parcial' ? 'bg-yellow-100 text-yellow-700' :
+                                  cuota.estado === 'vencido' ? 'bg-red-100 text-red-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {cuota.estado.toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                <div>Vence: {formatDate(cuota.fecha_vencimiento)}</div>
+                                <div>Monto: {selectedMatricula.moneda_monto} {cuota.monto_cuota.toFixed(2)}</div>
+                                {cuota.monto_pagado > 0 && (
+                                  <div className="text-green-600">
+                                    Pagado: {selectedMatricula.moneda_monto} {cuota.monto_pagado.toFixed(2)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {saldoPendiente > 0 && (
+                              <div className="text-right">
+                                <div className="text-xs text-gray-500">Saldo</div>
+                                <div className="font-bold text-orange-600">
+                                  {selectedMatricula.moneda_monto} {saldoPendiente.toFixed(2)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Historial de Pagos */}
               <div>
                 <h3 className="font-semibold mb-2 flex items-center gap-2">
@@ -452,8 +549,8 @@ export default function AdminMatriculasManagement() {
 
               {/* Fechas */}
               <div className="text-xs text-gray-500 border-t pt-4">
-                <p>Creado: {new Date(selectedMatricula.created_at).toLocaleString()}</p>
-                <p>Actualizado: {new Date(selectedMatricula.updated_at).toLocaleString()}</p>
+                <p>Creado: {formatDateTime(selectedMatricula.created_at)}</p>
+                <p>Actualizado: {formatDateTime(selectedMatricula.updated_at)}</p>
               </div>
             </div>
           )}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/lib/dateUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -212,9 +213,7 @@ export function Notifications() {
                         <div className="flex items-center gap-2 mt-2">
                           <p className="text-xs text-muted-foreground">
                             Fecha de entrega:{' '}
-                            {new Date(
-                              notification.assignments.due_date
-                            ).toLocaleDateString('es-ES')}
+                            {formatDate(notification.assignments.due_date)}
                           </p>
                           <Button
                             variant="link"

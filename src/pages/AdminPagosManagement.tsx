@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/lib/dateUtils.ts';
+import { formatDate, getTodayInPeru } from '@/lib/dateUtils.ts';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   Pago,
   PagoWithRelations,
   PagoFormData,
   PagoInsert,
+  CuotaMatricula,
   MONEDAS,
   METODOS_PAGO,
   TIPOS_PAGO,
@@ -69,6 +70,8 @@ export default function AdminPagosManagement() {
   const [loadingProductos, setLoadingProductos] = useState(false);
   const [searchProducto, setSearchProducto] = useState('');
   const [showProductoDropdown, setShowProductoDropdown] = useState(false);
+  const [cuotasMatricula, setCuotasMatricula] = useState<CuotaMatricula[]>([]);
+  const [cuotaSeleccionada, setCuotaSeleccionada] = useState<string | null>(null);
   
   const [filters, setFilters] = useState({
     categoria: 'all',
@@ -81,7 +84,7 @@ export default function AdminPagosManagement() {
     codigo_producto: '',
     estudiante_id: '',
     monto_pago: 0,
-    fecha_pago: new Date().toISOString().split('T')[0],
+    fecha_pago: getTodayInPeru(),
     metodo_pago: 'En efectivo',
     moneda_pago: 'PEN',
     estado_pago: 'pago_regular',
@@ -205,18 +208,22 @@ export default function AdminPagosManagement() {
             });
           }
         });
-      } else if (categoria === 'material') {
+      } else if (categoria === 'books' || categoria === 'kits') {
+        // Filtrar materiales por tipo (book o kit)
         const { data, error } = await supabase
           .from('registro_compra_materiales' as any)
           .select(`
             id,
+            codigo_material,
             nombre,
+            tipo_material,
             monto,
             estudiante_id,
             estudiante:profiles!registro_compra_materiales_estudiante_id_fkey(id, first_name, last_name),
             course:courses(name)
           `)
           .eq('estado_pago', 'pendiente')
+          .eq('tipo_material', categoria === 'books' ? 'book' : 'kit')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -224,7 +231,7 @@ export default function AdminPagosManagement() {
         data?.forEach((mat: any) => {
           if (mat.estudiante) {
             productos.push({
-              codigo: `MAT-${mat.id.substring(0, 8)}`,
+              codigo: mat.codigo_material,
               descripcion: `${mat.nombre} - ${mat.course?.name || 'Sin curso'}`,
               estudiante_id: mat.estudiante_id,
               estudiante_nombre: `${mat.estudiante.first_name} ${mat.estudiante.last_name}`,
@@ -233,12 +240,14 @@ export default function AdminPagosManagement() {
             });
           }
         });
-      } else if (categoria === 'curso_grabado') {
+      } else if (categoria === 'clases_grabadas') {
         const { data, error } = await supabase
           .from('venta_cursos_grabados' as any)
           .select(`
             id,
-            monto,
+            codigo_venta,
+            valor_venta,
+            moneda_venta,
             estudiante_id,
             estudiante:profiles!venta_cursos_grabados_estudiante_id_fkey(id, first_name, last_name),
             curso_grabado:cursos_grabados(name)
@@ -251,12 +260,12 @@ export default function AdminPagosManagement() {
         data?.forEach((venta: any) => {
           if (venta.estudiante) {
             productos.push({
-              codigo: `CG-${venta.id.substring(0, 8)}`,
+              codigo: venta.codigo_venta,
               descripcion: `${venta.curso_grabado?.name || 'Curso grabado'}`,
               estudiante_id: venta.estudiante_id,
               estudiante_nombre: `${venta.estudiante.first_name} ${venta.estudiante.last_name}`,
-              monto: venta.monto,
-              moneda: 'PEN',
+              monto: venta.valor_venta,
+              moneda: venta.moneda_venta,
             });
           }
         });
@@ -284,7 +293,7 @@ export default function AdminPagosManagement() {
     fetchProductosPorCategoria(categoria);
   };
 
-  const handleProductoChange = (codigo: string) => {
+  const handleProductoChange = async (codigo: string) => {
     const producto = productosDisponibles.find(p => p.codigo === codigo);
     if (producto) {
       setFormData({
@@ -295,14 +304,71 @@ export default function AdminPagosManagement() {
         moneda_pago: (producto.moneda as any) || formData.moneda_pago,
       });
       setSearchProducto(codigo);
+      
+      // Si es una matrícula, cargar sus cuotas
+      if (formData.categoria_producto === 'matricula') {
+        await fetchCuotasMatricula(codigo);
+      }
     } else {
       setFormData({
         ...formData,
         codigo_producto: codigo,
       });
       setSearchProducto(codigo);
+      setCuotasMatricula([]);
+      setCuotaSeleccionada(null);
     }
     setShowProductoDropdown(false);
+  };
+
+  const fetchCuotasMatricula = async (codMatricula: string) => {
+    try {
+      // Obtener la matrícula
+      const { data: matriculaData, error: matriculaError } = await supabase
+        .from('matriculas' as any)
+        .select('id')
+        .eq('cod_matricula', codMatricula)
+        .single();
+
+      if (matriculaError) throw matriculaError;
+      if (!matriculaData) {
+        setCuotasMatricula([]);
+        return;
+      }
+
+      // Obtener el plan de cuotas
+      const { data: planData, error: planError } = await supabase
+        .from('plan_cuotas_matricula' as any)
+        .select('id')
+        .eq('matricula_id', matriculaData.id)
+        .single();
+
+      if (planError || !planData) {
+        setCuotasMatricula([]);
+        return;
+      }
+
+      // Obtener las cuotas
+      const { data: cuotasData, error: cuotasError } = await supabase
+        .from('cuotas_matricula' as any)
+        .select('*')
+        .eq('plan_cuotas_id', planData.id)
+        .order('numero_cuota');
+
+      if (cuotasError) throw cuotasError;
+
+      setCuotasMatricula(cuotasData || []);
+      
+      // Auto-seleccionar la primera cuota pendiente
+      const primeraCuotaPendiente = cuotasData?.find(c => c.estado === 'pendiente' || c.estado === 'parcial');
+      if (primeraCuotaPendiente) {
+        setCuotaSeleccionada(primeraCuotaPendiente.id);
+        setFormData(prev => ({ ...prev, monto_pago: primeraCuotaPendiente.monto_cuota - primeraCuotaPendiente.monto_pagado }));
+      }
+    } catch (error: any) {
+      console.error('Error al cargar cuotas:', error);
+      setCuotasMatricula([]);
+    }
   };
 
   const handleOpenDialog = () => {
@@ -311,7 +377,7 @@ export default function AdminPagosManagement() {
       codigo_producto: '',
       estudiante_id: '',
       monto_pago: 0,
-      fecha_pago: new Date().toISOString().split('T')[0],
+      fecha_pago: getTodayInPeru(),
       metodo_pago: 'En efectivo',
       moneda_pago: 'PEN',
       estado_pago: 'pago_regular',
@@ -321,12 +387,16 @@ export default function AdminPagosManagement() {
     setSearchProducto('');
     setShowProductoDropdown(false);
     setProductosDisponibles([]);
+    setCuotasMatricula([]);
+    setCuotaSeleccionada(null);
     fetchProductosPorCategoria('matricula');
     setDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
+    setCuotasMatricula([]);
+    setCuotaSeleccionada(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -355,6 +425,7 @@ export default function AdminPagosManagement() {
         ...formData,
         usuario_id: currentUser.id,
         estudiante_id: formData.estudiante_id || null,
+        cuota_id: cuotaSeleccionada || null,
       };
 
       const { error } = await supabase
@@ -362,6 +433,23 @@ export default function AdminPagosManagement() {
         .insert(pagoData);
 
       if (error) throw error;
+
+      // Si hay una cuota seleccionada, actualizar su monto pagado
+      if (cuotaSeleccionada) {
+        const cuota = cuotasMatricula.find(c => c.id === cuotaSeleccionada);
+        if (cuota) {
+          const nuevoMontoPagado = cuota.monto_pagado + formData.monto_pago;
+          
+          const { error: updateError } = await supabase
+            .from('cuotas_matricula' as any)
+            .update({ monto_pagado: nuevoMontoPagado })
+            .eq('id', cuotaSeleccionada);
+
+          if (updateError) {
+            console.error('Error actualizando cuota:', updateError);
+          }
+        }
+      }
 
       toast({
         title: 'Éxito',
@@ -749,6 +837,83 @@ export default function AdminPagosManagement() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Sección de Cuotas (solo para matrículas) */}
+            {formData.categoria_producto === 'matricula' && cuotasMatricula.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Cuotas de la Matrícula</CardTitle>
+                  <CardDescription>Seleccione la cuota a la que desea aplicar el pago</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {cuotasMatricula.map((cuota) => {
+                      const saldoPendiente = cuota.monto_cuota - cuota.monto_pagado;
+                      const isPendiente = cuota.estado === 'pendiente' || cuota.estado === 'parcial';
+                      
+                      return (
+                        <div
+                          key={cuota.id}
+                          onClick={() => {
+                            if (isPendiente) {
+                              setCuotaSeleccionada(cuota.id);
+                              setFormData(prev => ({ ...prev, monto_pago: saldoPendiente }));
+                            }
+                          }}
+                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                            cuotaSeleccionada === cuota.id
+                              ? 'border-blue-500 bg-blue-50'
+                              : cuota.estado === 'pagado'
+                              ? 'border-green-200 bg-green-50 opacity-60 cursor-not-allowed'
+                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">Cuota {cuota.numero_cuota}</span>
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  cuota.estado === 'pagado' ? 'bg-green-100 text-green-700' :
+                                  cuota.estado === 'parcial' ? 'bg-yellow-100 text-yellow-700' :
+                                  cuota.estado === 'vencido' ? 'bg-red-100 text-red-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {cuota.estado.toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                <div>Vence: {formatDate(cuota.fecha_vencimiento)}</div>
+                                <div>Monto: {formData.moneda_pago} {cuota.monto_cuota.toFixed(2)}</div>
+                                {cuota.monto_pagado > 0 && (
+                                  <div className="text-green-600">
+                                    Pagado: {formData.moneda_pago} {cuota.monto_pagado.toFixed(2)}
+                                  </div>
+                                )}
+                                {saldoPendiente > 0 && (
+                                  <div className="text-orange-600 font-medium">
+                                    Saldo: {formData.moneda_pago} {saldoPendiente.toFixed(2)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {cuotaSeleccionada === cuota.id && (
+                              <div className="text-blue-600">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {cuotaSeleccionada && (
+                    <p className="text-xs text-green-600 mt-3">
+                      ✓ Cuota seleccionada. El monto del pago se actualizará automáticamente.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Sección 2: Detalles del Pago */}
             <Card>

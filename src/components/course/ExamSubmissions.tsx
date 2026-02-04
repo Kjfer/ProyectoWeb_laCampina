@@ -74,7 +74,7 @@ export function ExamSubmissions({ examId, courseId }: ExamSubmissionsProps) {
         .from('course_enrollments')
         .select(`
           student_id,
-          profiles!inner(
+          profiles!fk_enrollments_profiles(
             id,
             first_name,
             last_name,

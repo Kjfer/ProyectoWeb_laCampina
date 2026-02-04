@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { formatDate } from '@/lib/dateUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +14,6 @@ import { WeeklyContentManager } from '@/components/course/WeeklyContentManager';
 import { AttendanceManager } from '@/components/course/AttendanceManager';
 import { AttendanceRecords } from '@/components/course/AttendanceRecords';
 import { StudentCourseAttendance } from '@/components/course/StudentCourseAttendance';
-import { CourseScheduleManager } from '@/components/course/CourseScheduleManager';
 import { ExamsList } from '@/components/course/ExamsList';
 import { CourseEditDialog } from '@/components/course/CourseEditDialog';
 import { CourseAssignmentsReview } from '@/components/course/CourseAssignmentsReview';
@@ -137,7 +137,7 @@ export default function CourseDetail() {
         id: data.id,
         name: data.name,
         code: data.code,
-        description: `${data.course?.name || ''} - Inicio: ${new Date(data.start_date).toLocaleDateString()}`,
+        description: `${data.course?.name || ''} - Inicio: ${formatDate(data.start_date)}`,
         academic_year: data.course?.academic_year || '',
         semester: data.course?.semester || '',
         is_active: true,
@@ -165,7 +165,7 @@ export default function CourseDetail() {
           enrolled_at,
           access_status,
           student_id,
-          profiles!inner(
+          profiles!fk_enrollments_profiles(
             id,
             first_name,
             last_name,
@@ -177,8 +177,11 @@ export default function CourseDetail() {
 
       if (error) throw error;
       
+      console.log('Raw enrollment data:', data);
+      
       const enrolledStudents = data
         ?.map(enrollment => {
+          console.log('Processing enrollment:', enrollment);
           const student = enrollment.profiles;
           if (!student) {
             console.warn('Enrollment without student data:', enrollment);
@@ -192,6 +195,7 @@ export default function CourseDetail() {
         })
         .filter((student): student is Student => student !== null) || [];
       
+      console.log('Processed students:', enrolledStudents);
       setStudents(enrolledStudents);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -302,10 +306,10 @@ export default function CourseDetail() {
                 <GraduationCap className="h-4 w-4 text-muted-foreground" />
                 <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Profesores</p>
-                  <p className="font-medium">
-                    {course.teacher?.first_name || 'Sin asignar'} {course.teacher?.last_name || ''}
+                  <div className="font-medium">
+                    <span>{course.teacher?.first_name || 'Sin asignar'} {course.teacher?.last_name || ''}</span>
                     {course.teacher && <Badge variant="secondary" className="ml-2">Principal</Badge>}
-                  </p>
+                  </div>
                   {additionalTeachers.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {additionalTeachers.map((teacher) => (
@@ -333,29 +337,19 @@ export default function CourseDetail() {
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Horario</p>
-                  <div className="font-medium flex flex-col leading-tight">
-                    {/* 1. Los Días */}
-                    <span className="text-sm">
-                      {Array.isArray(course.schedule) && course.schedule.length > 0
-                        ? course.schedule.map((d: string) => 
-                            ({
-                              'Monday': 'Lun', 'Tuesday': 'Mar', 'Wednesday': 'Mié', 
-                              'Thursday': 'Jue', 'Friday': 'Vie', 'Saturday': 'Sáb', 'Sunday': 'Dom'
-                            }[d] || (typeof d === 'string' ? d.slice(0,3) : ''))
-                          ).join(', ')
-                        : 'Días por definir'}
-                    </span>
-                    
-                    {/* 2. La Hora */}
+                  <div className="font-medium">
+                    {Array.isArray(course.schedule) && course.schedule.length > 0
+                      ? course.schedule.join(', ')
+                      : 'Por definir'}
                     {(course.start_time || course.end_time) && (
-                      <span className="text-xs text-blue-600 font-bold">
-                        {course.start_time?.slice(0,5)} - {course.end_time?.slice(0,5)} hrs
-                      </span>
+                      <div className="text-xs text-blue-600 font-semibold">
+                        {course.start_time?.slice(0,5)} - {course.end_time?.slice(0,5)}
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
-
+              
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
@@ -387,12 +381,6 @@ export default function CourseDetail() {
               <Users className="h-4 w-4" />
               Estudiantes
             </TabsTrigger>
-            {profile?.role === 'admin' && (
-              <TabsTrigger value="schedule" className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Horario
-              </TabsTrigger>
-            )}
           </TabsList>
 
           <TabsContent value="content">
@@ -459,7 +447,7 @@ export default function CourseDetail() {
                         </h3>
                         <p className="text-sm text-muted-foreground">{student.email}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Inscrito: {new Date(student.enrolled_at).toLocaleDateString()}
+                          Inscrito: {formatDate(student.enrolled_at)}
                         </p>
                       </div>
                     ))}
@@ -476,12 +464,6 @@ export default function CourseDetail() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {profile?.role === 'admin' && (
-            <TabsContent value="schedule">
-              <CourseScheduleManager courseId={course.id} canEdit={canEdit || false} />
-            </TabsContent>
-          )}
         </Tabs>
 
         {/* Course Edit Dialog */}

@@ -48,7 +48,7 @@ const AdminReports = () => {
       icon: BarChart3,
       path: '/admin/course-report',
       color: 'bg-purple-500',
-      available: false,
+      available: true,
     },
     {
       title: 'Reporte de Tareas y Exámenes',

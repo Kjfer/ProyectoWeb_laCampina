@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { formatDate } from '@/lib/dateUtils';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -239,11 +240,7 @@ export default function Profile() {
                         <div>
                           <p className="text-sm text-muted-foreground">Fecha de Nacimiento</p>
                           <p className="font-medium">
-                            {new Date(profile.birth_date).toLocaleDateString('es-ES', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
+                            {formatDate(profile.birth_date)}
                           </p>
                         </div>
                       </div>
@@ -273,11 +270,7 @@ export default function Profile() {
                       <div>
                         <p className="text-sm text-muted-foreground">Miembro desde</p>
                         <p className="font-medium">
-                          {user?.created_at ? new Date(user.created_at).toLocaleDateString('es-ES', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          }) : 'No disponible'}
+                          {user?.created_at ? formatDate(user.created_at) : 'No disponible'}
                         </p>
                       </div>
                     </div>

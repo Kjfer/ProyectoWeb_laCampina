@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatDate } from '@/lib/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -189,9 +190,9 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                   </CardTitle>
                   
                   {section.description && (
-                    <p className="text-sm text-muted-foreground mt-1 capitalize">
+                    <p className="text-sm text-muted-foreground mt-1">
                       Sesión del {section.start_date 
-                        ? new Date(section.start_date).toLocaleDateString('es-PE', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' }) 
+                        ? formatDate(section.start_date)
                         : 'Fecha por definir'}</p>
                   )}
                 </div>
@@ -201,8 +202,7 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
               <div className="flex items-center gap-3">
                 {section.start_date && (
                   <Badge variant="outline" className="text-xs font-mono bg-blue-50 text-blue-700 border-blue-100">
-                    {/* Usamos UTC para mantener tu lógica de fecha */}
-                    {new Date(section.start_date).toLocaleDateString('es-PE', { timeZone: 'UTC' })}
+                    {formatDate(section.start_date)}
                   </Badge>
                 )}
                 
@@ -277,7 +277,7 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                             )}
                             {resource.resource_type === 'assignment' && resource.assignment_deadline && (
                               <Badge variant="outline" className="text-[10px] h-5">
-                                Entrega: {new Date(resource.assignment_deadline).toLocaleDateString()}
+                                Entrega: {formatDate(resource.assignment_deadline)}
                               </Badge>
                             )}
                           </div>

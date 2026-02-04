@@ -41,6 +41,7 @@ import CreateExam from "./pages/CreateExam";
 import GradingView from "./pages/GradingView";
 import AdminAttendanceReport from "./pages/AdminAttendanceReport";
 import AdminReports from "./pages/AdminReports";
+import AdminCourseReport from "./pages/AdminCourseReport";
 import AdminCertificates from "./pages/AdminCertificates";
 import Settings from "./pages/Settings";
 // Peri Institute Model imports
@@ -199,6 +200,11 @@ const App = () => (
             <Route path="/admin/attendance-report" element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminAttendanceReport />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/course-report" element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminCourseReport />
               </ProtectedRoute>
             } />
             <Route path="/admin/reports" element={
