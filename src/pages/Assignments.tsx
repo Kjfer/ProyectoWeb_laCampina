@@ -14,23 +14,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreateAssignmentDialog } from '@/components/assignments/CreateAssignmentDialog';
 import { EditAssignmentDialog } from '@/components/assignments/EditAssignmentDialog';
+import { parsePeruDateToUserTimezone } from '@/lib/timezoneUtils';
 
-// Helper para parsear fechas sin conversión UTC
+// Helper para parsear fechas convirtiendo de hora Perú a zona del usuario
 const parseExamDate = (dateString: string): Date => {
-  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss"
-  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
-  if (match) {
-    const [_, year, month, day, hour, minute, second] = match;
-    return new Date(
-      parseInt(year),
-      parseInt(month) - 1,
-      parseInt(day),
-      parseInt(hour),
-      parseInt(minute),
-      parseInt(second)
-    );
-  }
-  return new Date(dateString);
+  return parsePeruDateToUserTimezone(dateString);
 };
 
 interface Assignment {

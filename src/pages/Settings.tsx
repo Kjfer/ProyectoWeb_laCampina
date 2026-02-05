@@ -1,48 +1,109 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { setUserTimezone } from '@/lib/timezoneUtils';
 import { 
-  Bell, 
-  Mail, 
   Shield, 
-  Moon, 
-  Globe, 
   Lock,
-  Save
+  Save,
+  Loader2,
+  Moon,
+  Sun,
+  Clock
 } from 'lucide-react';
+
+interface UserPreferences {
+  darkMode: boolean;
+  timezone: string;
+}
 
 export default function Settings() {
   const { profile } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [loadingPrefs, setLoadingPrefs] = useState(true);
 
   // Estados para configuraciones
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [assignmentReminders, setAssignmentReminders] = useState(true);
-  const [examReminders, setExamReminders] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [language, setLanguage] = useState('es');
+  const [preferences, setPreferences] = useState<UserPreferences>({
+    darkMode: false,
+    timezone: 'America/Lima', // Perú por defecto
+  });
+
+  // Cargar preferencias del usuario
+  useEffect(() => {
+    if (profile?.id) {
+      loadUserPreferences();
+    }
+  }, [profile?.id]);
+
+  const loadUserPreferences = async () => {
+    try {
+      setLoadingPrefs(true);
+      // Intentar obtener las preferencias de la tabla profiles si existen
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('metadata')
+        .eq('id', profile!.id)
+        .single();
+
+      if (!error && data?.metadata?.preferences) {
+        const prefs = data.metadata.preferences;
+        setPreferences({
+          darkMode: prefs.darkMode ?? false,
+          timezone: prefs.timezone ?? 'America/Lima',
+        });
+        
+        // Aplicar tema oscuro si está activado
+        if (prefs.darkMode) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading preferences:', error);
+    } finally {
+      setLoadingPrefs(false);
+    }
+  };
 
   const handleSaveSettings = async () => {
+    if (!profile?.id) return;
+    
     setLoading(true);
     try {
-      // Aquí puedes guardar las configuraciones en la base de datos
-      // Por ahora solo mostramos un mensaje de éxito
+      // Guardar zona horaria en localStorage
+      setUserTimezone(preferences.timezone);
+      
+      // DEBUG: Verificar que se guardó
+      console.log('Zona horaria guardada:', preferences.timezone);
+      console.log('Zona horaria en localStorage:', localStorage.getItem('userTimezone'));
+      
+      // Guardar preferencias en el metadata del perfil
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          metadata: {
+            preferences
+          }
+        })
+        .eq('id', profile.id);
+
+      if (error) throw error;
       
       toast({
         title: 'Configuración guardada',
-        description: 'Tus preferencias han sido actualizadas correctamente.',
+        description: 'Tus preferencias han sido actualizadas correctamente. Recarga la página para ver los cambios.',
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error saving settings:', error);
       toast({
         title: 'Error',
         description: 'No se pudo guardar la configuración.',
@@ -53,93 +114,72 @@ export default function Settings() {
     }
   };
 
+  const handlePasswordReset = async () => {
+    if (!profile?.email) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Correo enviado',
+        description: 'Revisa tu bandeja de entrada para cambiar tu contraseña.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo enviar el correo de recuperación.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updatePreference = (key: keyof UserPreferences, value: boolean | string) => {
+    setPreferences(prev => {
+      const newPrefs = { ...prev, [key]: value };
+      
+      // Aplicar tema oscuro inmediatamente al cambiar el switch
+      if (key === 'darkMode') {
+        if (value) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+      
+      return newPrefs;
+    });
+  };
+
+  if (loadingPrefs) {
+    return (
+      <DashboardLayout>
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">Configuración</h1>
           <p className="text-muted-foreground mt-2">
-            Administra tus preferencias y configuración de la cuenta
+            Administra tus preferencias de apariencia y seguridad
           </p>
         </div>
 
         <div className="space-y-6">
-          {/* Notificaciones */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-primary" />
-                Notificaciones
-              </CardTitle>
-              <CardDescription>
-                Configura cómo y cuándo quieres recibir notificaciones
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="email-notifications">Notificaciones por Email</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Recibe actualizaciones importantes por correo electrónico
-                  </p>
-                </div>
-                <Switch
-                  id="email-notifications"
-                  checked={emailNotifications}
-                  onCheckedChange={setEmailNotifications}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="push-notifications">Notificaciones Push</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Recibe notificaciones en tiempo real
-                  </p>
-                </div>
-                <Switch
-                  id="push-notifications"
-                  checked={pushNotifications}
-                  onCheckedChange={setPushNotifications}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="assignment-reminders">Recordatorios de Tareas</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Recibe recordatorios de tareas próximas a vencer
-                  </p>
-                </div>
-                <Switch
-                  id="assignment-reminders"
-                  checked={assignmentReminders}
-                  onCheckedChange={setAssignmentReminders}
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="exam-reminders">Recordatorios de Exámenes</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Recibe recordatorios de exámenes próximos
-                  </p>
-                </div>
-                <Switch
-                  id="exam-reminders"
-                  checked={examReminders}
-                  onCheckedChange={setExamReminders}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Apariencia */}
           <Card>
             <CardHeader>
@@ -161,46 +201,73 @@ export default function Settings() {
                 </div>
                 <Switch
                   id="dark-mode"
-                  checked={darkMode}
-                  onCheckedChange={setDarkMode}
+                  checked={preferences.darkMode}
+                  onCheckedChange={(val) => updatePreference('darkMode', val)}
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Idioma y Región */}
+          {/* Zona Horaria */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Globe className="w-5 h-5 text-primary" />
-                Idioma y Región
+                <Clock className="w-5 h-5 text-primary" />
+                Zona Horaria
               </CardTitle>
               <CardDescription>
-                Configura tu idioma y preferencias regionales
+                Configura tu zona horaria local para mostrar las fechas correctamente
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="language">Idioma</Label>
+                <Label htmlFor="timezone">Zona Horaria</Label>
                 <select
-                  id="language"
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
+                  id="timezone"
+                  value={preferences.timezone}
+                  onChange={(e) => updatePreference('timezone', e.target.value)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <option value="es">Español</option>
-                  <option value="en">English</option>
+                  <option value="America/Lima">Perú - Lima (GMT-5)</option>
+                  <option value="America/Bogota">Colombia - Bogotá (GMT-5)</option>
+                  <option value="America/Guayaquil">Ecuador - Guayaquil (GMT-5)</option>
+                  <option value="America/Mexico_City">México - Ciudad de México (GMT-6)</option>
+                  <option value="America/Caracas">Venezuela - Caracas (GMT-4)</option>
+                  <option value="America/Argentina/Buenos_Aires">Argentina - Buenos Aires (GMT-3)</option>
+                  <option value="America/Santiago">Chile - Santiago (GMT-4/-3)</option>
+                  <option value="America/Montevideo">Uruguay - Montevideo (GMT-3)</option>
+                  <option value="America/Asuncion">Paraguay - Asunción (GMT-4/-3)</option>
+                  <option value="America/La_Paz">Bolivia - La Paz (GMT-4)</option>
+                  <option value="America/Panama">Panamá (GMT-5)</option>
+                  <option value="America/Costa_Rica">Costa Rica (GMT-6)</option>
+                  <option value="America/Guatemala">Guatemala (GMT-6)</option>
+                  <option value="America/Managua">Nicaragua (GMT-6)</option>
+                  <option value="America/Tegucigalpa">Honduras (GMT-6)</option>
+                  <option value="America/El_Salvador">El Salvador (GMT-6)</option>
+                  <option value="America/Havana">Cuba - La Habana (GMT-5/-4)</option>
+                  <option value="America/Santo_Domingo">República Dominicana (GMT-4)</option>
+                  <option value="Europe/Madrid">España - Madrid (GMT+1/+2)</option>
+                  <option value="UTC">UTC (GMT+0)</option>
                 </select>
+                <div className="mt-3 p-3 bg-muted rounded-md">
+                  <p className="text-sm font-medium mb-1">Vista previa de zona horaria:</p>
+                  <p className="text-xs text-muted-foreground">
+                    Las fechas y horas se mostrarán según tu zona horaria seleccionada.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <strong>Ejemplo:</strong> Una tarea con límite a las 23:55 hora Perú se mostrará en tu hora local.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Seguridad y Privacidad */}
+          {/* Seguridad */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="w-5 h-5 text-primary" />
-                Seguridad y Privacidad
+                Seguridad
               </CardTitle>
               <CardDescription>
                 Administra la seguridad de tu cuenta
@@ -208,13 +275,19 @@ export default function Settings() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="current-password">Cambiar Contraseña</Label>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Para cambiar tu contraseña, recibirás un enlace en tu correo electrónico
+                <Label>Cambiar Contraseña</Label>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Recibirás un correo con instrucciones para cambiar tu contraseña
                 </p>
-                <Button variant="outline" className="w-full" type="button">
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  type="button"
+                  onClick={handlePasswordReset}
+                  disabled={loading}
+                >
                   <Lock className="w-4 h-4 mr-2" />
-                  Enviar enlace para cambiar contraseña
+                  {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
                 </Button>
               </div>
             </CardContent>
@@ -222,12 +295,22 @@ export default function Settings() {
 
           {/* Botón Guardar */}
           <div className="flex justify-end gap-4">
-            <Button variant="outline" disabled={loading}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveSettings} disabled={loading}>
-              <Save className="w-4 h-4 mr-2" />
-              {loading ? 'Guardando...' : 'Guardar Cambios'}
+            <Button 
+              onClick={handleSaveSettings} 
+              disabled={loading}
+              className="min-w-[150px]"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Guardar Cambios
+                </>
+              )}
             </Button>
           </div>
         </div>

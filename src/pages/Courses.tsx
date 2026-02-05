@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/lib/dateUtils';
+import { formatDateInUserTimezone } from '@/lib/timezoneUtils';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -370,7 +370,7 @@ const Courses = () => {
                   {profile?.role === 'student' && course.enrolled_at && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
-                      <span>Inscrito: {formatDate(course.enrolled_at)}</span>
+                      <span>Inscrito: {formatDateInUserTimezone(course.enrolled_at)}</span>
                     </div>
                   )}
 

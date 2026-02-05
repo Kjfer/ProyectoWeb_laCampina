@@ -331,9 +331,9 @@ export function StudentCourses() {
 
   if (loading) {
     return (
-      <Card className="bg-gradient-card shadow-card border-0">
+      <Card className="bg-gradient-card dark:bg-gray-800 shadow-card border-0 dark:border dark:border-gray-700">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <CardTitle className="text-lg font-semibold text-foreground dark:text-white flex items-center gap-2">
             <BookOpen className="w-5 h-5" />
             Mis Cursos Activos
           </CardTitle>
@@ -351,15 +351,15 @@ export function StudentCourses() {
 
   if (courses.length === 0) {
     return (
-      <Card className="bg-gradient-card shadow-card border-0">
+      <Card className="bg-gradient-card dark:bg-gray-800 shadow-card border-0 dark:border dark:border-gray-700">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <CardTitle className="text-lg font-semibold text-foreground dark:text-white flex items-center gap-2">
             <BookOpen className="w-5 h-5" />
             {profile?.role === 'teacher' ? 'Mis Módulos Asignados' : 'Mis Cursos Activos'}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-muted-foreground dark:text-gray-400">
             <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p>{profile?.role === 'teacher' ? 'No tienes módulos asignados' : 'No estás inscrito en ningún curso'}</p>
           </div>
@@ -369,9 +369,9 @@ export function StudentCourses() {
   }
 
   return (
-    <Card className="bg-gradient-card shadow-card border-0">
+    <Card className="bg-gradient-card dark:bg-gray-800 shadow-card border-0 dark:border dark:border-gray-700">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+        <CardTitle className="text-lg font-semibold text-foreground dark:text-white flex items-center gap-2">
           <BookOpen className="w-5 h-5" />
           {profile?.role === 'teacher' ? 'Mis Módulos Asignados' : 'Mis Cursos Activos'}
         </CardTitle>
@@ -381,25 +381,25 @@ export function StudentCourses() {
           {courses.map((course) => (
             <div
               key={course.id}
-              className="p-4 rounded-lg bg-background/60 border border-border/50 hover:shadow-card transition-all duration-200"
+              className="p-4 rounded-lg bg-background/60 dark:bg-gray-700/50 border border-border/50 dark:border-gray-600 hover:shadow-card dark:hover:bg-gray-700 transition-all duration-200"
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-medium text-foreground">{course.name}</h4>
+                    <h4 className="font-medium text-foreground dark:text-gray-200">{course.name}</h4>
                     <Badge variant="secondary" className="text-xs">
                       {course.code}
                     </Badge>
                   </div>
                   
                   {course.teacher && profile?.role !== 'teacher' && (
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground dark:text-gray-400 mb-2">
                       <User className="w-3 h-3" />
                       Prof. {course.teacher.first_name} {course.teacher.last_name}
                     </div>
                   )}
 
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground dark:text-gray-500">
                     <Clock className="w-3 h-3" />
                     {formatSchedule(course)}
                   </div>
@@ -413,18 +413,18 @@ export function StudentCourses() {
               </div>
 
               {(course.pending_assignments! > 0 || course.upcoming_exams! > 0) && (
-                <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/30">
+                <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/30 dark:border-gray-600">
                   {course.pending_assignments! > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <FileText className="w-3 h-3 text-accent" />
-                      <span className="font-medium text-accent">{course.pending_assignments}</span> 
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground dark:text-gray-400">
+                      <FileText className="w-3 h-3 text-accent dark:text-yellow-400" />
+                      <span className="font-medium text-accent dark:text-yellow-400">{course.pending_assignments}</span> 
                       {profile?.role === 'teacher' ? ' entregas por revisar' : ' tareas pendientes'}
                     </div>
                   )}
                   {course.upcoming_exams! > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <ClipboardList className="w-3 h-3 text-accent" />
-                      <span className="font-medium text-accent">{course.upcoming_exams}</span> exámenes próximos
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground dark:text-gray-400">
+                      <ClipboardList className="w-3 h-3 text-accent dark:text-yellow-400" />
+                      <span className="font-medium text-accent dark:text-yellow-400">{course.upcoming_exams}</span> exámenes próximos
                     </div>
                   )}
                 </div>
@@ -435,9 +435,9 @@ export function StudentCourses() {
         
         {/* Pagination */}
         {totalCourses > ITEMS_PER_PAGE && (
-          <div className="mt-6 pt-4 border-t border-border/30">
+          <div className="mt-6 pt-4 border-t border-border/30 dark:border-gray-700">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground dark:text-gray-400">
                 Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalCourses)} de {totalCourses} {profile?.role === 'teacher' ? 'módulos' : 'cursos'}
               </p>
               <div className="flex items-center gap-2">

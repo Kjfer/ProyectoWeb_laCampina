@@ -34,9 +34,9 @@ const upcomingClasses = [
 
 export function UpcomingClasses() {
   return (
-    <Card className="bg-gradient-card shadow-card border-0">
+    <Card className="bg-gradient-card dark:bg-gray-800 shadow-card border-0 dark:border dark:border-gray-700">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+        <CardTitle className="text-lg font-semibold text-foreground dark:text-white flex items-center gap-2">
           <Calendar className="w-5 h-5" />
           Próximas Clases
         </CardTitle>
@@ -46,20 +46,20 @@ export function UpcomingClasses() {
           {upcomingClasses.map((classItem) => (
             <div
               key={classItem.id}
-              className="flex items-center justify-between p-4 rounded-lg bg-background/60 border border-border/50 hover:shadow-card transition-all duration-200"
+              className="flex items-center justify-between p-4 rounded-lg bg-background/60 dark:bg-gray-700/50 border border-border/50 dark:border-gray-600 hover:shadow-card dark:hover:bg-gray-700 transition-all duration-200"
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <h4 className="font-medium text-foreground">{classItem.subject}</h4>
+                  <h4 className="font-medium text-foreground dark:text-gray-200">{classItem.subject}</h4>
                   {classItem.isLive && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent text-accent-foreground text-xs font-medium">
-                      <div className="w-2 h-2 bg-accent-foreground rounded-full animate-pulse"></div>
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent dark:bg-yellow-900/40 text-accent-foreground dark:text-yellow-200 text-xs font-medium">
+                      <div className="w-2 h-2 bg-accent-foreground dark:bg-yellow-200 rounded-full animate-pulse"></div>
                       En Vivo
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">{classItem.teacher}</p>
-                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground dark:text-gray-400">{classItem.teacher}</p>
+                <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground dark:text-gray-500">
                   <div className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {classItem.time}
@@ -78,7 +78,7 @@ export function UpcomingClasses() {
                 <Button 
                   size="sm" 
                   variant={classItem.isLive ? "default" : "outline"}
-                  className={classItem.isLive ? "bg-gradient-primary shadow-glow" : ""}
+                  className={classItem.isLive ? "bg-gradient-primary dark:bg-blue-900/60 shadow-glow" : ""}
                 >
                   <Video className="w-4 h-4 mr-2" />
                   {classItem.isLive ? "Unirse" : "Programada"}

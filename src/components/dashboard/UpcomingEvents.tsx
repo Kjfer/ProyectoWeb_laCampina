@@ -166,11 +166,11 @@ export function UpcomingEvents() {
   const getEventColor = (type: string) => {
     switch (type) {
       case 'assignment':
-        return 'bg-orange-100 text-orange-700 border-orange-300';
+        return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700';
       case 'exam':
-        return 'bg-red-100 text-red-700 border-red-300';
+        return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700';
       default:
-        return 'bg-blue-100 text-blue-700 border-blue-300';
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700';
     }
   };
 
@@ -231,7 +231,7 @@ export function UpcomingEvents() {
             ))}
           </div>
         ) : events.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-muted-foreground dark:text-gray-400">
             <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No hay eventos próximos</p>
           </div>
@@ -241,25 +241,25 @@ export function UpcomingEvents() {
               <div
                 key={event.id}
                 onClick={() => handleEventClick(event)}
-                className="flex items-start gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors cursor-pointer"
+                className="flex items-start gap-3 p-3 rounded-lg border dark:border-gray-700 hover:bg-accent/50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
               >
                 <div className={`p-2 rounded-md ${getEventColor(event.type)}`}>
                   {getEventIcon(event.type)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="font-medium text-sm truncate">{event.title}</p>
+                    <p className="font-medium text-sm truncate dark:text-gray-200">{event.title}</p>
                     <Badge variant="outline" className="text-xs">
                       {getEventLabel(event.type)}
                     </Badge>
                   </div>
                   {event.courseName && (
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="text-xs text-muted-foreground dark:text-gray-400 truncate">
                       {event.courseName}
                       {event.moduleNumber && ` - Módulo ${event.moduleNumber}`}
                     </p>
                   )}
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground dark:text-gray-500 mt-1">
                     <Clock className="h-3 w-3" />
                     <span>{getDateLabel(event.date)}</span>
                     <span>•</span>

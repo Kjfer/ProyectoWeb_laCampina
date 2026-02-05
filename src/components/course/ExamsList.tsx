@@ -9,6 +9,7 @@ import { format, isAfter, isBefore, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { EditExamDialog } from './EditExamDialog';
+import { parsePeruDateToUserTimezone } from '@/lib/timezoneUtils';
 
 interface Exam {
   id: string;
@@ -25,26 +26,9 @@ interface ExamsListProps {
   canEdit: boolean;
 }
 
-// Función helper para parsear fecha de la BD sin conversión de timezone
-// La BD guarda en UTC, pero queremos mostrar la hora "tal cual" sin conversión
+// Función helper para parsear fechas convirtiendo de hora Perú a zona del usuario
 const parseExamDate = (dateString: string): Date => {
-  // Extraer la fecha y hora directamente del string sin conversión de zona horaria
-  // Formato esperado: "2026-02-04 11:30:00+00" o "2026-02-04T11:30:00+00:00"
-  const match = dateString.match(/(\d{4})-(\d{2})-(\d{2})[\sT](\d{2}):(\d{2}):(\d{2})/);
-  if (match) {
-    const [, year, month, day, hours, minutes, seconds] = match;
-    // Crear fecha local sin conversión (como si fuera hora local)
-    return new Date(
-      parseInt(year),
-      parseInt(month) - 1, // JavaScript months are 0-indexed
-      parseInt(day),
-      parseInt(hours),
-      parseInt(minutes),
-      parseInt(seconds)
-    );
-  }
-  // Fallback: usar conversión normal
-  return new Date(dateString);
+  return parsePeruDateToUserTimezone(dateString);
 };
 
 export function ExamsList({ courseId, canEdit }: ExamsListProps) {

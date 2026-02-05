@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { formatDateTime } from '@/lib/dateUtils';
+import { formatDateTimeInUserTimezone } from '@/lib/timezoneUtils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -302,7 +302,7 @@ export function ResourceDetailModal({ resource, isOpen, onClose }: ResourceDetai
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Fecha límite:</span>
                       <p className="font-medium">
-                        {formatDateTime(resource.assignment_deadline)}
+                        {formatDateTimeInUserTimezone(resource.assignment_deadline)}
                       </p>
                     </div>
                   )}

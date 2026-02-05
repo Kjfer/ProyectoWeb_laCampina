@@ -79,23 +79,23 @@ const AdeudosBanner = ({ studentCode }: AdeudosBannerProps) => {
         </div>
       ) : (
         // CASO AL DÍA (Verde)
-        <div className="mb-6 rounded-lg bg-green-50/50 border border-green-100 p-3 flex items-center justify-between shadow-sm animate-fade-in">
+        <div className="mb-6 rounded-lg bg-green-50/50 dark:bg-green-950/30 border border-green-100 dark:border-green-800 p-3 flex items-center justify-between shadow-sm animate-fade-in">
           <div className="flex items-center">
-            <CheckCircle className="h-5 w-5 text-green-600 mr-3 flex-shrink-0" />
+            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mr-3 flex-shrink-0" />
             <div>
-              <span className="text-green-800 font-medium text-sm">
+              <span className="text-green-800 dark:text-green-200 font-medium text-sm">
                 Estado financiero al día.
               </span>
-              <span className="text-green-600 text-xs ml-2 hidden sm:inline">
+              <span className="text-green-600 dark:text-green-400 text-xs ml-2 hidden sm:inline">
                 ¡Gracias por tu puntualidad!
               </span>
             </div>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="text-green-700 hover:text-green-900 text-sm font-medium flex items-center transition-colors"
+            className="text-green-700 dark:text-green-300 hover:text-green-900 dark:hover:text-green-100 text-sm font-medium flex items-center transition-colors"
           >
-             Ver Historial <ChevronRight className="h-4 w-4 ml-1" />
+            Ver Historial <ChevronRight className="h-4 w-4 ml-1" />
           </button>
         </div>
       )}

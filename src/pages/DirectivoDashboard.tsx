@@ -344,7 +344,7 @@ const DirectivoDashboard = () => {
   const getTrendIcon = (current: number, previous: number) => {
     if (current > previous) return <ArrowUp className="h-4 w-4 text-green-500" />;
     if (current < previous) return <ArrowDown className="h-4 w-4 text-red-500" />;
-    return <Minus className="h-4 w-4 text-gray-400" />;
+    return <Minus className="h-4 w-4 text-gray-400 dark:text-gray-500" />;
   };
 
   const getTrendPercentage = (current: number, previous: number) => {
@@ -560,7 +560,7 @@ const DirectivoDashboard = () => {
                 <CardContent className="space-y-4">
                   {getTopPerformers().length > 0 ? (
                     getTopPerformers().map((teacher, idx) => (
-                      <div key={teacher.teacher_id} className="flex items-center gap-4 p-4 bg-white rounded-lg shadow">
+                      <div key={teacher.teacher_id} className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
                         <div className="flex items-center justify-center w-12 h-12 rounded-full bg-yellow-500 text-white font-bold text-xl">
                           {idx + 1}
                         </div>
@@ -597,7 +597,7 @@ const DirectivoDashboard = () => {
                 <CardContent className="space-y-4">
                   {getNeedsAttention().length > 0 ? (
                     getNeedsAttention().map((teacher, idx) => (
-                      <div key={teacher.teacher_id} className="flex items-center gap-4 p-4 bg-white rounded-lg shadow border-l-4 border-orange-500">
+                      <div key={teacher.teacher_id} className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow border-l-4 border-orange-500">
                         <AlertTriangle className="h-8 w-8 text-orange-500 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-lg font-bold">
@@ -1148,19 +1148,19 @@ const DirectivoDashboard = () => {
                   .sort((a, b) => b.assignments_last_month - a.assignments_last_month)
                   .slice(0, 5)
                   .map((teacher, idx) => (
-                    <div key={teacher.teacher_id} className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
+                    <div key={teacher.teacher_id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
                       <div className={`flex items-center justify-center w-8 h-8 rounded-full ${idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-orange-600' : 'bg-gray-200'} text-white font-bold`}>
                         {idx + 1}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-sm">
+                        <p className="font-medium text-sm dark:text-gray-200">
                           {teacher.first_name} {teacher.last_name}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {teacher.assignments_last_month} tareas este mes
                         </p>
                       </div>
-                      <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                         {teacher.assignments_last_month}
                       </div>
                     </div>
@@ -1183,19 +1183,19 @@ const DirectivoDashboard = () => {
                   .sort((a, b) => a.pending_grading - b.pending_grading)
                   .slice(0, 5)
                   .map((teacher, idx) => (
-                    <div key={teacher.teacher_id} className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
+                    <div key={teacher.teacher_id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
                       <div className={`flex items-center justify-center w-8 h-8 rounded-full ${idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-orange-600' : 'bg-gray-200'} text-white font-bold`}>
                         {idx + 1}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-sm">
+                        <p className="font-medium text-sm dark:text-gray-200">
                           {teacher.first_name} {teacher.last_name}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {teacher.graded_submissions} calificadas
                         </p>
                       </div>
-                      <div className="text-2xl font-bold text-green-600">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                         {teacher.pending_grading}
                       </div>
                     </div>
@@ -1218,19 +1218,19 @@ const DirectivoDashboard = () => {
                   .sort((a, b) => b.total_exams - a.total_exams)
                   .slice(0, 5)
                   .map((teacher, idx) => (
-                    <div key={teacher.teacher_id} className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
+                    <div key={teacher.teacher_id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
                       <div className={`flex items-center justify-center w-8 h-8 rounded-full ${idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-orange-600' : 'bg-gray-200'} text-white font-bold`}>
                         {idx + 1}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-sm">
+                        <p className="font-medium text-sm dark:text-gray-200">
                           {teacher.first_name} {teacher.last_name}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {teacher.total_exams} exámenes
                         </p>
                       </div>
-                      <div className="text-2xl font-bold text-purple-600">
+                      <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                         {teacher.total_exams}
                       </div>
                     </div>

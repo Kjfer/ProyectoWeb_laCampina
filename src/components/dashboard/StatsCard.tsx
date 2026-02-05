@@ -23,14 +23,14 @@ export function StatsCard({
   };
 
   return (
-    <Card className="bg-gradient-card shadow-card hover:shadow-soft transition-all duration-300 border-0">
+    <Card className="bg-gradient-card dark:bg-gray-800 shadow-card hover:shadow-soft transition-all duration-300 border-0 dark:border dark:border-gray-700">
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-3xl font-bold text-foreground">{value}</p>
+            <p className="text-sm font-medium text-muted-foreground dark:text-gray-400">{title}</p>
+            <p className="text-3xl font-bold text-foreground dark:text-white">{value}</p>
             {description && (
-              <p className="text-sm text-muted-foreground">{description}</p>
+              <p className="text-sm text-muted-foreground dark:text-gray-400">{description}</p>
             )}
           </div>
           <div className={`w-12 h-12 rounded-lg ${colorClasses[color]} flex items-center justify-center shadow-soft`}>

@@ -115,52 +115,76 @@ const AdminDashboard = () => {
         });
       }
 
-      // Obtener últimas matrículas
-      const { data: enrollments } = await supabase
+      // Obtener últimas matrículas - consulta simplificada
+      const { data: enrollments, error: enrollmentError } = await supabase
         .from('matriculas')
-        .select(`
-          id, 
-          created_at,
-          student:profiles!matriculas_student_id_fkey(first_name, last_name),
-          edicion:ediciones(nombre)
-        `)
+        .select('id, created_at, student_id, edicion_id')
         .order('created_at', { ascending: false })
         .limit(3);
 
-      if (enrollments) {
-        enrollments.forEach(enrollment => {
-          activities.push({
-            id: enrollment.id,
-            type: 'matricula',
-            description: `Nueva matrícula: ${enrollment.student?.first_name} ${enrollment.student?.last_name} en ${enrollment.edicion?.nombre}`,
-            created_at: enrollment.created_at
-          });
-        });
+      if (enrollments && !enrollmentError) {
+        // Obtener detalles adicionales para cada matrícula
+        for (const enrollment of enrollments) {
+          try {
+            const { data: student } = await supabase
+              .from('profiles')
+              .select('first_name, last_name')
+              .eq('id', enrollment.student_id)
+              .single();
+
+            const { data: edicion } = await supabase
+              .from('ediciones')
+              .select('nombre')
+              .eq('id', enrollment.edicion_id)
+              .single();
+
+            activities.push({
+              id: enrollment.id,
+              type: 'matricula',
+              description: `Nueva matrícula: ${student?.first_name || ''} ${student?.last_name || ''} en ${edicion?.nombre || 'Edición'}`,
+              created_at: enrollment.created_at
+            });
+          } catch (err) {
+            console.error('Error fetching enrollment details:', err);
+          }
+        }
       }
 
-      // Obtener últimos pagos
-      const { data: payments } = await supabase
+      // Obtener últimos pagos - consulta simplificada
+      const { data: payments, error: paymentsError } = await supabase
         .from('pagos')
-        .select(`
-          id,
-          monto,
-          created_at,
-          matricula:matriculas(
-            student:profiles!matriculas_student_id_fkey(first_name, last_name)
-          )
-        `)
+        .select('id, monto, created_at, matricula_id')
         .order('created_at', { ascending: false })
         .limit(3);
 
-      if (payments) {
-        payments.forEach(payment => {
-          activities.push({
-            id: payment.id,
-            type: 'pago',
-            description: `Pago registrado: S/.${payment.monto} de ${payment.matricula?.student?.first_name} ${payment.matricula?.student?.last_name}`,
-            created_at: payment.created_at
-          });
-        });
+      if (payments && !paymentsError) {
+        // Obtener detalles adicionales para cada pago
+        for (const payment of payments) {
+          try {
+            const { data: matricula } = await supabase
+              .from('matriculas')
+              .select('student_id')
+              .eq('id', payment.matricula_id)
+              .single();
+
+            if (matricula) {
+              const { data: student } = await supabase
+                .from('profiles')
+                .select('first_name, last_name')
+                .eq('id', matricula.student_id)
+                .single();
+
+              activities.push({
+                id: payment.id,
+                type: 'pago',
+                description: `Pago registrado: S/.${payment.monto} de ${student?.first_name || ''} ${student?.last_name || ''}`,
+                created_at: payment.created_at
+              });
+            }
+          } catch (err) {
+            console.error('Error fetching payment details:', err);
+          }
+        }
       }
 
       // Ordenar por fecha y tomar las 6 más recientes
@@ -204,8 +228,8 @@ const AdminDashboard = () => {
         <div className="container mx-auto px-4 py-8">
           <Card>
             <CardContent className="p-6">
-              <h1 className="text-2xl font-bold text-red-600">Acceso Denegado</h1>
-              <p className="mt-2 text-gray-600">No tienes permisos para acceder al panel de administración.</p>
+              <h1 className="text-2xl font-bold text-red-600 dark:text-red-400">Acceso Denegado</h1>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">No tienes permisos para acceder al panel de administración.</p>
             </CardContent>
           </Card>
         </div>
@@ -234,8 +258,8 @@ const AdminDashboard = () => {
     <DashboardLayout>
       <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Panel de Administración</h1>
-        <p className="mt-2 text-gray-600">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Panel de Administración</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
           Gestiona usuarios, cursos y contenido de Peri Institute
         </p>
       </div>
@@ -276,14 +300,14 @@ const AdminDashboard = () => {
           return (
             <Card key={index} className="hover:shadow-lg transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
+                <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   {stat.title}
                 </CardTitle>
                 <IconComponent className={`h-4 w-4 ${stat.color}`} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-gray-500 mt-1">
+                <div className="text-2xl font-bold dark:text-white">{stat.value}</div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {stat.description}
                 </p>
               </CardContent>
@@ -311,14 +335,14 @@ const AdminDashboard = () => {
                           <Badge variant={getActivityBadgeVariant(activity.type)}>
                             {activity.type.charAt(0).toUpperCase() + activity.type.slice(1)}
                           </Badge>
-                          <span className="text-sm">{activity.description}</span>
+                          <span className="text-sm dark:text-gray-300">{activity.description}</span>
                         </div>
-                        <span className="text-xs text-gray-500">{getTimeAgo(activity.created_at)}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{getTimeAgo(activity.created_at)}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 text-center py-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
                     No hay actividad reciente
                   </p>
                 )}

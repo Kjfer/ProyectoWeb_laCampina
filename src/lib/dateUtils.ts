@@ -3,6 +3,8 @@
  * Evita problemas de zona horaria al mostrar fechas de base de datos
  */
 
+import { formatDateInUserTimezone, formatDateTimeInUserTimezone } from './timezoneUtils';
+
 /**
  * Parsea una fecha desde la base de datos sin conversión UTC
  * Esto previene el desfase de horas al mostrar fechas
@@ -43,51 +45,26 @@ export const formatLocalDateTime = (date: Date): string => {
 /**
  * Formatea una fecha en formato YYYY-MM-DD a DD/MM/YYYY
  * Útil para fechas almacenadas en base de datos sin componente de tiempo
+ * Usa la zona horaria configurada por el usuario
  */
 export const formatDate = (dateString: string | null | undefined): string => {
   if (!dateString) return '-';
   
-  // Convertir a string si no lo es
-  const dateStr = String(dateString);
-  
-  // Extraer solo la parte de fecha si viene con timestamp
-  const datePart = dateStr.split('T')[0];
-  
-  // Verificar formato YYYY-MM-DD
-  if (datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    const [year, month, day] = datePart.split('-');
-    return `${day}/${month}/${year}`;
+  // Si es una fecha simple (YYYY-MM-DD), usar función con timezone
+  if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return formatDateInUserTimezone(dateString + 'T00:00:00');
   }
   
-  // Fallback: intentar parsear pero sin timezone
-  const date = new Date(dateString);
-  if (!isNaN(date.getTime())) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${day}/${month}/${year}`;
-  }
-  
-  return '-';
+  // Si tiene timestamp, usar función con timezone
+  return formatDateInUserTimezone(dateString);
 };
 
 /**
  * Formatea un timestamp completo a fecha y hora
- * Usa la zona horaria local del navegador (Perú) para evitar desfases
+ * Usa la zona horaria configurada por el usuario
  */
 export const formatDateTime = (dateString: string | null | undefined): string => {
-  if (!dateString) return '-';
-  
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return '-';
-  
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
+  return formatDateTimeInUserTimezone(dateString);
 };
 
 /**

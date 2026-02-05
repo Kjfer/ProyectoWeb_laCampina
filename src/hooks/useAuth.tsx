@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { setUserTimezone } from '@/lib/timezoneUtils';
 
 export type UserRole = 'admin' | 'teacher' | 'student' | 'parent' | 'tutor' | 'directivo';
 
@@ -16,6 +17,12 @@ interface Profile {
   phone?: string;
   avatar_url?: string;
   is_active: boolean;
+  metadata?: {
+    preferences?: {
+      darkMode?: boolean;
+      timezone?: string;
+    };
+  };
 }
 
 interface AuthContextType {
@@ -89,6 +96,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               } else {
                 setActiveRoleState(primaryRole);
               }
+
+              // Apply user preferences (dark mode, timezone, etc.)
+              if (profileData.metadata?.preferences) {
+                const prefs = profileData.metadata.preferences;
+                
+                // Apply dark mode
+                if (prefs.darkMode) {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+                
+                // Apply timezone
+                if (prefs.timezone) {
+                  setUserTimezone(prefs.timezone);
+                }
+              }
             
               // Fetch unread notifications for students
               if (profile && profile.role === 'student') {
@@ -159,6 +183,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setActiveRoleState(savedActiveRole);
             } else {
               setActiveRoleState(primaryRole);
+            }
+
+            // Apply user preferences (dark mode, timezone, etc.)
+            if (profileData.metadata?.preferences) {
+              const prefs = profileData.metadata.preferences;
+              
+              // Apply dark mode
+              if (prefs.darkMode) {
+                document.documentElement.classList.add('dark');
+              } else {
+                document.documentElement.classList.remove('dark');
+              }
+              
+              // Apply timezone
+              if (prefs.timezone) {
+                setUserTimezone(prefs.timezone);
+              }
             }
           }
           

@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/lib/dateUtils';
+import { formatDateTimeInUserTimezone } from '@/lib/timezoneUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Bell, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { Bell, CheckCircle, AlertCircle, ExternalLink, FileText, DollarSign, BookOpen, GraduationCap, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -17,14 +17,27 @@ interface NotificationAssignment {
   due_date: string;
 }
 
+interface NotificationExam {
+  id: string;
+  title: string;
+  start_time: string;
+}
+
 interface Notification {
   id: string;
   assignment_id: string | null;
+  exam_id: string | null;
+  material_id: string | null;
+  pago_id: string | null;
+  matricula_id: string | null;
+  modulo_id: string | null;
   type: string;
   message: string;
   is_read: boolean;
   created_at: string;
+  metadata?: any;
   assignments?: NotificationAssignment;
+  exams?: NotificationExam;
 }
 
 export function Notifications() {
@@ -50,6 +63,11 @@ export function Notifications() {
             id,
             title,
             due_date
+          ),
+          exams (
+            id,
+            title,
+            start_time
           )
         `)
         .eq('user_id', profile!.id)
@@ -57,12 +75,15 @@ export function Notifications() {
 
       if (error) throw error;
 
-      // Normalize assignments to always be a single object
+      // Normalize data to ensure single objects instead of arrays
       const normalizedData = (data || []).map((notif: any) => ({
         ...notif,
         assignments: Array.isArray(notif.assignments) 
           ? notif.assignments[0] 
-          : notif.assignments
+          : notif.assignments,
+        exams: Array.isArray(notif.exams) 
+          ? notif.exams[0] 
+          : notif.exams
       }));
 
       setNotifications(normalizedData);
@@ -121,13 +142,53 @@ export function Notifications() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
+      // Tareas
+      case 'assignment_published':
+        return <FileText className="h-5 w-5 text-blue-500" />;
+      case 'assignment_due_soon':
+        return <AlertCircle className="h-5 w-5 text-orange-500" />;
+      case 'assignment_overdue':
       case 'overdue':
         return <AlertCircle className="h-5 w-5 text-destructive" />;
-      case 'assignment_published':
+        
+      // Exámenes
       case 'exam_published':
+        return <GraduationCap className="h-5 w-5 text-purple-500" />;
+      case 'exam_due_soon':
+        return <AlertCircle className="h-5 w-5 text-orange-500" />;
+      case 'exam_graded':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        
+      // Materiales
+      case 'material_published':
+        return <BookOpen className="h-5 w-5 text-cyan-500" />;
+      case 'material_updated':
+        return <Package className="h-5 w-5 text-cyan-600" />;
+      case 'resource_available':
+        return <FileText className="h-5 w-5 text-teal-500" />;
+        
+      // Pagos
+      case 'pago_pendiente':
+      case 'recordatorio_pago':
+        return <DollarSign className="h-5 w-5 text-orange-500" />;
+      case 'pago_vencido':
+        return <DollarSign className="h-5 w-5 text-destructive" />;
+      case 'pago_confirmado':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'material_pago_pendiente':
+        return <DollarSign className="h-5 w-5 text-orange-500" />;
+      case 'material_acceso_bloqueado':
+        return <AlertCircle className="h-5 w-5 text-destructive" />;
+        
+      // Sistema
+      case 'announcement':
+      case 'general':
         return <Bell className="h-5 w-5 text-primary" />;
+        
+      // Compatibilidad
       case 'pending':
         return <Bell className="h-5 w-5 text-warning" />;
+        
       default:
         return <Bell className="h-5 w-5" />;
     }
@@ -135,14 +196,54 @@ export function Notifications() {
 
   const getNotificationBadge = (type: string) => {
     switch (type) {
-      case 'overdue':
-        return <Badge variant="destructive">Vencida</Badge>;
+      // Tareas
       case 'assignment_published':
-        return <Badge variant="default">Nueva Tarea</Badge>;
+        return <Badge className="bg-blue-500 hover:bg-blue-600">Nueva Tarea</Badge>;
+      case 'assignment_due_soon':
+        return <Badge className="bg-orange-500 hover:bg-orange-600">Tarea Por Vencer</Badge>;
+      case 'assignment_overdue':
+      case 'overdue':
+        return <Badge variant="destructive">Tarea Vencida</Badge>;
+        
+      // Exámenes
       case 'exam_published':
-        return <Badge variant="default">Nuevo Examen</Badge>;
+        return <Badge className="bg-purple-500 hover:bg-purple-600">Nuevo Examen</Badge>;
+      case 'exam_due_soon':
+        return <Badge className="bg-orange-500 hover:bg-orange-600">Examen Por Vencer</Badge>;
+      case 'exam_graded':
+        return <Badge className="bg-green-500 hover:bg-green-600">Examen Calificado</Badge>;
+        
+      // Materiales
+      case 'material_published':
+        return <Badge className="bg-cyan-500 hover:bg-cyan-600">Nuevo Material</Badge>;
+      case 'material_updated':
+        return <Badge className="bg-cyan-600 hover:bg-cyan-700">Material Actualizado</Badge>;
+      case 'resource_available':
+        return <Badge className="bg-teal-500 hover:bg-teal-600">Recurso Disponible</Badge>;
+        
+      // Pagos
+      case 'pago_pendiente':
+      case 'recordatorio_pago':
+        return <Badge className="bg-orange-500 hover:bg-orange-600">Pago Pendiente</Badge>;
+      case 'pago_vencido':
+        return <Badge variant="destructive">Pago Vencido</Badge>;
+      case 'pago_confirmado':
+        return <Badge className="bg-green-500 hover:bg-green-600">Pago Confirmado</Badge>;
+      case 'material_pago_pendiente':
+        return <Badge className="bg-orange-500 hover:bg-orange-600">Material - Pago Pendiente</Badge>;
+      case 'material_acceso_bloqueado':
+        return <Badge variant="destructive">Acceso Bloqueado</Badge>;
+        
+      // Sistema
+      case 'announcement':
+        return <Badge className="bg-primary">Anuncio</Badge>;
+      case 'general':
+        return <Badge variant="secondary">General</Badge>;
+        
+      // Compatibilidad
       case 'pending':
         return <Badge className="bg-warning text-warning-foreground">Pendiente</Badge>;
+        
       default:
         return <Badge variant="secondary">Notificación</Badge>;
     }
@@ -209,11 +310,13 @@ export function Notifications() {
                         </span>
                       </div>
                        <p className="text-sm">{notification.message}</p>
+                      
+                      {/* Enlaces contextuales según el tipo de notificación */}
                       {notification.assignments && (
                         <div className="flex items-center gap-2 mt-2">
                           <p className="text-xs text-muted-foreground">
                             Fecha de entrega:{' '}
-                            {formatDate(notification.assignments.due_date)}
+                            {formatDateTimeInUserTimezone(notification.assignments.due_date)}
                           </p>
                           <Button
                             variant="link"
@@ -227,6 +330,91 @@ export function Notifications() {
                             <ExternalLink className="h-3 w-3 mr-1" />
                             Ver tarea
                           </Button>
+                        </div>
+                      )}
+                      
+                      {notification.exams && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <p className="text-xs text-muted-foreground">
+                            Fecha del examen:{' '}
+                            {formatDateTimeInUserTimezone(notification.exams.start_time)}
+                          </p>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            onClick={() => {
+                              markAsRead(notification.id);
+                              navigate('/exams');
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Ver examen
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {/* Notificaciones de materiales - solo mostrar metadata */}
+                      {(notification.type === 'material_published' || 
+                        notification.type === 'material_updated' ||
+                        notification.type === 'resource_available') && notification.metadata && (
+                        <div className="flex items-center gap-2 mt-2">
+                          {notification.metadata.material_title && (
+                            <p className="text-xs text-muted-foreground">
+                              Material: {notification.metadata.material_title}
+                            </p>
+                          )}
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            onClick={() => {
+                              markAsRead(notification.id);
+                              navigate('/courses');
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Ver curso
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {(notification.type === 'pago_pendiente' || 
+                        notification.type === 'recordatorio_pago' ||
+                        notification.type === 'material_pago_pendiente') && (
+                        <div className="mt-2">
+                          {notification.metadata && (
+                            <div className="text-xs text-muted-foreground space-y-1">
+                              {notification.metadata.saldo_pendiente && (
+                                <p>Saldo pendiente: ${notification.metadata.saldo_pendiente}</p>
+                              )}
+                              {notification.metadata.monto && (
+                                <p>Monto: ${notification.metadata.monto}</p>
+                              )}
+                            </div>
+                          )}
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs mt-1"
+                            onClick={() => {
+                              markAsRead(notification.id);
+                              // Aquí podrías redirigir a una página de pagos si existe
+                              toast.info('Contacta con administración para realizar tu pago');
+                            }}
+                          >
+                            <DollarSign className="h-3 w-3 mr-1" />
+                            Información de pago
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {notification.type === 'pago_confirmado' && notification.metadata && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          <p>Monto: {notification.metadata.monto} {notification.metadata.moneda}</p>
+                          {notification.metadata.comprobante && (
+                            <p>Comprobante: {notification.metadata.comprobante}</p>
+                          )}
                         </div>
                       )}
                     </div>

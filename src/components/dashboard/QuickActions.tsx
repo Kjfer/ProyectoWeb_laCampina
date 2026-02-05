@@ -36,9 +36,9 @@ const quickActions = [
 
 export function QuickActions() {
   return (
-    <Card className="bg-gradient-card shadow-card border-0">
+    <Card className="bg-gradient-card dark:bg-gray-800 shadow-card border-0 dark:border dark:border-gray-700">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-foreground">
+        <CardTitle className="text-lg font-semibold text-foreground dark:text-white">
           Acciones Rápidas
         </CardTitle>
       </CardHeader>
@@ -47,9 +47,9 @@ export function QuickActions() {
           {quickActions.map((action) => {
             const Icon = action.icon;
             const colorClasses = {
-              primary: "bg-gradient-primary hover:shadow-glow text-primary-foreground",
-              secondary: "bg-gradient-secondary hover:shadow-soft text-secondary-foreground",
-              accent: "bg-accent hover:shadow-soft text-accent-foreground"
+              primary: "bg-gradient-primary dark:bg-blue-900/40 hover:shadow-glow text-primary-foreground dark:text-blue-200",
+              secondary: "bg-gradient-secondary dark:bg-purple-900/40 hover:shadow-soft text-secondary-foreground dark:text-purple-200",
+              accent: "bg-accent dark:bg-yellow-900/40 hover:shadow-soft text-accent-foreground dark:text-yellow-200"
             };
 
             return (

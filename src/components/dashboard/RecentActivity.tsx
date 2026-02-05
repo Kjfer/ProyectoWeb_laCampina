@@ -283,40 +283,40 @@ export function RecentActivity() {
         return { 
           variant: "secondary" as const, 
           label: "Completado",
-          iconColor: "text-green-500"
+          iconColor: "text-green-500 dark:text-green-400"
         };
       case "graded":
         return { 
           variant: "default" as const, 
           label: "Calificado",
-          iconColor: "text-blue-500"
+          iconColor: "text-blue-500 dark:text-blue-400"
         };
       case "pending":
         return { 
           variant: "destructive" as const, 
           label: "Urgente",
-          iconColor: "text-destructive"
+          iconColor: "text-destructive dark:text-red-400"
         };
       case "new":
         return { 
           variant: "outline" as const, 
           label: "Próximo",
-          iconColor: "text-accent"
+          iconColor: "text-accent dark:text-blue-300"
         };
       default:
         return { 
           variant: "outline" as const, 
           label: "Desconocido",
-          iconColor: "text-muted-foreground"
+          iconColor: "text-muted-foreground dark:text-gray-400"
         };
     }
   };
 
   if (loading) {
     return (
-      <Card className="bg-gradient-card shadow-card border-0">
+      <Card className="bg-gradient-card dark:bg-gray-800 shadow-card border-0 dark:border dark:border-gray-700">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-foreground">
+          <CardTitle className="text-lg font-semibold text-foreground dark:text-white">
             Actividad Reciente
           </CardTitle>
         </CardHeader>
@@ -333,14 +333,14 @@ export function RecentActivity() {
 
   if (activities.length === 0) {
     return (
-      <Card className="bg-gradient-card shadow-card border-0">
+      <Card className="bg-gradient-card dark:bg-gray-800 shadow-card border-0 dark:border dark:border-gray-700">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-foreground">
+          <CardTitle className="text-lg font-semibold text-foreground dark:text-white">
             Actividad Reciente
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-muted-foreground dark:text-gray-400">
             <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p>No hay actividad reciente</p>
           </div>
@@ -350,9 +350,9 @@ export function RecentActivity() {
   }
 
   return (
-    <Card className="bg-gradient-card shadow-card border-0">
+    <Card className="bg-gradient-card dark:bg-gray-800 shadow-card border-0 dark:border dark:border-gray-700">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-foreground">
+        <CardTitle className="text-lg font-semibold text-foreground dark:text-white">
           Actividad Reciente
         </CardTitle>
       </CardHeader>
@@ -363,18 +363,18 @@ export function RecentActivity() {
             const statusConfig = getStatusConfig(activity.status);
             
             return (
-              <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+              <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 dark:hover:bg-gray-700 transition-colors">
                 <div className={`mt-0.5 ${statusConfig.iconColor}`}>
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
+                  <p className="text-sm font-medium text-foreground dark:text-gray-200 truncate">
                     {activity.title}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground dark:text-gray-400">
                     {activity.subject}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground dark:text-gray-500 mt-1">
                     {activity.time}
                   </p>
                 </div>
@@ -388,8 +388,8 @@ export function RecentActivity() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/30">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/30 dark:border-gray-700">
+            <p className="text-sm text-muted-foreground dark:text-gray-400">
               {totalActivities} actividades
             </p>
             <div className="flex gap-2">

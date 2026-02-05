@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { CalendarIcon, MapPin, Clock, FileText } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth';
-import { parseLocalDate } from '@/lib/dateUtils';
+import { parsePeruDateToUserTimezone } from '@/lib/timezoneUtils';
 
 interface AcademicEvent {
   id: string;
@@ -186,8 +186,8 @@ export function AcademicCalendar() {
 
   const getEventsForDate = (date: Date) => {
     const academic = academicEvents.filter(event => {
-      const startDate = parseLocalDate(event.start_date);
-      const endDate = parseLocalDate(event.end_date);
+      const startDate = parsePeruDateToUserTimezone(event.start_date);
+      const endDate = parsePeruDateToUserTimezone(event.end_date);
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
       const checkDate = new Date(date);
@@ -196,8 +196,8 @@ export function AcademicCalendar() {
     });
 
     const course = courseEvents.filter(event => {
-      const startDate = parseLocalDate(event.start_date);
-      const endDate = parseLocalDate(event.end_date);
+      const startDate = parsePeruDateToUserTimezone(event.start_date);
+      const endDate = parsePeruDateToUserTimezone(event.end_date);
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(23, 59, 59, 999);
       const checkDate = new Date(date);
@@ -206,7 +206,7 @@ export function AcademicCalendar() {
     });
 
     const assignmentsForDate = assignments.filter(assignment => {
-      const dueDate = parseLocalDate(assignment.due_date);
+      const dueDate = parsePeruDateToUserTimezone(assignment.due_date);
       dueDate.setHours(0, 0, 0, 0);
       const checkDate = new Date(date);
       checkDate.setHours(0, 0, 0, 0);
@@ -214,7 +214,7 @@ export function AcademicCalendar() {
     });
 
     const examsForDate = exams.filter(exam => {
-      const examDate = parseLocalDate(exam.start_time);
+      const examDate = parsePeruDateToUserTimezone(exam.start_time);
       examDate.setHours(0, 0, 0, 0);
       const checkDate = new Date(date);
       checkDate.setHours(0, 0, 0, 0);
@@ -255,8 +255,8 @@ export function AcademicCalendar() {
   // Mark dates that have events
   const datesWithEvents = new Set<string>();
   [...academicEvents, ...courseEvents].forEach(event => {
-    const start = parseLocalDate(event.start_date);
-    const end = parseLocalDate(event.end_date);
+    const start = parsePeruDateToUserTimezone(event.start_date);
+    const end = parsePeruDateToUserTimezone(event.end_date);
     const current = new Date(start);
     while (current <= end) {
       datesWithEvents.add(format(current, 'yyyy-MM-dd'));
@@ -266,13 +266,13 @@ export function AcademicCalendar() {
   
   // Mark dates that have assignments
   assignments.forEach(assignment => {
-    const dueDate = parseLocalDate(assignment.due_date);
+    const dueDate = parsePeruDateToUserTimezone(assignment.due_date);
     datesWithEvents.add(format(dueDate, 'yyyy-MM-dd'));
   });
   
   // Mark dates that have exams
   exams.forEach(exam => {
-    const examDate = parseLocalDate(exam.start_time);
+    const examDate = parsePeruDateToUserTimezone(exam.start_time);
     datesWithEvents.add(format(examDate, 'yyyy-MM-dd'));
   });
 
@@ -352,7 +352,7 @@ export function AcademicCalendar() {
             ) : (
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                 {selectedEvents.academic.length === 0 && selectedEvents.course.length === 0 && selectedEvents.assignments.length === 0 && selectedEvents.exams.length === 0 && (
-                  <div className="text-center py-12 text-muted-foreground">
+                  <div className="text-center py-12 text-muted-foreground dark:text-gray-400">
                     <CalendarIcon className="h-16 w-16 mx-auto mb-4 opacity-20" />
                     <p className="text-lg font-medium mb-1">Sin eventos programados</p>
                     <p className="text-sm">Selecciona otra fecha para ver eventos</p>
@@ -361,29 +361,29 @@ export function AcademicCalendar() {
 
               {selectedEvents.academic.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                  <h3 className="font-semibold text-sm text-muted-foreground dark:text-gray-400 uppercase tracking-wide flex items-center gap-2">
                     <div className="h-1 w-8 bg-blue-500 rounded"></div>
                     Eventos Académicos
                   </h3>
                   {selectedEvents.academic.map(event => (
                     <div
                       key={event.id}
-                      className="group p-4 rounded-xl border-2 bg-gradient-to-br from-blue-50/50 to-transparent hover:from-blue-50 hover:border-blue-300 transition-all duration-200"
+                      className="group p-4 rounded-xl border-2 bg-gradient-to-br from-blue-50/50 dark:from-blue-950/30 to-transparent hover:from-blue-50 dark:hover:from-blue-950/50 hover:border-blue-300 dark:hover:border-blue-700 dark:border-gray-700 transition-all duration-200"
                     >
                       <div className="flex items-start justify-between gap-3 mb-2">
-                        <h4 className="font-semibold text-base group-hover:text-blue-700 transition-colors">{event.title}</h4>
+                        <h4 className="font-semibold text-base dark:text-gray-200 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">{event.title}</h4>
                         <Badge variant={getEventTypeBadgeVariant(event.event_type)} className="shrink-0">
                           {getEventTypeLabel(event.event_type)}
                         </Badge>
                       </div>
                       {event.description && (
-                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{event.description}</p>
+                        <p className="text-sm text-muted-foreground dark:text-gray-400 mb-3 line-clamp-2">{event.description}</p>
                       )}
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground dark:text-gray-500">
                         <Clock className="h-3.5 w-3.5" />
                         <span className="font-medium">
-                          {format(parseLocalDate(event.start_date), "HH:mm", { locale: es })} - 
-                          {format(parseLocalDate(event.end_date), "HH:mm", { locale: es })}
+                          {format(parsePeruDateToUserTimezone(event.start_date), "HH:mm", { locale: es })} - 
+                          {format(parsePeruDateToUserTimezone(event.end_date), "HH:mm", { locale: es })}
                         </span>
                       </div>
                     </div>
@@ -467,7 +467,7 @@ export function AcademicCalendar() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="h-3.5 w-3.5" />
                         <span className="font-medium">
-                          Entrega: {format(parseLocalDate(assignment.due_date), "HH:mm", { locale: es })}
+                          Entrega: {format(parsePeruDateToUserTimezone(assignment.due_date), "HH:mm", { locale: es })}
                         </span>
                       </div>
                     </div>
@@ -506,7 +506,7 @@ export function AcademicCalendar() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="h-3.5 w-3.5" />
                         <span className="font-medium">
-                          {format(parseLocalDate(exam.start_time), "HH:mm", { locale: es })} • Duración: {exam.duration_minutes} min
+                          {format(parsePeruDateToUserTimezone(exam.start_time), "HH:mm", { locale: es })} • Duración: {exam.duration_minutes} min
                         </span>
                       </div>
                     </div>
@@ -521,3 +521,4 @@ export function AcademicCalendar() {
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatDate } from '@/lib/dateUtils';
+import { formatDateInUserTimezone, getUserTimezone } from '@/lib/timezoneUtils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -83,6 +83,22 @@ const getResourceTypeLabel = (type: string) => {
 export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSection }: CourseWeeklySectionProps) {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  
+  // DEBUG: Verificar zona horaria y conversión
+  console.log('=== CourseWeeklySection Debug ===');
+  console.log('Zona horaria actual:', getUserTimezone());
+  console.log('Fecha de sesión (solo día):', section.start_date);
+  
+  // Debug de recursos con hora
+  if (section.resources) {
+    section.resources.forEach(resource => {
+      if (resource.assignment_deadline) {
+        console.log('Tarea:', resource.title);
+        console.log('  - Deadline original:', resource.assignment_deadline);
+        console.log('  - Debe mostrar hora convertida');
+      }
+    });
+  }
   
   // Estado para controlar el modo edición de la SECCIÓN (La fecha, título, etc.)
   const [isEditingSection, setIsEditingSection] = useState(false);
@@ -192,7 +208,7 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                   {section.description && (
                     <p className="text-sm text-muted-foreground mt-1">
                       Sesión del {section.start_date 
-                        ? formatDate(section.start_date)
+                        ? formatDateInUserTimezone(section.start_date)
                         : 'Fecha por definir'}</p>
                   )}
                 </div>
@@ -202,7 +218,7 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
               <div className="flex items-center gap-3">
                 {section.start_date && (
                   <Badge variant="outline" className="text-xs font-mono bg-blue-50 text-blue-700 border-blue-100">
-                    {formatDate(section.start_date)}
+                    {formatDateInUserTimezone(section.start_date)}
                   </Badge>
                 )}
                 

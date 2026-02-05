@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { formatDate } from '@/lib/dateUtils';
+import { formatSimpleDate, convertTimeToUserTimezone } from '@/lib/timezoneUtils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -137,7 +137,7 @@ export default function CourseDetail() {
         id: data.id,
         name: data.name,
         code: data.code,
-        description: `${data.course?.name || ''} - Inicio: ${formatDate(data.start_date)}`,
+        description: `${data.course?.name || ''} - Inicio: ${formatSimpleDate(data.start_date)}`,
         academic_year: data.course?.academic_year || '',
         semester: data.course?.semester || '',
         is_active: true,
@@ -343,7 +343,7 @@ export default function CourseDetail() {
                       : 'Por definir'}
                     {(course.start_time || course.end_time) && (
                       <div className="text-xs text-blue-600 font-semibold">
-                        {course.start_time?.slice(0,5)} - {course.end_time?.slice(0,5)}
+                        {convertTimeToUserTimezone(course.start_time)} - {convertTimeToUserTimezone(course.end_time)}
                       </div>
                     )}
                   </div>
@@ -447,7 +447,7 @@ export default function CourseDetail() {
                         </h3>
                         <p className="text-sm text-muted-foreground">{student.email}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Inscrito: {formatDate(student.enrolled_at)}
+                          Inscrito: {formatSimpleDate(student.enrolled_at)}
                         </p>
                       </div>
                     ))}
