@@ -62,6 +62,7 @@ interface Assignment {
   due_date: string;
   max_score: number;
   course_id: string;
+  modulo_id?: string;
   course: {
     id: string;
     name: string;
@@ -285,6 +286,7 @@ const AssignmentDetail = () => {
           body: {
             assignmentTitle: assignment?.title,
             courseId: assignment?.course_id,
+            moduloId: assignment?.modulo_id,
             content: content.trim(),
             files: uploadedFiles,
           },

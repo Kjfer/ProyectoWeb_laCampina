@@ -7,6 +7,7 @@ import { StudentCourses } from "@/components/dashboard/StudentCourses";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Notifications } from "@/components/Notifications";
 import { AcademicCalendar } from "@/components/calendar/AcademicCalendar";
+import { UpcomingEvents } from "@/components/dashboard/UpcomingEvents";
 // --- AQUÍ ESTÁ EL COMPONENTE NUEVO CON EL NOMBRE CORRECTO ---
 import AdeudosBanner from "@/components/dashboard/AdeudosBanner"; 
 import { BookOpen, FileText, GraduationCap, TrendingUp, User, Users } from "lucide-react";
@@ -368,10 +369,8 @@ const Index = () => {
           <div className="space-y-6">
             <QuickActions />
             
-            {/* Calendar Section */}
-            <div>
-              <AcademicCalendar />
-            </div>
+            {/* Upcoming Events Section */}
+            <UpcomingEvents />
           </div>
         </div>
       </div>

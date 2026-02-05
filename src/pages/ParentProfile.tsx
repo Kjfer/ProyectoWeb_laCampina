@@ -197,7 +197,7 @@ export default function ParentProfile() {
 
               <Alert>
                 <AlertDescription>
-                  Mantén tus datos de contacto actualizados para recibir comunicaciones importantes del colegio.
+                  Mantén tus datos de contacto actualizados para recibir comunicaciones importantes del instituto.
                 </AlertDescription>
               </Alert>
 

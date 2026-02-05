@@ -8,24 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-
-// Helper para parsear fechas sin conversión UTC
-const parseExamDate = (dateString: string): Date => {
-  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss"
-  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
-  if (match) {
-    const [_, year, month, day, hour, minute, second] = match;
-    return new Date(
-      parseInt(year),
-      parseInt(month) - 1,
-      parseInt(day),
-      parseInt(hour),
-      parseInt(minute),
-      parseInt(second)
-    );
-  }
-  return new Date(dateString);
-};
+import { parseLocalDate } from "@/lib/dateUtils";
 
 interface Activity {
   id: string;
@@ -57,119 +40,13 @@ export function RecentActivity() {
       setLoading(true);
       const activities: Activity[] = [];
 
-      // Get enrolled courses
-      const { data: enrollments } = await supabase
-        .from('course_enrollments')
-        .select('course_id, courses!inner(name)')
-        .eq('student_id', profile!.id);
-
-      const courseIds = enrollments?.map(e => e.course_id) || [];
-
-      if (courseIds.length === 0) {
-        setActivities([]);
-        setTotalActivities(0);
-        return;
+      // Para profesores
+      if (profile?.role === 'teacher' || profile?.role === 'admin') {
+        await fetchTeacherActivity(activities);
+      } else {
+        // Para estudiantes
+        await fetchStudentActivity(activities);
       }
-
-      // Get recent assignment submissions (completed)
-      const { data: submissions } = await supabase
-        .from('assignment_submissions')
-        .select(`
-          id,
-          submitted_at,
-          score,
-          assignments!inner(
-            title,
-            courses!inner(name)
-          )
-        `)
-        .eq('student_id', profile!.id)
-        .order('submitted_at', { ascending: false })
-        .limit(5);
-
-      submissions?.forEach((sub: any) => {
-        activities.push({
-          id: `sub-${sub.id}`,
-          title: sub.score !== null 
-            ? `Tarea calificada: ${sub.assignments.title}`
-            : `Tarea entregada: ${sub.assignments.title}`,
-          subject: sub.assignments.courses.name,
-          time: formatDistanceToNow(new Date(sub.submitted_at), { addSuffix: true, locale: es }),
-          status: sub.score !== null ? 'graded' : 'completed',
-          icon: sub.score !== null ? CheckCircle : FileText,
-          type: 'assignment'
-        });
-      });
-
-      // Get upcoming assignments (pending)
-      const { data: upcomingAssignments } = await supabase
-        .from('assignments')
-        .select(`
-          id,
-          title,
-          due_date,
-          courses!inner(name)
-        `)
-        .in('course_id', courseIds)
-        .eq('is_published', true)
-        .gt('due_date', new Date().toISOString())
-        .order('due_date', { ascending: true })
-        .limit(3);
-
-      // Check which ones are not submitted
-      const assignmentIds = upcomingAssignments?.map(a => a.id) || [];
-      const { data: existingSubmissions } = await supabase
-        .from('assignment_submissions')
-        .select('assignment_id')
-        .eq('student_id', profile!.id)
-        .in('assignment_id', assignmentIds);
-
-      const submittedSet = new Set(existingSubmissions?.map(s => s.assignment_id) || []);
-
-      upcomingAssignments?.forEach((assignment: any) => {
-        if (!submittedSet.has(assignment.id)) {
-          const dueDate = new Date(assignment.due_date);
-          const isUrgent = (dueDate.getTime() - Date.now()) < 24 * 60 * 60 * 1000; // Less than 24 hours
-
-          activities.push({
-            id: `assign-${assignment.id}`,
-            title: `Tarea pendiente: ${assignment.title}`,
-            subject: assignment.courses.name,
-            time: format(dueDate, "d 'de' MMMM, HH:mm", { locale: es }),
-            status: isUrgent ? 'pending' : 'new',
-            icon: AlertCircle,
-            type: 'assignment'
-          });
-        }
-      });
-
-      // Get upcoming exams
-      const { data: upcomingExams } = await supabase
-        .from('exams')
-        .select(`
-          id,
-          title,
-          start_time,
-          courses!inner(name)
-        `)
-        .in('course_id', courseIds)
-        .eq('is_published', true)
-        .gt('start_time', new Date().toISOString())
-        .order('start_time', { ascending: true })
-        .limit(3);
-
-      upcomingExams?.forEach((exam: any) => {
-        const examDate = parseExamDate(exam.start_time);
-        activities.push({
-          id: `exam-${exam.id}`,
-          title: `Examen próximo: ${exam.title}`,
-          subject: exam.courses.name,
-          time: format(examDate, "d 'de' MMMM, HH:mm", { locale: es }),
-          status: 'new',
-          icon: ClipboardList,
-          type: 'exam'
-        });
-      });
 
       // Sort by most recent/urgent
       activities.sort((a, b) => {
@@ -187,6 +64,215 @@ export function RecentActivity() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchTeacherActivity = async (activities: Activity[]) => {
+    // Get modulos where teacher is principal or additional
+    const { data: modulos } = await supabase
+      .from('modulos')
+      .select('id, name')
+      .or(`teacher_principal_id.eq.${profile!.id},aditional_teachers.cs.{${profile!.id}}`);
+
+    const moduloIds = modulos?.map(m => m.id) || [];
+
+    if (moduloIds.length === 0) return;
+
+    // Get recent submissions to review
+    const { data: submissions } = await supabase
+      .from('assignment_submissions')
+      .select(`
+        id,
+        submitted_at,
+        graded_at,
+        assignments!inner(
+          title,
+          modulo_id,
+          modulos!inner(
+            name,
+            courses!inner(name)
+          )
+        )
+      `)
+      .in('assignments.modulo_id', moduloIds)
+      .order('submitted_at', { ascending: false })
+      .limit(10);
+
+    submissions?.forEach((sub: any) => {
+      const courseName = sub.assignments?.modulos?.courses?.name || sub.assignments?.modulos?.name || 'Curso';
+      activities.push({
+        id: `sub-${sub.id}`,
+        title: sub.graded_at
+          ? `Tarea calificada: ${sub.assignments.title}`
+          : `Nueva entrega: ${sub.assignments.title}`,
+        subject: courseName,
+        time: formatDistanceToNow(parseLocalDate(sub.submitted_at), { addSuffix: true, locale: es }),
+        status: sub.graded_at ? 'graded' : 'pending',
+        icon: sub.graded_at ? CheckCircle : AlertCircle,
+        type: 'assignment'
+      });
+    });
+
+    // Get upcoming exams
+    const { data: upcomingExams } = await supabase
+      .from('exams')
+      .select(`
+        id,
+        title,
+        start_time,
+        modulo_id,
+        modulos!inner(
+          name,
+          courses!inner(name)
+        )
+      `)
+      .in('modulo_id', moduloIds)
+      .eq('is_published', true)
+      .gt('start_time', new Date().toISOString())
+      .order('start_time', { ascending: true })
+      .limit(5);
+
+    upcomingExams?.forEach((exam: any) => {
+      const examDate = parseLocalDate(exam.start_time);
+      const courseName = exam.modulos?.courses?.name || exam.modulos?.name || 'Curso';
+      activities.push({
+        id: `exam-${exam.id}`,
+        title: `Examen próximo: ${exam.title}`,
+        subject: courseName,
+        time: format(examDate, "d 'de' MMMM, HH:mm", { locale: es }),
+        status: 'new',
+        icon: ClipboardList,
+        type: 'exam'
+      });
+    });
+  };
+
+  const fetchStudentActivity = async (activities: Activity[]) => {
+    // Get enrolled modulos
+    const { data: enrollments } = await supabase
+      .from('course_enrollments')
+      .select('modulo_id, modulos!inner(name, courses!inner(name))')
+      .eq('student_id', profile!.id);
+
+    const moduloIds = enrollments?.map(e => e.modulo_id) || [];
+
+    if (moduloIds.length === 0) return;
+
+    if (moduloIds.length === 0) return;
+
+    // Get recent assignment submissions (completed)
+    const { data: submissions } = await supabase
+      .from('assignment_submissions')
+      .select(`
+        id,
+        submitted_at,
+        score,
+        assignments!inner(
+          title,
+          modulo_id,
+          modulos!inner(
+            name,
+            courses!inner(name)
+          )
+        )
+      `)
+      .eq('student_id', profile!.id)
+      .order('submitted_at', { ascending: false })
+      .limit(5);
+
+    submissions?.forEach((sub: any) => {
+      const courseName = sub.assignments?.modulos?.courses?.name || sub.assignments?.modulos?.name || 'Curso';
+      activities.push({
+        id: `sub-${sub.id}`,
+        title: sub.score !== null
+          ? `Tarea calificada: ${sub.assignments.title}`
+          : `Tarea entregada: ${sub.assignments.title}`,
+        subject: courseName,
+        time: formatDistanceToNow(parseLocalDate(sub.submitted_at), { addSuffix: true, locale: es }),
+        status: sub.score !== null ? 'graded' : 'completed',
+        icon: sub.score !== null ? CheckCircle : FileText,
+        type: 'assignment'
+      });
+    });
+
+    // Get upcoming assignments (pending)
+    const { data: upcomingAssignments } = await supabase
+      .from('assignments')
+      .select(`
+        id,
+        title,
+        due_date,
+        modulo_id,
+        modulos!inner(
+          name,
+          courses!inner(name)
+        )
+      `)
+      .in('modulo_id', moduloIds)
+      .eq('is_published', true)
+      .gt('due_date', new Date().toISOString())
+      .order('due_date', { ascending: true })
+      .limit(3);
+
+    // Check which ones are not submitted
+    const assignmentIds = upcomingAssignments?.map(a => a.id) || [];
+    const { data: existingSubmissions } = await supabase
+      .from('assignment_submissions')
+      .select('assignment_id')
+      .eq('student_id', profile!.id)
+      .in('assignment_id', assignmentIds);
+
+    const submittedSet = new Set(existingSubmissions?.map(s => s.assignment_id) || []);
+
+    upcomingAssignments?.forEach((assignment: any) => {
+      if (!submittedSet.has(assignment.id)) {
+        const dueDate = parseLocalDate(assignment.due_date);
+        const isUrgent = (dueDate.getTime() - Date.now()) < 24 * 60 * 60 * 1000; // Less than 24 hours
+        const courseName = assignment.modulos?.courses?.name || assignment.modulos?.name || 'Curso';
+
+        activities.push({
+          id: `assign-${assignment.id}`,
+          title: `Tarea pendiente: ${assignment.title}`,
+          subject: courseName,
+          time: format(dueDate, "d 'de' MMMM, HH:mm", { locale: es }),
+          status: isUrgent ? 'pending' : 'new',
+          icon: AlertCircle,
+          type: 'assignment'
+        });
+      }
+    });
+
+    // Get upcoming exams
+    const { data: upcomingExams } = await supabase
+      .from('exams')
+      .select(`
+        id,
+        title,
+        start_time,
+        modulo_id,
+        modulos!inner(
+          name,
+          courses!inner(name)
+        )
+      `)
+      .in('modulo_id', moduloIds)
+      .eq('is_published', true)
+      .gt('start_time', new Date().toISOString())
+      .order('start_time', { ascending: true })
+      .limit(3);
+
+    upcomingExams?.forEach((exam: any) => {
+      const examDate = parseLocalDate(exam.start_time);
+      const courseName = exam.modulos?.courses?.name || exam.modulos?.name || 'Curso';
+      activities.push({
+        id: `exam-${exam.id}`,
+        title: `Examen próximo: ${exam.title}`,
+        subject: courseName,
+        time: format(examDate, "d 'de' MMMM, HH:mm", { locale: es }),
+        status: 'new',
+        icon: ClipboardList,
+        type: 'exam'
+      });
+    });
   };
 
   const totalPages = Math.ceil(totalActivities / ITEMS_PER_PAGE);

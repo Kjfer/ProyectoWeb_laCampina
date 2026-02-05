@@ -65,26 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             
             console.log('Profile data received:', profileData);
-            console.log('Profile data received:', profileData);
             
             if (profileData) {
-              // Fetch user roles from user_roles table
-              const { data: rolesData } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', session.user.id);
-
-              console.log('Roles data received:', rolesData);
-
-              // Get all roles or use profile role as fallback
-              const allRoles = rolesData && rolesData.length > 0 
-                ? rolesData.map(r => r.role as UserRole)
-                : [profileData.role as UserRole];
+              // Use role from profiles table
+              const primaryRole = profileData.role as UserRole;
+              const allRoles = [primaryRole];
 
               console.log('All roles:', allRoles);
-
-              // Use the first role as the primary role
-              const primaryRole = allRoles[0];
 
               const profile = {
                 ...profileData,
@@ -154,19 +141,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           
           if (profileData) {
-            // Fetch user roles from user_roles table
-            const { data: rolesData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id);
-
-            // Get all roles or use profile role as fallback
-            const allRoles = rolesData && rolesData.length > 0 
-              ? rolesData.map(r => r.role as UserRole)
-              : [profileData.role as UserRole];
-
-            // Use the first role as the primary role
-            const primaryRole = allRoles[0];
+            // Use role from profiles table
+            const primaryRole = profileData.role as UserRole;
+            const allRoles = [primaryRole];
 
             const profile = {
               ...profileData,

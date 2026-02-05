@@ -4,6 +4,43 @@
  */
 
 /**
+ * Parsea una fecha desde la base de datos sin conversión UTC
+ * Esto previene el desfase de horas al mostrar fechas
+ */
+export const parseLocalDate = (dateString: string): Date => {
+  // Manejar tanto "YYYY-MM-DD HH:mm:ss" como "YYYY-MM-DDTHH:mm:ss.sssZ"
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [_, year, month, day, hour, minute, second] = match;
+    return new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second)
+    );
+  }
+  return new Date(dateString);
+};
+
+/**
+ * Formatea un objeto Date a formato PostgreSQL sin conversión UTC
+ * Esto previene el desfase de horas al guardar fechas
+ * Formato: YYYY-MM-DD HH:mm:ss
+ */
+export const formatLocalDateTime = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  const second = String(date.getSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+};
+
+/**
  * Formatea una fecha en formato YYYY-MM-DD a DD/MM/YYYY
  * Útil para fechas almacenadas en base de datos sin componente de tiempo
  */

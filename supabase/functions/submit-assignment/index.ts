@@ -29,7 +29,8 @@ serve(async (req) => {
       assignmentTitle, 
       content, 
       files,
-      courseId 
+      courseId,
+      moduloId 
     } = await req.json();
 
     console.log('Submitting assignment for user:', user.id);
@@ -47,15 +48,18 @@ serve(async (req) => {
 
     // Check if assignment already exists
     let assignmentId;
+    let assignmentModuloId = moduloId;
+    
     const { data: existingAssignment } = await supabaseClient
       .from('assignments')
-      .select('id')
+      .select('id, modulo_id')
       .eq('title', assignmentTitle)
-      .eq('course_id', courseId)
+      .or(`course_id.eq.${courseId}${moduloId ? `,modulo_id.eq.${moduloId}` : ''}`)
       .maybeSingle();
 
     if (existingAssignment) {
       assignmentId = existingAssignment.id;
+      assignmentModuloId = existingAssignment.modulo_id || moduloId;
     } else {
       // Create assignment using service role (bypasses RLS)
       const { data: newAssignment, error: assignmentError } = await supabaseClient
@@ -65,6 +69,7 @@ serve(async (req) => {
           description: `Tarea: ${assignmentTitle}`,
           max_score: 100,
           course_id: courseId,
+          modulo_id: moduloId,
           is_published: true
         })
         .select()
@@ -75,6 +80,7 @@ serve(async (req) => {
         throw new Error('Error al crear la tarea');
       }
       assignmentId = newAssignment.id;
+      assignmentModuloId = newAssignment.modulo_id;
     }
 
     // Create submission with user's auth (RLS allows students to create their own submissions)
@@ -105,6 +111,7 @@ serve(async (req) => {
       .insert({
         assignment_id: assignmentId,
         student_id: profile.id,
+        modulo_id: assignmentModuloId,
         content: content || null,
         file_path: firstFile?.filePath,
         file_name: firstFile?.fileName,

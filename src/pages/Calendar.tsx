@@ -30,10 +30,10 @@ export default function Calendar() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Calendario Académico</h1>
             <p className="text-muted-foreground">
-              Visualiza eventos del colegio y de tus cursos
+              Visualiza eventos académicos y de tus cursos
             </p>
           </div>
-          {profile?.role === 'admin' && (
+          {(profile?.role === 'admin' || profile?.role === 'directivo') && (
             <Button onClick={() => setIsEventDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nuevo Evento
@@ -43,7 +43,7 @@ export default function Calendar() {
 
         <AcademicCalendar key={refreshKey} />
 
-        {profile?.role === 'admin' && (
+        {(profile?.role === 'admin' || profile?.role === 'directivo') && (
           <EventDialog
             open={isEventDialogOpen}
             onOpenChange={setIsEventDialogOpen}

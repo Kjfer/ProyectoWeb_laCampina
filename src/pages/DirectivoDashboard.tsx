@@ -115,21 +115,37 @@ const DirectivoDashboard = () => {
       if (teachersError) throw teachersError;
 
       const metricsPromises = teachersData.map(async (teacher) => {
-        // Get teacher's courses
-        const { data: courses, error: coursesError } = await supabase
-          .from("courses")
+        // Get teacher's modulos (como profesor principal o adicional)
+        const { data: modulosAsPrincipal, error: principalError } = await supabase
+          .from("modulos")
           .select("id")
-          .eq("teacher_id", teacher.id);
+          .eq("teacher_principal_id", teacher.id);
 
-        if (coursesError) {
-          console.error(`Error fetching courses for ${teacher.first_name}:`, coursesError);
+        if (principalError) {
+          console.error(`Error fetching modulos as principal for ${teacher.first_name}:`, principalError);
         }
 
-        const courseIds = courses?.map((c) => c.id) || [];
+        // Get modulos where teacher is additional teacher
+        const { data: allModulos, error: modulosError } = await supabase
+          .from("modulos")
+          .select("id, aditional_teachers");
+
+        if (modulosError) {
+          console.error(`Error fetching all modulos for ${teacher.first_name}:`, modulosError);
+        }
+
+        const modulosAsAdditional = allModulos?.filter(m => 
+          m.aditional_teachers && m.aditional_teachers.includes(teacher.id)
+        ) || [];
+
+        // Combine both lists and remove duplicates
+        const principalModuloIds = modulosAsPrincipal?.map((m) => m.id) || [];
+        const additionalModuloIds = modulosAsAdditional.map((m) => m.id);
+        const moduloIds = [...new Set([...principalModuloIds, ...additionalModuloIds])];
         
-        // Debug: Log para ver si se están obteniendo los cursos
-        if (courseIds.length > 0) {
-          console.log(`${teacher.first_name} ${teacher.last_name}: ${courseIds.length} cursos encontrados`, courseIds);
+        // Debug: Log para ver si se están obteniendo los módulos
+        if (moduloIds.length > 0) {
+          console.log(`${teacher.first_name} ${teacher.last_name}: ${moduloIds.length} módulos encontrados (${principalModuloIds.length} principal, ${additionalModuloIds.length} adicional)`, moduloIds);
         }
 
         const now = new Date();
@@ -142,11 +158,11 @@ const DirectivoDashboard = () => {
         const quarterAgo = new Date();
         quarterAgo.setDate(now.getDate() - 90);
 
-        // Get ALL assignments metrics (including historical)
+        // Get ALL assignments metrics (including historical) - now using modulo_id
         const { data: assignments, error: assignmentsError } = await supabase
           .from("assignments")
           .select("id, is_published, created_at")
-          .in("course_id", courseIds)
+          .in("modulo_id", moduloIds)
           .order("created_at", { ascending: false });
 
         if (assignmentsError) {
@@ -181,11 +197,11 @@ const DirectivoDashboard = () => {
           ?.filter((s) => s.graded_at)
           .sort((a, b) => new Date(b.graded_at!).getTime() - new Date(a.graded_at!).getTime())[0];
 
-        // Get exams
+        // Get exams - now using modulo_id
         const { count: examsCount } = await supabase
           .from("exams")
           .select("*", { count: "exact", head: true })
-          .in("course_id", courseIds);
+          .in("modulo_id", moduloIds);
 
         // Get attendance records
         const { count: attendanceCount } = await supabase
@@ -221,7 +237,7 @@ const DirectivoDashboard = () => {
           last_name: teacher.last_name,
           email: teacher.email,
           is_active: teacher.is_active,
-          total_courses: courseIds.length,
+          total_courses: moduloIds.length, // ahora representa módulos
           total_assignments: totalAssignments,
           published_assignments: publishedAssignments,
           assignments_last_week: assignmentsLastWeek,

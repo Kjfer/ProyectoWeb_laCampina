@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { formatLocalDateTime } from '@/lib/dateUtils';
 
 interface EventDialogProps {
   open: boolean;
@@ -64,9 +65,9 @@ export function EventDialog({ open, onOpenChange, onEventCreated }: EventDialogP
       const { error } = await supabase.from('academic_events').insert([{
         title: formData.title,
         description: formData.description,
-        event_type: formData.event_type as 'vacation' | 'holiday' | 'exam' | 'meeting' | 'other',
-        start_date: startDateTime.toISOString(),
-        end_date: endDateTime.toISOString(),
+        event_type: formData.event_type as 'vacation' | 'holiday' | 'exam' | 'class' | 'reunion' | 'portafolio' | 'other',
+        start_date: formatLocalDateTime(startDateTime),
+        end_date: formatLocalDateTime(endDateTime),
         is_published: true,
         created_by: profile.id,
       }]);
@@ -98,7 +99,7 @@ export function EventDialog({ open, onOpenChange, onEventCreated }: EventDialogP
         <DialogHeader>
           <DialogTitle>Crear Evento Académico</DialogTitle>
           <DialogDescription>
-            Agrega un nuevo evento al calendario académico del colegio
+            Agrega un nuevo evento al calendario académico del instituto
           </DialogDescription>
         </DialogHeader>
 
@@ -136,7 +137,9 @@ export function EventDialog({ open, onOpenChange, onEventCreated }: EventDialogP
                 <SelectItem value="vacation">Vacaciones</SelectItem>
                 <SelectItem value="holiday">Feriado</SelectItem>
                 <SelectItem value="exam">Examen</SelectItem>
-                <SelectItem value="meeting">Reunión</SelectItem>
+                <SelectItem value="class">Clase</SelectItem>
+                <SelectItem value="reunion">Reunión</SelectItem>
+                <SelectItem value="portafolio">Portafolio</SelectItem>
                 <SelectItem value="other">Otro</SelectItem>
               </SelectContent>
             </Select>
