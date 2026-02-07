@@ -133,12 +133,21 @@ export default function AdminEdicionForm() {
   const handleProgramChange = (programId: string) => {
     const newFormData = { ...formData, program_id: programId };
     
-    // Generar código automáticamente
+    // Generar código automáticamente si ya hay una fecha seleccionada
     if (formData.start_date) {
       const programa = programas.find(p => p.id === programId);
       if (programa) {
-        const code = generateCourseCode(programa.code, new Date(formData.start_date));
+        const selectedDate = new Date(formData.start_date);
+        
+        // Obtenemos el mes en formato corto (MAY, ABR, FEB) y en mayúsculas
+        const mesShort = selectedDate.toLocaleString('es-ES', { month: 'short' })
+          .toUpperCase()
+          .replace('.', ''); 
+        
+        const año = selectedDate.getFullYear();
+        const code = `${programa.code}-${mesShort}-${año}`;
         const name = generateEdicionName(programId, formData.start_date);
+        
         newFormData.code = code;
         newFormData.name = name;
       }
@@ -156,15 +165,22 @@ export default function AdminEdicionForm() {
     newFormData.academic_year = year.toString();
     
     // Detectar semestre (I: Enero-Junio, II: Julio-Diciembre)
-    const month = selectedDate.getMonth() + 1; // getMonth() devuelve 0-11
+    const month = selectedDate.getMonth() + 1; 
     newFormData.semester = month <= 6 ? 'I' : 'II';
     
     // Regenerar código y nombre si ya hay programa seleccionado
     if (formData.program_id) {
       const programa = programas.find(p => p.id === formData.program_id);
       if (programa) {
-        const code = generateCourseCode(programa.code, selectedDate);
+        const mesShort = selectedDate.toLocaleString('es-ES', { month: 'short' })
+          .toUpperCase()
+          .replace('.', ''); // Quitamos el punto si existe (ej: "abr.")
+        
+        const año = selectedDate.getFullYear();
+
+        const code = `${programa.code}-${mesShort}-${año}`;
         const name = generateEdicionName(formData.program_id, date);
+        
         newFormData.code = code;
         newFormData.name = name;
       }

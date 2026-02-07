@@ -293,7 +293,7 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                             )}
                             {resource.resource_type === 'assignment' && resource.assignment_deadline && (
                               <Badge variant="outline" className="text-[10px] h-5">
-                                Entrega: {formatDate(resource.assignment_deadline)}
+                                Entrega: {formatDateInUserTimezone(resource.assignment_deadline)}
                               </Badge>
                             )}
                           </div>

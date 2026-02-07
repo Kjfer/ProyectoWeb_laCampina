@@ -331,17 +331,17 @@ export default function AdminModulosManagement() {
     try {
       // Generar código si no existe
       let code = formData.code;
-      if (!code && programa) {
-        code = generateModuloCode(
-          programa.code,
-          formData.num_modulo!,
-          new Date(formData.start_date!)
-        );
+      // Forzamos que use siempre el código de la EDICIÓN (course.code)
+      if (course && formData.num_modulo) {
+        code = `${course.code}-M${formData.num_modulo}`;
       }
+      const finalCode = course && formData.num_modulo 
+        ? `${course.code}-M${formData.num_modulo}` 
+        : formData.code;
 
       const dataToSave = {
         ...formData,
-        code,
+        code: finalCode,
         schedule,
       };
 

@@ -53,6 +53,7 @@ import AdminMatriculaForm from "./pages/AdminMatriculaForm";
 import AdminMaterialesManagement from "./pages/AdminMaterialesManagement";
 import AdminCursosGrabadosManagement from "./pages/AdminCursosGrabadosManagement";
 import AdminVentasCursosGrabadosManagement from "./pages/AdminVentasCursosGrabadosManagement";
+import PortfolioReview from "./pages/PortfolioReview";
 
 const queryClient = new QueryClient();
 
@@ -110,6 +111,11 @@ const App = () => (
             <Route path="/assignment-review/:assignmentId" element={
               <ProtectedRoute>
                 <AssignmentReview />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/portfolios/:portfolioId/review" element={
+              <ProtectedRoute allowedRoles={["admin", "teacher"]}>
+                <PortfolioReview />
               </ProtectedRoute>
             } />
             <Route path="/grading/:submissionId" element={
