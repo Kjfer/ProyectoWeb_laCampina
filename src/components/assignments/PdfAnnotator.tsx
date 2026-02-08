@@ -15,6 +15,7 @@ type Props = {
   submissionId: string;
   storageBucket?: string;
   storagePath?: string | null;
+  isPortfolio?: boolean;
 };
 
 export interface PdfAnnotatorRef {
@@ -24,11 +25,10 @@ export interface PdfAnnotatorRef {
 function safeKeyName(input: string) {
   return input.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "_");
 }
-
 const PdfAnnotator = forwardRef<PdfAnnotatorRef, Props>(({
-  pdfUrl, fileName, submissionId, storageBucket = "student-submissions", storagePath = null
+  pdfUrl, fileName, submissionId, storageBucket = "student-submissions", storagePath = null, isPortfolio = false // <-- Agrégalo aquí
 }, ref) => {
-  
+
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   
@@ -195,57 +195,86 @@ const PdfAnnotator = forwardRef<PdfAnnotatorRef, Props>(({
       if(next >= 1 && next <= pageCount) setPageNum(next);
   }
 
-  // --- FUNCIÓN DE GUARDADO MAESTRA ---
   const savePdfComplete = async (): Promise<boolean> => {
-    if(!pdfBytes) return false;
+    if (!pdfBytes) return false;
     try {
-        saveCurrentOverlay(); 
+      saveCurrentOverlay();
+
+      const pdfDoc = await PDFDocument.load(pdfBytes.slice(0));
+      const pages = pdfDoc.getPages();
+
+      for (const [pStr, dataUrl] of Object.entries(pageOverlays)) {
+        const pIndex = Number(pStr) - 1;
+        if (pIndex < 0 || pIndex >= pages.length) continue;
+        const pngImage = await pdfDoc.embedPng(dataUrl);
+        const page = pages[pIndex];
+        page.drawImage(pngImage, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
+      }
+
+      //const pdfBytesFinal: Uint8Array = await pdfDoc.save();
+      //const blob = new Blob([pdfBytesFinal.buffer], { type: "application/pdf" }); 
+
+      const pdfBytesFinal = await pdfDoc.save();
+      const blob = new Blob([pdfBytesFinal], { type: "application/pdf" });
+      const safeName = safeKeyName(fileName);
+
+      // --- LÓGICA DE RUTA ---
+      // Si es portafolio, usamos la ruta original (storagePath) para SOBRESCRIBIR
+      // Si es tarea, creamos una ruta nueva en feedback/
+      const finalPath = isPortfolio && storagePath 
+        ? storagePath 
+        : `feedback/annotated_${Date.now()}_${safeName}`;
+
+      // --- SUBIDA AL STORAGE ---
+      // Usamos upsert: true para que si el archivo existe (Portafolio), lo reemplace
+      const { error: upErr } = await supabase.storage
+        .from(storageBucket)
+        .upload(finalPath, blob, { upsert: true });
+
+      if (upErr) throw upErr;
+
+      // --- ACTUALIZACIÓN DE BASE DE DATOS ---
+      if (isPortfolio) {
+        // CASO PORTAFOLIO: Solo nos aseguramos que el path sea el correcto
+        const { error: dbErr } = await supabase
+          .from("edition_portfolio_submissions")
+          .update({ file_path: finalPath })
+          .eq("id", submissionId);
         
-        // ✅ CORRECCIÓN 3: Usamos .slice(0) TAMBIÉN AQUÍ para evitar "Detached ArrayBuffer"
-        const pdfDoc = await PDFDocument.load(pdfBytes.slice(0)); 
-        const pages = pdfDoc.getPages();
-
-        for (const [pStr, dataUrl] of Object.entries(pageOverlays)) {
-            const pIndex = Number(pStr) - 1;
-            if (pIndex < 0 || pIndex >= pages.length) continue;
-            const pngImage = await pdfDoc.embedPng(dataUrl);
-            const page = pages[pIndex];
-            page.drawImage(pngImage, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
-        }
-
-        const pdfBytesFinal = await pdfDoc.save();
-        const blob = new Blob([pdfBytesFinal], { type: "application/pdf" });
-        const safeName = safeKeyName(fileName);
-        const path = `feedback/annotated_${Date.now()}_${safeName}`;
-        
-        // Subir archivo
-        const { error: upErr } = await supabase.storage.from(storageBucket).upload(path, blob);
-        if(upErr) throw upErr;
-
-        // ✅ CORRECCIÓN 4: Agregamos fileSize y file_size al metadata
-        // Esto soluciona el problema de "0.00 KB" en la vista del alumno
+        if (dbErr) throw dbErr;
+      } else {
+        // CASO TAREAS (Tu lógica original intacta)
         const newFile = {
-            bucket: storageBucket,
-            path: path,
-            fileName: `Corregido_${safeName}`,
-            mimeType: "application/pdf",
-            fileSize: blob.size,    // IMPORTANTE
-            file_size: blob.size,   // IMPORTANTE (por si acaso el backend usa este formato)
-            createdAt: new Date().toISOString()
+          bucket: storageBucket,
+          path: finalPath,
+          fileName: `Corregido_${safeName}`,
+          mimeType: "application/pdf",
+          fileSize: blob.size,
+          file_size: blob.size,
+          createdAt: new Date().toISOString()
         };
 
-        const { data: currentData } = await supabase.from("assignment_submissions").select("feedback_files").eq("id", submissionId).single();
+        const { data: currentData } = await supabase
+          .from("assignment_submissions")
+          .select("feedback_files")
+          .eq("id", submissionId)
+          .single();
+
         const existingFiles = (currentData?.feedback_files as any[]) || [];
         
-        const { error: dbErr } = await supabase.from("assignment_submissions")
-            .update({ feedback_files: [...existingFiles, newFile] }).eq("id", submissionId);
+        const { error: dbErr } = await supabase
+          .from("assignment_submissions")
+          .update({ feedback_files: [...existingFiles, newFile] })
+          .eq("id", submissionId);
 
-        if(dbErr) throw dbErr;
-        return true;
-    } catch(err: any) {
-        console.error(err);
-        toast.error("Error generando PDF: " + err.message);
-        return false;
+        if (dbErr) throw dbErr;
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Error generando PDF: " + err.message);
+      return false;
     }
   };
 

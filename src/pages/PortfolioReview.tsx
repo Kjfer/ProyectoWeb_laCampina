@@ -182,6 +182,7 @@ export default function PortfolioReview() {
                       submissionId={selectedSubmission.id}
                       storageBucket="student-submissions"
                       storagePath={selectedSubmission.file_path}
+                      isPortfolio={true}
                     />
                   ) : (
                     <div className="h-full flex items-center justify-center text-gray-500">
