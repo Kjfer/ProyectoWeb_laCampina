@@ -7,13 +7,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Video, Link as LinkIcon, FileText, Plus, Trash2, ExternalLink, Pencil, Briefcase, Loader2, FileCheck } from 'lucide-react';
+import { Video, Link as LinkIcon, FileText, Plus, Trash2, ExternalLink, Pencil, Briefcase, Loader2, FileCheck, ClipboardList } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PortfolioConfigDialog } from './PortfolioConfigDialog';
 import { useNavigate } from 'react-router-dom';
 import { PortfolioSubmissionDialog } from './PortfolioSubmissionDialog';
 import { useAuth } from '@/hooks/useAuth';
+
+// IMPORTANTE: Asegúrate de que estos archivos existan en tu carpeta
+import { SurveyConfigDialog } from './SurveyConfigDialog';
+import { TeacherSurveyDialog } from '@/components/course/TeacherSurveyDialog';
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
@@ -40,6 +44,11 @@ export const CourseGeneralResources = ({ courseId, canEdit }: { courseId: string
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isPortfolioDialogOpen, setIsPortfolioDialogOpen] = useState(false);
   const [isSubmissionDialogOpen, setIsSubmissionDialogOpen] = useState(false);
+  
+  // NUEVOS ESTADOS PARA ENCUESTA
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isSurveyOpen, setIsSurveyOpen] = useState(false);
+  const [hasCompletedSurvey, setHasCompletedSurvey] = useState(true); // Default true para evitar parpadeo
 
   const [formData, setFormData] = useState({ type: 'link', title: '', content: '', description: '' });
 
@@ -50,13 +59,42 @@ export const CourseGeneralResources = ({ courseId, canEdit }: { courseId: string
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      await Promise.all([fetchResources(), fetchPortfolio()]);
+      await Promise.all([fetchResources(), fetchPortfolio(), fetchSurveyStatus()]);
     } catch (error) {
       console.error("Error cargando datos:", error);
     } finally {
       setLoading(false);
     }
   };
+  const fetchSurveyStatus = async () => {
+    if (!profile?.id || canEdit) return;
+
+    // 1. Primero verificamos si ESTE módulo específico tiene una encuesta configurada
+    // Esto evita que el banner salga en módulos donde el profe no activó nada.
+    const { data: config } = await supabase
+      .from('survey_configurations')
+      .select('id')
+      .eq('modulo_id', courseId)
+      .maybeSingle();
+
+    // SI NO HAY CONFIGURACIÓN EN ESTE MÓDULO -> OCULTAMOS EL BANNER
+    if (!config) {
+      setHasCompletedSurvey(true);
+      return;
+    }
+
+    // 2. SI HAY CONFIGURACIÓN -> Verificamos si YA RESPONDIÓ en este curso (no solo este módulo)
+    // Cambiamos la lógica para buscar si ya existe una respuesta tuya en la tabla general.
+    const { data: survey } = await supabase
+      .from('teacher_surveys')
+      .select('id')
+      .eq('student_id', profile.id)
+      .eq('course_id', courseId) // Verifica la respuesta para este ID de módulo actual
+      .maybeSingle();
+    
+    setHasCompletedSurvey(!!survey);
+  };
+
 
   const fetchPortfolio = async () => {
     const { data: moduloData } = await supabase.from('modulos').select('course_id').eq('id', courseId).single();
@@ -95,10 +133,33 @@ export const CourseGeneralResources = ({ courseId, canEdit }: { courseId: string
     }
   };
 
-  if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  const handleDelete = async (id: string) => {
+    if(!confirm('¿Eliminar?')) return;
+    await supabase.from('course_general_resources').delete().eq('id', id);
+    fetchResources();
+  };
+
+  if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
 
   return (
     <div className="mb-6 space-y-4">
+      
+      {/* BANNER DE ENCUESTA (Solo Alumnos) */}
+      {!canEdit && !hasCompletedSurvey && (
+        <Card className="mb-4 border-2 border-orange-200 bg-orange-50 animate-in fade-in slide-in-from-top-2">
+          <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-500 rounded-full text-white"><ClipboardList className="h-5 w-5" /></div>
+              <div>
+                <p className="text-sm font-bold text-orange-900">Encuesta Docente Pendiente</p>
+                <p className="text-xs text-orange-700">Completa la encuesta para habilitar la entrega del portafolio.</p>
+              </div>
+            </div>
+            <Button onClick={() => setIsSurveyOpen(true)} className="bg-orange-600 hover:bg-orange-700 text-white w-full md:w-auto">Completar Encuesta</Button>
+          </CardContent>
+        </Card>
+      )}
+
       {portfolio && (
         <Card className="mb-6 bg-gradient-to-r from-blue-700 to-indigo-800 text-white border-none shadow-lg">
           <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -108,11 +169,20 @@ export const CourseGeneralResources = ({ courseId, canEdit }: { courseId: string
             </div>
             <div className="flex flex-wrap gap-3">
               {canEdit ? (
-                <Button className="bg-green-600" onClick={() => navigate(`/admin/portfolios/${portfolio.id}/review`)}>Revisar Entregas</Button>
+                <Button className="bg-green-600 hover:bg-green-700" onClick={() => navigate(`/admin/portfolios/${portfolio.id}/review`)}>Revisar Entregas</Button>
               ) : (
                 <>
                   {(!userSubmission || userSubmission.status !== 'graded') && (
-                    <Button className={userSubmission ? "bg-green-600" : "bg-orange-500"} onClick={() => setIsSubmissionDialogOpen(true)}>
+                    <Button 
+                      className={userSubmission ? "bg-green-600" : "bg-orange-500"} 
+                      onClick={() => {
+                        if (!hasCompletedSurvey) {
+                          toast.error("Debes completar la encuesta docente primero.");
+                          return;
+                        }
+                        setIsSubmissionDialogOpen(true);
+                      }}
+                    >
                       {userSubmission ? '📂 Ver / Editar Entrega' : '📤 Entregar Portafolio'}
                     </Button>
                   )}
@@ -127,47 +197,90 @@ export const CourseGeneralResources = ({ courseId, canEdit }: { courseId: string
         </Card>
       )}
 
+      {/* RESULTADOS DE NOTA */}
       {!canEdit && userSubmission && userSubmission.status === 'graded' && (
-        <div id="res-nota" className="mb-6 p-6 bg-white rounded-xl border-2 border-green-200 shadow-md">
-          <div className="flex justify-between items-center">
+        <div id="res-nota" className="mb-6 p-6 bg-white rounded-xl border-2 border-green-200 shadow-md scroll-mt-10">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
               <p className="text-green-700 font-bold text-xs uppercase">Calificación Final</p>
-              <div className="flex items-center gap-3"><span className="text-5xl font-black">{userSubmission.grade}</span><Badge className="bg-green-600">Aprobado</Badge></div>
+              <div className="flex items-center gap-3"><span className="text-5xl font-black">{userSubmission.grade}</span><Badge className="bg-green-600 text-white">Aprobado</Badge></div>
             </div>
-            <Button className="bg-blue-600 font-bold" onClick={() => window.open(`${supabase.storage.from('student-submissions').getPublicUrl(userSubmission.file_path).data.publicUrl}?t=${new Date().getTime()}`, '_blank')}>
-              <FileCheck className="mr-2" /> Ver Revision de Portafolio
+            <Button className="bg-blue-600 font-bold py-6 px-6" onClick={() => window.open(`${supabase.storage.from('student-submissions').getPublicUrl(userSubmission.file_path).data.publicUrl}?t=${new Date().getTime()}`, '_blank')}>
+              <FileCheck className="mr-2 h-6 w-6" /> Ver Revision de Portafolio
             </Button>
           </div>
-          {userSubmission.feedback && <div className="mt-4 p-3 bg-gray-50 rounded border italic text-gray-600">"{userSubmission.feedback}"</div>}
+          {userSubmission.feedback && <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-dashed text-gray-700 italic">"{userSubmission.feedback}"</div>}
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Enlaces y Recursos</h3>
-        {canEdit && <Button onClick={() => setIsDialogOpen(true)} size="sm" variant="outline"><Plus className="h-4 w-4 mr-1" /> Agregar</Button>}
+      {/* BOTONES ADMINISTRATIVOS ENCUESTA */}
+      <div className="flex justify-between items-center pt-4 border-t">
+        <h3 className="text-lg font-semibold text-gray-700">Enlaces y Recursos</h3>
+        <div className="flex gap-2">
+           {canEdit && (
+            <Button variant="outline" size="sm" onClick={() => setIsConfigOpen(true)} className="gap-2 border-orange-200 text-orange-700 hover:bg-orange-50">
+              <ClipboardList className="h-4 w-4" /> Configurar Encuesta
+            </Button>
+          )}
+          {canEdit && <Button onClick={() => {setEditingId(null); setIsDialogOpen(true);}} size="sm" variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Agregar Enlace</Button>}
+        </div>
       </div>
 
+      {/* LISTA DE RECURSOS */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {resources.map((res) => {
           const style = getResourceStyle(res.type);
           const Icon = style.icon;
           return (
-            <Card key={res.id} className={`p-4 border ${style.bg} group relative`}>
+            <Card key={res.id} className={`p-4 border ${style.bg} group relative shadow-sm hover:shadow-md transition-all`}>
               <div className="flex items-start gap-4">
-                <div className={`p-3 rounded-full bg-white ${style.color}`}><Icon className="h-6 w-6" /></div>
+                <div className={`p-3 rounded-full bg-white shadow-inner ${style.color}`}><Icon className="h-6 w-6" /></div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold truncate">{res.title}</h4>
-                  <a href={res.content} target="_blank" className="text-sm text-blue-600 hover:underline flex items-center gap-1 mt-2">Abrir <ExternalLink className="h-3 w-3" /></a>
+                  <h4 className="font-semibold truncate text-gray-900">{res.title}</h4>
+                  <a href={res.content} target="_blank" className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1 mt-2">Abrir Enlace <ExternalLink className="h-3 w-3" /></a>
                 </div>
-                {canEdit && <Button variant="ghost" size="icon" className="text-red-500 opacity-0 group-hover:opacity-100" onClick={() => handleDelete(res.id)}><Trash2 className="h-4 w-4" /></Button>}
+                {canEdit && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => handleDelete(res.id)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                )}
               </div>
             </Card>
           );
         })}
       </div>
 
+      {/* DIALOGOS Y MODALES */}
       <PortfolioConfigDialog editionId={portfolio?.edition_id || courseId} isOpen={isPortfolioDialogOpen} onClose={() => setIsPortfolioDialogOpen(false)} onSuccess={fetchInitialData} initialData={portfolio} />
       {portfolio && <PortfolioSubmissionDialog portfolioId={portfolio.id} isOpen={isSubmissionDialogOpen} onClose={() => setIsSubmissionDialogOpen(false)} onSuccess={fetchInitialData} />}
+      
+      {/* MODALES DE ENCUESTA */}
+      <SurveyConfigDialog isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} moduloId={courseId} />
+      <TeacherSurveyDialog isOpen={isSurveyOpen} onClose={() => setIsSurveyOpen(false)} onSuccess={fetchInitialData} studentId={profile?.id} courseId={courseId} />
+
+      {/* MODAL RECURSOS */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader><DialogTitle>{editingId ? 'Editar Recurso' : 'Nuevo Enlace'}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={formData.type} onValueChange={(v: any) => setFormData({...formData, type: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="whatsapp">📱 Grupo de WhatsApp</SelectItem>
+                  <SelectItem value="video">🎥 Videoconferencia</SelectItem>
+                  <SelectItem value="file">📁 Carpeta / Archivo</SelectItem>
+                  <SelectItem value="link">🔗 Enlace General</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Título</Label><Input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="Ej: Link de Zoom" /></div>
+            <div className="space-y-2"><Label>URL</Label><Input value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} placeholder="https://..." /></div>
+          </div>
+          <DialogFooter><Button onClick={handleSubmit} className="bg-blue-600 text-white w-full">Guardar Recurso</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
