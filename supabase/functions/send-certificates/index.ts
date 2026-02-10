@@ -217,28 +217,36 @@ serve(async (req) => {
       console.error('❌ Error de conexión con n8n:', n8nError);
     }
 
-    // Registrar cada envío en la base de datos (usando supabaseAdmin)
-    console.log('📝 Registrando envíos en base de datos...');
-    const logs = students.map((student, index) => ({
-      course_id: course_id,
-      student_id: student.id,
-      sent_by: profile.id,
-      sent_at: new Date().toISOString(),
-      status: n8nError ? 'failed' : 'sent',
-      error_message: n8nError,
-      n8n_webhook_url: n8n_webhook_url,
-      metadata: certificateData[index]
-    }));
+    // Actualizar registros existentes en certificate_logs de 'pending' a 'sent'/'failed'
+    console.log('📝 Actualizando registros en base de datos...');
+    
+    // Actualizar cada estudiante individualmente
+    const updatePromises = students.map(async (student, index) => {
+      const { error } = await supabaseAdmin
+        .from('certificate_logs')
+        .update({
+          sent_by: profile.id,
+          sent_at: new Date().toISOString(),
+          status: n8nError ? 'failed' : 'sent',
+          error_message: n8nError,
+          n8n_webhook_url: n8n_webhook_url,
+          metadata: certificateData[index]
+        })
+        .eq('course_id', course_id)
+        .eq('student_id', student.id)
+        .eq('status', 'pending');
+      
+      return { student_id: student.id, error };
+    });
 
-    const { error: logsError } = await supabaseAdmin
-      .from('certificate_logs')
-      .insert(logs);
-
-    if (logsError) {
-      console.error('⚠️ Error guardando logs:', logsError.message);
+    const results = await Promise.all(updatePromises);
+    const updateErrors = results.filter(r => r.error);
+    
+    if (updateErrors.length > 0) {
+      console.error('⚠️ Errores actualizando algunos registros:', updateErrors);
       // No fallar la petición por esto, solo log
     } else {
-      console.log('✅ Logs guardados correctamente');
+      console.log('✅ Todos los registros actualizados correctamente');
     }
 
     // Si hubo error en n8n, retornar error
@@ -247,7 +255,7 @@ serve(async (req) => {
         JSON.stringify({ 
           error: 'Error enviando certificados al webhook',
           details: n8nError,
-          logs_saved: !logsError
+          records_updated: updateErrors.length === 0
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -261,7 +269,7 @@ serve(async (req) => {
         success: true,
         message: `${certificateData.length} certificado${certificateData.length !== 1 ? 's' : ''} enviado${certificateData.length !== 1 ? 's' : ''} correctamente`,
         certificates_sent: certificateData.length,
-        logs_saved: !logsError,
+        records_updated: updateErrors.length === 0,
         n8n_response: n8nResult
       }),
       {

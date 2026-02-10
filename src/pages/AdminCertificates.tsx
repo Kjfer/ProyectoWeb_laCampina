@@ -48,7 +48,7 @@ interface CertificateLog {
   id: string;
   student_id: string;
   sent_at: string;
-  status: 'sent' | 'failed';
+  status: 'pending' | 'sent' | 'failed';
   error_message: string | null;
 }
 
@@ -120,21 +120,33 @@ const AdminCertificates = () => {
     setSelectedStudents(new Set());
     
     try {
-      // Obtener estudiantes matriculados en el curso
-      const { data: enrollments, error: enrollError } = await supabase
-        .from('course_enrollments')
+      console.log('🔍 Buscando estudiantes para curso:', courseId);
+      
+      // Obtener estudiantes que entregaron portafolio (registrados en certificate_logs)
+      // Solo se extraen registros con status='pending' (no enviados aún)
+      const { data: certificateLogs, error: logsError } = await (supabase as any)
+        .from('certificate_logs')
         .select('student_id')
-        .eq('course_id', courseId);
+        .eq('course_id', courseId)
+        .eq('status', 'pending');
 
-      if (enrollError) throw enrollError;
+      console.log('📋 Certificate logs pendientes encontrados:', certificateLogs);
+      console.log('❌ Error en certificate_logs:', logsError);
 
-      const studentIds = enrollments?.map(e => e.student_id) || [];
+      if (logsError) {
+        console.error('Error al obtener certificate_logs:', logsError);
+        throw logsError;
+      }
+
+      const studentIds = certificateLogs?.map((log: any) => log.student_id) || [];
+      console.log('👥 IDs de estudiantes:', studentIds);
 
       if (studentIds.length === 0) {
+        console.log('⚠️ No hay estudiantes pendientes de certificado para este curso');
         setStudents([]);
         toast({
           title: 'Sin estudiantes',
-          description: 'Este curso no tiene estudiantes matriculados',
+          description: 'No hay estudiantes con certificados pendientes de envío',
         });
         return;
       }
@@ -143,16 +155,30 @@ const AdminCertificates = () => {
       const { data: studentsData, error: studentsError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, paternal_surname, maternal_surname, email, student_code')
-        .in('id', studentIds)
-        .order('paternal_surname');
+        .in('id', studentIds);
 
-      if (studentsError) throw studentsError;
-      setStudents(studentsData || []);
-    } catch (error) {
-      console.error('Error cargando estudiantes:', error);
+      console.log('✅ Datos de estudiantes:', studentsData);
+      console.log('❌ Error en profiles:', studentsError);
+
+      if (studentsError) {
+        console.error('Error al obtener profiles:', studentsError);
+        throw studentsError;
+      }
+
+      // Ordenar manualmente para manejar nulls
+      const sortedStudents = (studentsData || []).sort((a, b) => {
+        const surnameA = a.paternal_surname || a.last_name || '';
+        const surnameB = b.paternal_surname || b.last_name || '';
+        return surnameA.localeCompare(surnameB);
+      });
+
+      console.log('📊 Total estudiantes cargados:', sortedStudents.length);
+      setStudents(sortedStudents);
+    } catch (error: any) {
+      console.error('💥 Error completo:', error);
       toast({
         title: 'Error',
-        description: 'No se pudieron cargar los estudiantes',
+        description: `No se pudieron cargar los estudiantes: ${error.message}`,
         variant: 'destructive',
       });
     } finally {
@@ -344,7 +370,7 @@ const AdminCertificates = () => {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Gestión de Certificados</h1>
             <p className="text-muted-foreground mt-1">
-              Envía certificados a estudiantes mediante n8n
+              Envía certificados a estudiantes con portafolio entregado (solo pendientes de envío)
             </p>
           </div>
         </div>
@@ -436,9 +462,9 @@ const AdminCertificates = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Estudiantes</CardTitle>
+                  <CardTitle>Estudiantes con Certificados Pendientes</CardTitle>
                   <CardDescription>
-                    Selecciona los estudiantes que recibirán certificados
+                    Solo se muestran estudiantes con certificados pendientes de envío
                   </CardDescription>
                 </div>
                 {students.length > 0 && (
@@ -477,7 +503,7 @@ const AdminCertificates = () => {
                 </div>
               ) : students.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  <p>No hay estudiantes matriculados en este curso</p>
+                  <p>No hay estudiantes con certificados pendientes en este curso</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -550,21 +576,37 @@ const AdminCertificates = () => {
               ¿Cómo funciona?
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              El sistema enviará los siguientes datos al webhook de n8n para cada estudiante seleccionado:
-            </p>
-            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-2">
-              <li><strong>student_name</strong>: Nombre completo del estudiante</li>
-              <li><strong>student_email</strong>: Email de registro del estudiante</li>
-              <li><strong>course_name</strong>: Nombre del curso</li>
-              <li><strong>course_code</strong>: Código del curso</li>
-              <li><strong>program_name</strong>: Nombre del programa académico</li>
-              <li><strong>academic_year</strong>: Año académico</li>
-              <li><strong>semester</strong>: Semestre</li>
-            </ul>
-            <p className="text-sm text-muted-foreground pt-2">
-              Asegúrate de que tu workflow de n8n esté configurado para recibir estos datos.
+          <CardContent className="space-y-3">
+            <div className="bg-white p-3 rounded-lg border border-blue-200">
+              <p className="text-sm font-semibold text-blue-900 mb-2">
+                📋 Flujo del sistema:
+              </p>
+              <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1 ml-2">
+                <li>El estudiante entrega su portafolio final</li>
+                <li>Automáticamente se registra en la lista de certificados (estado: pendiente)</li>
+                <li>Solo los estudiantes con estado 'pendiente' aparecen en esta vista</li>
+                <li>El administrador selecciona estudiantes y envía certificados vía n8n</li>
+                <li>Al enviar, el sistema marca los registros como 'sent' o 'failed'</li>
+              </ol>
+            </div>
+            
+            <div className="bg-white p-3 rounded-lg border border-blue-200">
+              <p className="text-sm font-semibold text-blue-900 mb-2">
+                📤 Datos enviados al webhook de n8n:
+              </p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-2">
+                <li><strong>student_name</strong>: Nombre completo del estudiante</li>
+                <li><strong>student_email</strong>: Email de registro del estudiante</li>
+                <li><strong>course_name</strong>: Nombre del curso</li>
+                <li><strong>course_code</strong>: Código del curso</li>
+                <li><strong>program_name</strong>: Nombre del programa académico</li>
+                <li><strong>academic_year</strong>: Año académico</li>
+                <li><strong>semester</strong>: Semestre</li>
+              </ul>
+            </div>
+            
+            <p className="text-sm text-muted-foreground italic">
+              💡 Asegúrate de que tu workflow de n8n esté configurado para recibir estos datos.
             </p>
           </CardContent>
         </Card>

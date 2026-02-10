@@ -57,6 +57,14 @@ Guía rápida para encontrar toda la documentación del proyecto.
 
 ## 📅 Otros Módulos
 
+### Certificados y Portafolios
+- **[CERTIFICADOS_PORTAFOLIO_README.md](CERTIFICADOS_PORTAFOLIO_README.md)**
+  - Sistema automático de certificados
+  - Vinculación con entregas de portafolio
+  - Trigger automático
+  - Integración con n8n
+  - Flujo completo del proceso
+
 ### Calendario de Eventos
 - **[CALENDARIO_EVENTOS_README.md](CALENDARIO_EVENTOS_README.md)**
   - Sistema de calendario
@@ -95,7 +103,8 @@ Guía rápida para encontrar toda la documentación del proyecto.
 ```
 supabase/migrations/
 ├── 20260205000000_update_notifications_system.sql
-└── 20260205000001_notifications_rls_and_cron.sql
+├── 20260205000001_notifications_rls_and_cron.sql
+└── 20260209000000_auto_register_certificates_from_portfolios.sql
 ```
 
 ### Scripts de Prueba
@@ -166,6 +175,18 @@ supabase/
 
 #### ¿Consultas SQL útiles?
 → [SISTEMA_NOTIFICACIONES_README.md](SISTEMA_NOTIFICACIONES_README.md) (sección "Métricas y Monitoreo")
+
+#### ¿Cómo funciona el sistema de certificados?
+→ [CERTIFICADOS_PORTAFOLIO_README.md](CERTIFICADOS_PORTAFOLIO_README.md)
+
+#### ¿Qué estudiantes reciben certificados?
+→ [CERTIFICADOS_PORTAFOLIO_README.md](CERTIFICADOS_PORTAFOLIO_README.md) (sección "Flujo del Sistema")
+
+#### ¿Cómo se vinculan portafolios y certificados?
+→ [CERTIFICADOS_PORTAFOLIO_README.md](CERTIFICADOS_PORTAFOLIO_README.md) (sección "Trigger Automático")
+
+#### ¿Cómo integrar con n8n?
+→ [CERTIFICADOS_PORTAFOLIO_README.md](CERTIFICADOS_PORTAFOLIO_README.md) (sección "Integración con n8n")
 
 ---
 
