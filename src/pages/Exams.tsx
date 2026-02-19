@@ -5,11 +5,13 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, Calendar, Clock, Plus, AlertCircle, XCircle, CheckCircle } from 'lucide-react';
+import { ClipboardList, Calendar, Clock, Plus, AlertCircle, XCircle, CheckCircle, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, isAfter, isBefore, addMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useExamMonitor } from '@/hooks/useExamMonitor';
 import { parsePeruDateToUserTimezone, getUserTimezone } from '@/lib/timezoneUtils';
 import {
@@ -55,6 +57,9 @@ const Exams = () => {
   const [loading, setLoading] = useState(true);
   const [activeExam, setActiveExam] = useState<string | null>(null);
   const [showClosedDialog, setShowClosedDialog] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [courseFilter, setCourseFilter] = useState<string>('all');
 
   const { abandonCount, maxAbandonAttempts } = useExamMonitor({
     examId: activeExam || '',
@@ -184,6 +189,29 @@ const Exams = () => {
     };
   };
 
+  // Get unique courses for filter
+  const uniqueCourses = Array.from(
+    new Map(
+      exams
+        .filter(e => e.modulo?.course_id)
+        .map(e => [e.modulo.course_id, e.modulo])
+    ).values()
+  );
+
+  // Apply filters
+  const filteredExams = exams.filter(exam => {
+    const matchesSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         exam.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         exam.modulo?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCourse = courseFilter === 'all' || exam.modulo?.course_id === courseFilter;
+    
+    const status = getExamStatus(exam).status;
+    const matchesStatus = statusFilter === 'all' || status === statusFilter;
+
+    return matchesSearch && matchesCourse && matchesStatus;
+  });
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -222,7 +250,46 @@ const Exams = () => {
           )}
         </div>
 
-        {exams.length === 0 ? (
+        {/* Search and Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar exámenes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <Select value={courseFilter} onValueChange={setCourseFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos los cursos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los cursos</SelectItem>
+              {uniqueCourses.map(modulo => (
+                <SelectItem key={modulo.course_id} value={modulo.course_id}>
+                  {modulo.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Todos los estados" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="upcoming">Próximo</SelectItem>
+              <SelectItem value="in-progress">En progreso</SelectItem>
+              <SelectItem value="completed">Finalizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {filteredExams.length === 0 ? (
           <Card className="bg-gradient-card shadow-card border-0">
             <CardContent className="p-8 text-center">
               <ClipboardList className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
@@ -230,16 +297,18 @@ const Exams = () => {
                 No hay exámenes disponibles
               </h3>
               <p className="text-muted-foreground">
-                {profile?.role === 'student' 
-                  ? 'No tienes exámenes programados en este momento.'
-                  : 'Aún no has creado ningún examen para tus cursos.'
+                {searchTerm || courseFilter !== 'all' || statusFilter !== 'all'
+                  ? 'No se encontraron exámenes con los filtros aplicados.'
+                  : profile?.role === 'student' 
+                    ? 'No tienes exámenes programados en este momento.'
+                    : 'Aún no has creado ningún examen para tus cursos.'
                 }
               </p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
-            {exams.map((exam) => {
+            {filteredExams.map((exam) => {
               const status = getExamStatus(exam);
               
               return (

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate, getTodayInPeru } from '@/lib/dateUtils.ts';
+import { formatDate, formatSimpleDate, getTodayInPeru } from '@/lib/dateUtils.ts';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   MatriculaFormData,
@@ -1183,7 +1183,7 @@ export default function AdminMatriculaForm() {
                         <div>
                           <span className="font-medium">Cuota {cuota.numero_cuota}</span>
                           <span className="text-xs text-gray-500 ml-2">
-                            Vence: {formatDate(cuota.fecha_vencimiento)}
+                            Vence: {formatSimpleDate(cuota.fecha_vencimiento)}
                           </span>
                         </div>
                         <span className="font-semibold text-blue-600">

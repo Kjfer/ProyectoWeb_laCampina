@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate, formatDateTime } from '@/lib/dateUtils.ts';
+import { formatDate, formatDateTime, formatSimpleDate } from '@/lib/dateUtils.ts';
 import { MatriculaWithRelations } from '@/integrations/supabase/peri-types';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -472,7 +472,7 @@ export default function AdminMatriculasManagement() {
                                 </span>
                               </div>
                               <div className="text-sm text-gray-600 mt-1">
-                                <div>Vence: {formatDate(cuota.fecha_vencimiento)}</div>
+                                <div>Vence: {formatSimpleDate(cuota.fecha_vencimiento)}</div>
                                 <div>Monto: {selectedMatricula.moneda_monto} {cuota.monto_cuota.toFixed(2)}</div>
                                 {cuota.monto_pagado > 0 && (
                                   <div className="text-green-600">
@@ -511,6 +511,7 @@ export default function AdminMatriculasManagement() {
                         <TableHead>Monto</TableHead>
                         <TableHead>Método</TableHead>
                         <TableHead>Estado</TableHead>
+                        <TableHead>Comprobante</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -527,6 +528,20 @@ export default function AdminMatriculasManagement() {
                             <Badge variant="secondary">
                               {pago.estado_pago.replace('_', ' ').toUpperCase()}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {pago.comprobante ? (
+                              <a 
+                                href={pago.comprobante} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline text-sm"
+                              >
+                                Ver
+                              </a>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

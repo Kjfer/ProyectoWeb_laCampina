@@ -171,6 +171,7 @@ const AdminStudentManagementHub = () => {
   }, []);
 
   useEffect(() => {
+    // Ejecutar el filtro cada vez que cambien las dependencias
     filterStudentsList();
   }, [students, searchTerm, searchType, filterCourse, filterStatus]);
 
@@ -203,14 +204,32 @@ const AdminStudentManagementHub = () => {
 
   const fetchCourses = async () => {
     try {
-      const { data, error } = await supabase
-        .from('modulos' as any)
-        .select('*, course:courses(name, code)')
-        .eq('is_active', true)
-        .order('start_date', { ascending: false });
+      // Cargar solo cursos que tengan módulos activos
+      const { data: modulosData, error: modulosError } = await supabase
+        .from('modulos')
+        .select('course_id, courses(id, name, code)')
+        .eq('is_active', true);
 
-      if (error) throw error;
-      setCourses(data || []);
+      if (modulosError) throw modulosError;
+
+      // Extraer cursos únicos
+      const coursesMap = new Map();
+      modulosData?.forEach((modulo: any) => {
+        if (modulo.courses && !coursesMap.has(modulo.courses.id)) {
+          coursesMap.set(modulo.courses.id, {
+            id: modulo.courses.id,
+            name: modulo.courses.name,
+            code: modulo.courses.code,
+            is_active: true
+          });
+        }
+      });
+
+      const uniqueCourses = Array.from(coursesMap.values());
+      // Ordenar por nombre
+      uniqueCourses.sort((a, b) => a.name.localeCompare(b.name));
+      
+      setCourses(uniqueCourses);
     } catch (error) {
       console.error('Error fetching courses:', error);
     }
@@ -219,8 +238,41 @@ const AdminStudentManagementHub = () => {
   const filterStudentsList = async () => {
     let filtered = [...students];
 
-    // Filtro por búsqueda
-    if (searchTerm) {
+    // Filtro por curso primero (si está seleccionado)
+    if (searchType === 'course' && filterCourse !== 'all') {
+      // Primero obtener los módulos del curso seleccionado
+      const { data: modulos, error: modulosError } = await supabase
+        .from('modulos')
+        .select('id')
+        .eq('course_id', filterCourse);
+      
+      if (modulosError) {
+        console.error('Error fetching modulos:', modulosError);
+      }
+      
+      const moduloIds = modulos?.map(m => m.id) || [];
+      
+      if (moduloIds.length > 0) {
+        // Buscar estudiantes matriculados en cualquiera de estos módulos
+        const { data: enrollments, error: enrollError } = await supabase
+          .from('course_enrollments')
+          .select('student_id')
+          .in('modulo_id', moduloIds);
+        
+        if (enrollError) {
+          console.error('Error fetching enrollments:', enrollError);
+        }
+        
+        const enrolledIds = new Set(enrollments?.map(e => e.student_id) || []);
+        filtered = filtered.filter(s => enrolledIds.has(s.id));
+      } else {
+        // Si no hay módulos, no hay estudiantes matriculados
+        filtered = [];
+      }
+    }
+    
+    // Filtro por búsqueda de texto (si hay término y no es búsqueda por curso)
+    if (searchTerm && searchType !== 'course') {
       const term = searchTerm.toLowerCase();
       
       if (searchType === 'code') {
@@ -230,31 +282,7 @@ const AdminStudentManagementHub = () => {
           const fullName = `${s.paternal_surname} ${s.maternal_surname} ${s.first_name}`.toLowerCase();
           return fullName.includes(term) || s.document_number?.toLowerCase().includes(term);
         });
-      } else if (searchType === 'course' && filterCourse !== 'all') {
-        const { data: enrollments } = await supabase
-          .from('course_enrollments')
-          .select('student_id')
-          .eq('modulo_id', filterCourse);
-        
-        const enrolledIds = new Set(enrollments?.map(e => e.student_id) || []);
-        filtered = filtered.filter(s => enrolledIds.has(s.id));
-        
-        // También aplicar búsqueda por nombre si hay término
-        if (term) {
-          filtered = filtered.filter(s => {
-            const fullName = `${s.paternal_surname} ${s.maternal_surname} ${s.first_name}`.toLowerCase();
-            return fullName.includes(term);
-          });
-        }
       }
-    } else if (searchType === 'course' && filterCourse !== 'all') {
-      const { data: enrollments } = await supabase
-        .from('course_enrollments')
-        .select('student_id')
-        .eq('course_id', filterCourse);
-      
-      const enrolledIds = new Set(enrollments?.map(e => e.student_id) || []);
-      filtered = filtered.filter(s => enrolledIds.has(s.id));
     }
 
     // Filtro por estado
@@ -847,7 +875,7 @@ const AdminStudentManagementHub = () => {
                           <SelectItem value="all">Todos los cursos</SelectItem>
                           {courses.map((course) => (
                             <SelectItem key={course.id} value={course.id}>
-                              {course?.name || 'Sin nombre'} ({course?.code || 'Sin código'})
+                              {course.name} - {course.code}
                             </SelectItem>
                           ))}
                         </SelectContent>

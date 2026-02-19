@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate, getTodayInPeru } from '@/lib/dateUtils.ts';
+import { formatDate, formatSimpleDate, getTodayInPeru } from '@/lib/dateUtils.ts';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   Pago,
@@ -42,13 +42,19 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Plus, DollarSign, Filter, Calendar } from 'lucide-react';
+import { Plus, DollarSign, Filter, Calendar, FileText } from 'lucide-react';
 
 interface Profile {
   id: string;
   first_name: string;
   last_name: string;
   email: string;
+}
+
+interface Course {
+  id: string;
+  name: string;
+  code: string;
 }
 
 interface ProductoDisponible {
@@ -63,6 +69,7 @@ interface ProductoDisponible {
 export default function AdminPagosManagement() {
   const [pagos, setPagos] = useState<PagoWithRelations[]>([]);
   const [students, setStudents] = useState<Profile[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -72,11 +79,16 @@ export default function AdminPagosManagement() {
   const [showProductoDropdown, setShowProductoDropdown] = useState(false);
   const [cuotasMatricula, setCuotasMatricula] = useState<CuotaMatricula[]>([]);
   const [cuotaSeleccionada, setCuotaSeleccionada] = useState<string | null>(null);
+  const [matriculasPorCurso, setMatriculasPorCurso] = useState<Map<string, string[]>>(new Map());
+  const [materialesPorCurso, setMaterialesPorCurso] = useState<Map<string, string>>(new Map());
+  const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
+  const [uploadingComprobante, setUploadingComprobante] = useState(false);
   
   const [filters, setFilters] = useState({
     categoria: 'all',
     estado: 'all',
     estudiante: 'all',
+    curso: 'all',
   });
 
   const [formData, setFormData] = useState<PagoFormData>({
@@ -96,6 +108,9 @@ export default function AdminPagosManagement() {
     getCurrentUser();
     fetchPagos();
     fetchStudents();
+    fetchCourses();
+    fetchMatriculasConModulos();
+    fetchMaterialesConCursos();
   }, []);
 
   // Resetear estado_pago a 'pago_regular' si se cambia a categoría diferente de matricula
@@ -172,6 +187,96 @@ export default function AdminPagosManagement() {
       setStudents(data || []);
     } catch (error: any) {
       console.error('Error fetching students:', error);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      // Cargar cursos que tienen módulos activos
+      const { data: modulosData, error: modulosError } = await supabase
+        .from('modulos')
+        .select('course_id, courses(id, name, code)')
+        .eq('is_active', true);
+
+      if (modulosError) throw modulosError;
+
+      // Extraer cursos únicos
+      const coursesMap = new Map();
+      modulosData?.forEach((modulo: any) => {
+        if (modulo.courses && !coursesMap.has(modulo.courses.id)) {
+          coursesMap.set(modulo.courses.id, {
+            id: modulo.courses.id,
+            name: modulo.courses.name,
+            code: modulo.courses.code,
+          });
+        }
+      });
+
+      const uniqueCourses = Array.from(coursesMap.values()) as Course[];
+      uniqueCourses.sort((a, b) => a.name.localeCompare(b.name));
+      
+      setCourses(uniqueCourses);
+    } catch (error: any) {
+      console.error('Error fetching courses:', error);
+    }
+  };
+
+  const fetchMatriculasConModulos = async () => {
+    try {
+      // Obtener todas las matrículas con sus enrollments
+      const { data: matriculas, error } = await supabase
+        .from('matriculas' as any)
+        .select('cod_matricula, estudiante_id');
+
+      if (error) throw error;
+
+      // Para cada matrícula, obtener los módulos enrollados
+      const matriculasCursoMap = new Map<string, string[]>();
+
+      for (const matricula of matriculas || []) {
+        const { data: enrollments } = await supabase
+          .from('course_enrollments')
+          .select('modulo_id, modulos!course_enrollments_modulo_id_fkey(course_id)')
+          .eq('student_id', matricula.estudiante_id);
+
+        if (enrollments && enrollments.length > 0) {
+          const courseIds = enrollments
+            .map((e: any) => e.modulos?.course_id)
+            .filter((id: any) => id);
+
+          if (courseIds.length > 0) {
+            matriculasCursoMap.set(matricula.cod_matricula, courseIds);
+          }
+        }
+      }
+
+      setMatriculasPorCurso(matriculasCursoMap);
+    } catch (error: any) {
+      console.error('Error fetching matriculas con modulos:', error);
+    }
+  };
+
+  const fetchMaterialesConCursos = async () => {
+    try {
+      // Obtener todos los materiales registrados con su course_id
+      const { data: materiales, error } = await supabase
+        .from('registro_compra_materiales')
+        .select('codigo_material, course_id');
+
+      if (error) throw error;
+
+      // Crear un mapa: codigo_material -> course_id
+      const materialesCursoMap = new Map<string, string>();
+
+      materiales?.forEach((material: any) => {
+        if (material.codigo_material && material.course_id) {
+          materialesCursoMap.set(material.codigo_material, material.course_id);
+        }
+      });
+
+      setMaterialesPorCurso(materialesCursoMap);
+    } catch (error: any) {
+      console.error('Error fetching materiales con cursos:', error);
     }
   };
 
@@ -389,6 +494,7 @@ export default function AdminPagosManagement() {
     setProductosDisponibles([]);
     setCuotasMatricula([]);
     setCuotaSeleccionada(null);
+    setComprobanteFile(null);
     fetchProductosPorCategoria('matricula');
     setDialogOpen(true);
   };
@@ -397,6 +503,7 @@ export default function AdminPagosManagement() {
     setDialogOpen(false);
     setCuotasMatricula([]);
     setCuotaSeleccionada(null);
+    setComprobanteFile(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -421,8 +528,35 @@ export default function AdminPagosManagement() {
     }
 
     try {
+      let comprobanteUrl = formData.comprobante;
+
+      // Si hay un archivo de comprobante, subirlo primero
+      if (comprobanteFile) {
+        setUploadingComprobante(true);
+        const fileExt = comprobanteFile.name.split('.').pop();
+        const fileName = `${Date.now()}_${formData.estudiante_id}_${formData.codigo_producto}.${fileExt}`;
+        const filePath = `${formData.estudiante_id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('payment-receipts')
+          .upload(filePath, comprobanteFile, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('payment-receipts')
+          .getPublicUrl(filePath);
+
+        comprobanteUrl = urlData.publicUrl;
+        setUploadingComprobante(false);
+      }
+
       const pagoData: PagoInsert = {
         ...formData,
+        comprobante: comprobanteUrl,
         usuario_id: currentUser.id,
         estudiante_id: formData.estudiante_id || null,
         cuota_id: cuotaSeleccionada || null,
@@ -458,6 +592,11 @@ export default function AdminPagosManagement() {
 
       handleCloseDialog();
       fetchPagos();
+      
+      // Recargar materiales si el pago es de tipo material
+      if (formData.categoria_producto === 'kits' || formData.categoria_producto === 'books') {
+        fetchMaterialesConCursos();
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -472,6 +611,27 @@ export default function AdminPagosManagement() {
     if (filters.categoria !== 'all' && pago.categoria_producto !== filters.categoria) return false;
     if (filters.estado !== 'all' && pago.estado_pago !== filters.estado) return false;
     if (filters.estudiante !== 'all' && pago.estudiante_id !== filters.estudiante) return false;
+    
+    // Filtro por curso
+    if (filters.curso !== 'all') {
+      if (pago.categoria_producto === 'matricula') {
+        // Para matrículas: verificar si está relacionado con el curso
+        const cursoIds = matriculasPorCurso.get(pago.codigo_producto);
+        if (!cursoIds || !cursoIds.includes(filters.curso)) {
+          return false;
+        }
+      } else if (pago.categoria_producto === 'kits' || pago.categoria_producto === 'books') {
+        // Para materiales (kits/books): verificar si el material pertenece al curso
+        const courseId = materialesPorCurso.get(pago.codigo_producto);
+        if (!courseId || courseId !== filters.curso) {
+          return false;
+        }
+      } else {
+        // Para otros tipos de pago (clases_grabadas), no mostrar cuando se filtra por curso
+        return false;
+      }
+    }
+    
     return true;
   });
 
@@ -509,7 +669,7 @@ export default function AdminPagosManagement() {
               <Filter className="h-4 w-4" />
               <span className="font-semibold">Filtros</span>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Categoría</Label>
                 <Select
@@ -571,6 +731,27 @@ export default function AdminPagosManagement() {
                     {students.map((student) => (
                       <SelectItem key={student.id} value={student.id}>
                         {student.first_name} {student.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Curso</Label>
+                <Select
+                  value={filters.curso}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, curso: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los cursos</SelectItem>
+                    {courses.map((course) => (
+                      <SelectItem key={course.id} value={course.id}>
+                        {course.name} - {course.code}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -672,7 +853,21 @@ export default function AdminPagosManagement() {
                         {pago.estado_pago.replace('_', ' ').toUpperCase()}
                       </span>
                     </TableCell>
-                    <TableCell>{pago.comprobante || '-'}</TableCell>
+                    <TableCell>
+                      {pago.comprobante ? (
+                        <a 
+                          href={pago.comprobante} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          <FileText className="h-4 w-4" />
+                          Ver comprobante
+                        </a>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -882,7 +1077,7 @@ export default function AdminPagosManagement() {
                                 </span>
                               </div>
                               <div className="text-sm text-gray-600 mt-1">
-                                <div>Vence: {formatDate(cuota.fecha_vencimiento)}</div>
+                                <div>Vence: {formatSimpleDate(cuota.fecha_vencimiento)}</div>
                                 <div>Monto: {formData.moneda_pago} {cuota.monto_cuota.toFixed(2)}</div>
                                 {cuota.monto_pagado > 0 && (
                                   <div className="text-green-600">
@@ -1033,15 +1228,27 @@ export default function AdminPagosManagement() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="comprobante">Número de Comprobante</Label>
+                  <Label htmlFor="comprobante">Archivo de Comprobante</Label>
                   <Input
                     id="comprobante"
-                    value={formData.comprobante}
-                    onChange={(e) =>
-                      setFormData({ ...formData, comprobante: e.target.value })
-                    }
-                    placeholder="Boleta, factura, recibo..."
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      setComprobanteFile(file || null);
+                    }}
+                    disabled={uploadingComprobante}
                   />
+                  {comprobanteFile && (
+                    <p className="text-xs text-muted-foreground">
+                      Archivo seleccionado: {comprobanteFile.name}
+                    </p>
+                  )}
+                  {uploadingComprobante && (
+                    <p className="text-xs text-blue-600">
+                      Subiendo comprobante...
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -1060,12 +1267,12 @@ export default function AdminPagosManagement() {
             </Card>
 
             <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={handleCloseDialog}>
+              <Button type="button" variant="outline" onClick={handleCloseDialog} disabled={uploadingComprobante}>
                 Cancelar
               </Button>
-              <Button type="submit">
+              <Button type="submit" disabled={uploadingComprobante}>
                 <DollarSign className="mr-2 h-4 w-4" />
-                Registrar Pago
+                {uploadingComprobante ? 'Subiendo...' : 'Registrar Pago'}
               </Button>
             </DialogFooter>
           </form>

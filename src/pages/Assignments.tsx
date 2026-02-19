@@ -33,7 +33,7 @@ interface Assignment {
     id: string;
     name: string;
     course_id: string;
-  };
+  } | null;
   submissions?: {
     id: string;
     score: string;  // Ahora es texto (AD, A, B, C)
@@ -113,17 +113,19 @@ const Assignments = () => {
       if (assignmentsError) throw assignmentsError;
 
       // Only use assignments from the assignments table (no duplicates from weekly resources)
-      const formattedAssignments: Assignment[] = (assignmentsData || []).map(assignment => ({
-        id: assignment.id,
-        title: assignment.title,
-        description: assignment.description || '',
-        due_date: assignment.due_date,
-        max_score: assignment.max_score,
-        modulo_id: assignment.modulo_id,
-        source: 'assignment' as const,
-        modulo: assignment.modulo,
-        submissions: assignment.submissions
-      })).sort((a, b) => parseExamDate(a.due_date).getTime() - parseExamDate(b.due_date).getTime());
+      const formattedAssignments: Assignment[] = (assignmentsData || [])
+        .filter(assignment => assignment.modulo) // Filter out assignments without modulo
+        .map(assignment => ({
+          id: assignment.id,
+          title: assignment.title,
+          description: assignment.description || '',
+          due_date: assignment.due_date,
+          max_score: assignment.max_score,
+          modulo_id: assignment.modulo_id,
+          source: 'assignment' as const,
+          modulo: assignment.modulo,
+          submissions: assignment.submissions
+        })).sort((a, b) => parseExamDate(a.due_date).getTime() - parseExamDate(b.due_date).getTime());
 
       setAssignments(formattedAssignments);
     } catch (error) {
@@ -181,17 +183,21 @@ const Assignments = () => {
   };
 
   // Get unique courses for filter
-  const uniqueCourses = Array.from(new Set(assignments.map(a => a.modulo_id)))
-    .map(moduloId => assignments.find(a => a.modulo_id === moduloId)?.modulo)
-    .filter(Boolean);
+  const uniqueCourses = Array.from(
+    new Map(
+      assignments
+        .filter(a => a.modulo?.course_id)
+        .map(a => [a.modulo!.course_id, a.modulo!])
+    ).values()
+  );
 
   // Apply filters
   const filteredAssignments = assignments.filter(assignment => {
     const matchesSearch = assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          assignment.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         assignment.modulo.name.toLowerCase().includes(searchTerm.toLowerCase());
+                         (assignment.modulo?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     
-    const matchesCourse = courseFilter === 'all' || assignment.modulo_id === courseFilter;
+    const matchesCourse = courseFilter === 'all' || assignment.modulo?.course_id === courseFilter;
     
     const status = getAssignmentStatus(assignment).status;
     const matchesStatus = statusFilter === 'all' || status === statusFilter;
@@ -267,13 +273,13 @@ const Assignments = () => {
           
           <Select value={courseFilter} onValueChange={setCourseFilter}>
             <SelectTrigger>
-              <SelectValue placeholder="Todos los módulos" />
+              <SelectValue placeholder="Todos los cursos" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los módulos</SelectItem>
+              <SelectItem value="all">Todos los cursos</SelectItem>
               {uniqueCourses.map(modulo => (
-                <SelectItem key={modulo!.id} value={modulo!.id}>
-                  {modulo!.name}
+                <SelectItem key={modulo.course_id} value={modulo.course_id}>
+                  {modulo.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -342,7 +348,7 @@ const Assignments = () => {
                           <Badge variant="secondary" className="text-xs">
                             Módulo
                           </Badge>
-                          <span>{assignment.modulo.name}</span>
+                          <span>{assignment.modulo?.name || 'Sin módulo'}</span>
                         </div>
                       </div>
                       <FileText className="w-6 h-6 text-primary" />

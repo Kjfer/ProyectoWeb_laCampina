@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDate } from '@/lib/dateUtils.ts';
+import { formatDate, getRawDate, getLocalDateFromTimestamp } from '@/lib/dateUtils.ts';
 import { MatriculaWithRelations } from '@/integrations/supabase/peri-types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,7 @@ export function MatriculasTab() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchType, setSearchType] = useState<'codigo' | 'fecha' | 'curso'>('codigo');
-  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedMatricula, setSelectedMatricula] = useState<MatriculaWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -154,10 +154,11 @@ export function MatriculasTab() {
       return mat.cod_matricula.toLowerCase().includes(searchLower);
     } else if (searchType === 'fecha') {
       if (!selectedDate) return true;
-      const matriculaDate = new Date(mat.created_at).toISOString().split('T')[0];
+      // Usar getLocalDateFromTimestamp para obtener la fecha en zona horaria local
+      const matriculaDate = getLocalDateFromTimestamp(mat.created_at);
       return matriculaDate === selectedDate;
     } else if (searchType === 'curso') {
-      if (!selectedCourseId) return true;
+      if (!selectedCourseId || selectedCourseId === 'all') return true;
       // Verificar si algún módulo matriculado pertenece al curso seleccionado
       const modulos = mat.modulos_matriculados || [];
       return modulos.some((modulo: any) => {
@@ -251,7 +252,7 @@ export function MatriculasTab() {
                       <SelectValue placeholder="Selecciona un curso" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos los cursos</SelectItem>
+                      <SelectItem value="all">Todos los cursos</SelectItem>
                       {courses.map(course => (
                         <SelectItem key={course.id} value={course.id}>
                           {course.code} - {course.name}
@@ -480,6 +481,7 @@ export function MatriculasTab() {
                         <TableHead>Monto</TableHead>
                         <TableHead>Método</TableHead>
                         <TableHead>Tipo</TableHead>
+                        <TableHead>Comprobante</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -489,11 +491,25 @@ export function MatriculasTab() {
                             {formatDate(pago.fecha_pago)}
                           </TableCell>
                           <TableCell className="font-medium">
-                            {pago.moneda} {pago.monto_pago.toFixed(2)}
+                            {pago.moneda_pago} {pago.monto_pago.toFixed(2)}
                           </TableCell>
                           <TableCell>{pago.metodo_pago}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{pago.tipo_pago}</Badge>
+                            <Badge variant="outline">{pago.estado_pago}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {pago.comprobante ? (
+                              <a 
+                                href={pago.comprobante} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline text-sm"
+                              >
+                                Ver
+                              </a>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

@@ -84,6 +84,45 @@ export const getRawDate = (dateString: string | null | undefined): string => {
 };
 
 /**
+ * Obtiene la fecha de un timestamp en la zona horaria local del navegador
+ * en formato YYYY-MM-DD (útil para comparar con inputs type="date")
+ */
+export const getLocalDateFromTimestamp = (dateString: string | null | undefined): string => {
+  if (!dateString) return '-';
+  
+  // Si es un date puro (sin tiempo), retornar tal cual
+  if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    return dateString;
+  }
+  
+  // Convertir el timestamp a fecha local
+  const date = new Date(dateString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Formatea una fecha simple (YYYY-MM-DD) a DD/MM/YYYY
+ * Sin conversiones de zona horaria - útil para fechas de cuotas, vencimientos, etc.
+ */
+export const formatSimpleDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return '-';
+  
+  // Extraer la parte de fecha si es un timestamp
+  const dateOnly = dateString.includes('T') ? dateString.split('T')[0] : dateString;
+  
+  // Validar formato YYYY-MM-DD
+  const match = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return dateString;
+  
+  const [_, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+};
+
+/**
  * Obtiene la fecha actual en formato YYYY-MM-DD usando la fecha local del navegador
  * Sin conversiones UTC que causan desfases de zona horaria
  */
