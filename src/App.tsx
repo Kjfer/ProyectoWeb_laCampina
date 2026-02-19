@@ -54,7 +54,7 @@ import AdminMaterialesManagement from "./pages/AdminMaterialesManagement";
 import AdminCursosGrabadosManagement from "./pages/AdminCursosGrabadosManagement";
 import AdminVentasCursosGrabadosManagement from "./pages/AdminVentasCursosGrabadosManagement";
 import PortfolioReview from "./pages/PortfolioReview";
-
+import AdminSatisfaccion from './pages/AdminSatisfaccion';
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -118,6 +118,7 @@ const App = () => (
                 <PortfolioReview />
               </ProtectedRoute>
             } />
+            <Route path="/admin/satisfaccion" element={<AdminSatisfaccion />} />
             <Route path="/grading/:submissionId" element={
               <ProtectedRoute>
                 <GradingView />

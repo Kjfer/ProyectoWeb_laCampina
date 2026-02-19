@@ -189,7 +189,13 @@ export const adminNavigationItems: NavItem[] = [
     url: '/admin/certificates',
     icon: Award,
     roles: ['admin']
-  }
+  },
+  {
+    title: 'Encuesta Docente',
+    url: '/admin/satisfaccion',
+    icon: ClipboardList, // Este icono ya lo tienes importado arriba
+    roles: ['admin']
+  },
 ];
 
 export function getNavigationForRole(role: UserRole, allRoles?: UserRole[]): NavItem[] {
