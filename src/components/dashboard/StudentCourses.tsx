@@ -214,13 +214,13 @@ export function StudentCourses() {
 
       const moduloIds = modulosData.map(m => m.id);
 
-      // Obtener entregas pendientes de revisar
+      // Obtener entregas pendientes de revisar (submitted_at no nulo y score nulo)
       const { data: submissions } = await supabase
         .from('assignment_submissions')
         .select('id, assignment:assignments!inner(modulo_id)')
         .in('assignment.modulo_id', moduloIds)
-        .is('grade', null)
-        .eq('status', 'submitted');
+        .not('submitted_at', 'is', null)
+        .is('score', null);
 
       // Agrupar por módulo
       const submissionsByModulo = new Map<string, number>();

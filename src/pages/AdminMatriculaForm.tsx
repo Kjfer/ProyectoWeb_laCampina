@@ -446,7 +446,9 @@ export default function AdminMatriculaForm() {
           modulo_id: modulo.id,
           nombre: modulo.name,
           code: modulo.code,
+          course_id: modulo.course_id,
           course_name: modulo.course?.name,
+          course_code: modulo.course?.code,
           start_date: modulo.start_date,
           end_date: modulo.end_date,
         };

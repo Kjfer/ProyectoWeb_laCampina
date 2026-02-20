@@ -29,6 +29,8 @@ interface StudentData {
   phone?: string;
   gender: string;
   birth_date: string;
+  country?: string;
+  education_level?: string;
 }
 
 interface BulkStudentImportProps {
@@ -73,9 +75,25 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
         'APELLIDO MATERNO': 'López',
         'NOMBRES': 'Juan Carlos',
         'EMAIL': 'juan.garcia@correo.com',
-        'TELÉFONO': '987654321',
+        'TELÉFONO': '+51 987654321',
         'SEXO': 'M',
-        'FECHA DE NACIMIENTO': '2010-05-15'
+        'FECHA DE NACIMIENTO': '2010-05-15',
+        'PAÍS': 'Perú',
+        'NIVEL EDUCATIVO': 'Secundaria Completa'
+      },
+      {
+        'TIPO DE DOCUMENTO': 'Valores: DNI, CE, PASAPORTE',
+        'NÚMERO DE DOCUMENTO': 'Campo obligatorio',
+        'CÓDIGO DEL ESTUDIANTE': 'Campo obligatorio',
+        'APELLIDO PATERNO': 'Campo obligatorio',
+        'APELLIDO MATERNO': 'Campo obligatorio',
+        'NOMBRES': 'Campo obligatorio',
+        'EMAIL': 'Campo obligatorio - correo@dominio.com',
+        'TELÉFONO': 'Opcional - Con código de país (Ej: +51 987654321)',
+        'SEXO': 'Valores: M (Masculino) o F (Femenino)',
+        'FECHA DE NACIMIENTO': 'Formato: AAAA-MM-DD (Ej: 2010-05-15)',
+        'PAÍS': 'Opcional - Países disponibles o escriba otro',
+        'NIVEL EDUCATIVO': 'Opcional - Primaria/Secundaria/Universidad Completa/Incompleta, Superior/Instituto'
       }
     ];
 
@@ -135,6 +153,8 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
         phone: row['TELÉFONO'] ? String(row['TELÉFONO']).trim() : undefined,
         gender: String(row['SEXO'] || '').trim().toUpperCase(),
         birth_date: row['FECHA DE NACIMIENTO'] ? formatExcelDate(row['FECHA DE NACIMIENTO']) : '',
+        country: row['PAÍS'] ? String(row['PAÍS']).trim() : undefined,
+        education_level: row['NIVEL EDUCATIVO'] ? String(row['NIVEL EDUCATIVO']).trim() : undefined,
       })).filter(student => student.document_number && student.student_code && student.first_name && student.email);
 
       if (students.length === 0) {

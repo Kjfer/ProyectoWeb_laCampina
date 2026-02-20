@@ -114,8 +114,8 @@ const Index = () => {
           .from('assignment_submissions')
           .select('id, assignment:assignments!inner(modulo_id)')
           .in('assignment.modulo_id', moduloIds)
-          .is('grade', null)
-          .eq('status', 'submitted');
+          .not('submitted_at', 'is', null)
+          .is('score', null);
 
         pendingAssignments = submissions?.length || 0;
 

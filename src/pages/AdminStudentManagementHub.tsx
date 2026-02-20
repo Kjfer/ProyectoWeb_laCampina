@@ -145,6 +145,7 @@ const AdminStudentManagementHub = () => {
     country: 'Perú',
     education_level: ''
   });
+  const [customCountry, setCustomCountry] = useState('');
 
   if (profile?.role !== 'admin') {
     return (
@@ -388,7 +389,7 @@ const AdminStudentManagementHub = () => {
             gender: formData.gender,
             birthDate: formData.birth_date,
             phone: formData.phone,
-            country: formData.country,
+            country: formData.country === 'Otro' ? customCountry : formData.country,
             educationLevel: formData.education_level
           }]
         })
@@ -421,6 +422,7 @@ const AdminStudentManagementHub = () => {
         country: 'Perú',
         education_level: ''
       });
+      setCustomCountry('');
       fetchStudents();
     } catch (error: any) {
       console.error('Error creating student:', error);
@@ -783,33 +785,92 @@ const AdminStudentManagementHub = () => {
                           </div>
                         </div>
 
+                        <div>
+                          <Label htmlFor="phone">Teléfono (con código de país)</Label>
+                          <Input
+                            id="phone"
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                            placeholder="+51 987654321"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Incluye el código de país (Ej: +51 para Perú, +52 para México)
+                          </p>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
-                          <div>
+                          <div className="space-y-2">
                             <Label htmlFor="country">País</Label>
-                            <Input
-                              id="country"
+                            <Select
                               value={formData.country}
-                              onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                            />
+                              onValueChange={(value) => {
+                                setFormData({ ...formData, country: value });
+                                if (value !== 'Otro') {
+                                  setCustomCountry('');
+                                }
+                              }}
+                            >
+                              <SelectTrigger id="country">
+                                <SelectValue placeholder="Seleccionar país" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Perú">Perú</SelectItem>
+                                <SelectItem value="Argentina">Argentina</SelectItem>
+                                <SelectItem value="Bolivia">Bolivia</SelectItem>
+                                <SelectItem value="Brasil">Brasil</SelectItem>
+                                <SelectItem value="Chile">Chile</SelectItem>
+                                <SelectItem value="Colombia">Colombia</SelectItem>
+                                <SelectItem value="Costa Rica">Costa Rica</SelectItem>
+                                <SelectItem value="Cuba">Cuba</SelectItem>
+                                <SelectItem value="Ecuador">Ecuador</SelectItem>
+                                <SelectItem value="El Salvador">El Salvador</SelectItem>
+                                <SelectItem value="España">España</SelectItem>
+                                <SelectItem value="Guatemala">Guatemala</SelectItem>
+                                <SelectItem value="Honduras">Honduras</SelectItem>
+                                <SelectItem value="México">México</SelectItem>
+                                <SelectItem value="Nicaragua">Nicaragua</SelectItem>
+                                <SelectItem value="Panamá">Panamá</SelectItem>
+                                <SelectItem value="Paraguay">Paraguay</SelectItem>
+                                <SelectItem value="Puerto Rico">Puerto Rico</SelectItem>
+                                <SelectItem value="República Dominicana">República Dominicana</SelectItem>
+                                <SelectItem value="Uruguay">Uruguay</SelectItem>
+                                <SelectItem value="Venezuela">Venezuela</SelectItem>
+                                <SelectItem value="Estados Unidos">Estados Unidos</SelectItem>
+                                <SelectItem value="Canadá">Canadá</SelectItem>
+                                <SelectItem value="Otro">Otro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {formData.country === 'Otro' && (
+                              <Input
+                                id="custom_country"
+                                value={customCountry}
+                                onChange={(e) => setCustomCountry(e.target.value)}
+                                placeholder="Ingresa el nombre del país"
+                                className="mt-2"
+                              />
+                            )}
                           </div>
                           <div>
                             <Label htmlFor="education_level">Nivel Educativo</Label>
-                            <Input
-                              id="education_level"
+                            <Select
                               value={formData.education_level}
-                              onChange={(e) => setFormData({ ...formData, education_level: e.target.value })}
-                              placeholder="Ej: Secundaria"
-                            />
+                              onValueChange={(value) => setFormData({ ...formData, education_level: value })}
+                            >
+                              <SelectTrigger id="education_level">
+                                <SelectValue placeholder="Seleccionar nivel" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Primaria Completa">Primaria Completa</SelectItem>
+                                <SelectItem value="Primaria Incompleta">Primaria Incompleta</SelectItem>
+                                <SelectItem value="Secundaria Completa">Secundaria Completa</SelectItem>
+                                <SelectItem value="Secundaria Incompleta">Secundaria Incompleta</SelectItem>
+                                <SelectItem value="Universidad Completa">Universidad Completa</SelectItem>
+                                <SelectItem value="Universidad Incompleta">Universidad Incompleta</SelectItem>
+                                <SelectItem value="Superior / Instituto">Superior / Instituto</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="phone">Teléfono</Label>
-                          <Input
-                            id="phone"
-                            value={formData.phone}
-                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          />
                         </div>
 
                         <div className="bg-muted p-3 rounded-lg text-sm">

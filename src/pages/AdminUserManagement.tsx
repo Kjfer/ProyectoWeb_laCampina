@@ -9,8 +9,10 @@ import { Skeleton } from '../components/ui/skeleton';
 import { Progress } from '../components/ui/progress';
 import { useToast } from '../components/ui/use-toast';
 import { supabase } from '../integrations/supabase/client';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Eye, User, Mail, Phone, Calendar, MapPin, GraduationCap, FileText } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Badge } from '../components/ui/badge';
 
 import type { UserRole } from '../utils/roleNavigation';
 interface Profile {
@@ -19,6 +21,17 @@ interface Profile {
   last_name: string;
   email: string;
   role: UserRole;
+  phone?: string | null;
+  document_type?: string | null;
+  document_number?: string | null;
+  student_code?: string | null;
+  gender?: string | null;
+  birth_date?: string | null;
+  country?: string | null;
+  education_level?: string | null;
+  paternal_surname?: string | null;
+  maternal_surname?: string | null;
+  created_at?: string;
 }
 
 const ROLES = [
@@ -42,6 +55,8 @@ const AdminUserManagement: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkRole, setBulkRole] = useState<UserRole | "">("");
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -52,7 +67,7 @@ const AdminUserManagement: React.FC = () => {
   const fetchProfiles = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('profiles').select('id, first_name, last_name, email, role');
+      const { data, error } = await supabase.from('profiles').select('*');
       if (error) throw error;
       setProfiles((data || []) as Profile[]);
     } catch (e) {
@@ -63,6 +78,11 @@ const AdminUserManagement: React.FC = () => {
       });
     }
     setLoading(false);
+  };
+
+  const handleViewDetails = async (profile: Profile) => {
+    setSelectedProfile(profile);
+    setDetailsModalOpen(true);
   };
 
   // Actualizar rol de usuario en Supabase
@@ -197,8 +217,8 @@ const AdminUserManagement: React.FC = () => {
           )}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
             {/* Buscador y filtro rápido de rol */}
-            <div className="flex gap-2 w-full max-w-xl">
-              <div className="relative flex-1">
+            <div className="flex flex-col md:flex-row gap-2 w-full">
+              <div className="relative flex-1 max-w-xl">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                   <Search className="h-4 w-4" />
                 </span>
@@ -209,19 +229,29 @@ const AdminUserManagement: React.FC = () => {
                   className="pl-9 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-200 border border-gray-200 w-full"
                 />
               </div>
-              <Select value={roleFilter} onValueChange={val => setRoleFilter(val as UserRole | "") }>
-                <SelectTrigger className="w-40 bg-white border border-gray-200">
-                  <span>{roleFilter ? (ROLES.find(r => r.value === roleFilter)?.label) : 'Filtrar por rol'}</span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={undefined}>Todos los roles</SelectItem>
-                  {ROLES.map((role) => (
-                    <SelectItem key={role.value} value={role.value}>
-                      {role.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Button
+                  variant={roleFilter === 'student' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setRoleFilter(roleFilter === 'student' ? '' : 'student')}
+                  className="whitespace-nowrap"
+                >
+                  Solo Estudiantes
+                </Button>
+                <Select value={roleFilter} onValueChange={val => setRoleFilter(val as UserRole | "") }>
+                  <SelectTrigger className="w-40 bg-white border border-gray-200">
+                    <span>{roleFilter ? (ROLES.find(r => r.value === roleFilter)?.label) : 'Todos los roles'}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={undefined}>Todos los roles</SelectItem>
+                    {ROLES.map((role) => (
+                      <SelectItem key={role.value} value={role.value}>
+                        {role.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {/* Selector de cantidad de usuarios */}
             <div className="flex items-center gap-2 md:ml-24 mt-1 pl-2">
@@ -312,6 +342,18 @@ const AdminUserManagement: React.FC = () => {
                         <td className="px-4 py-2 align-middle text-center">
                           <div className="flex gap-2 items-center justify-center">
                             {saving === profile.id && <Skeleton className="h-4 w-4 rounded-full" />}
+                            {(profile.role === 'student' || profile.role === 'teacher') && (
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="border-green-200 hover:bg-green-100"
+                                onClick={() => handleViewDetails(profile)}
+                                disabled={saving === profile.id}
+                                title="Ver detalles"
+                              >
+                                <Eye className="h-5 w-5 text-green-600" />
+                              </Button>
+                            )}
                             <Button
                               size="icon"
                               variant="outline"
@@ -388,6 +430,159 @@ const AdminUserManagement: React.FC = () => {
             </>
           )}
         </Card>
+
+        {/* Modal de Detalles */}
+        <Dialog open={detailsModalOpen} onOpenChange={setDetailsModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Detalles del Usuario
+              </DialogTitle>
+            </DialogHeader>
+            {selectedProfile && (
+              <div className="space-y-6">
+                {/* Información Básica */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Información Básica</h3>
+                    <Badge variant={selectedProfile.role === 'student' ? 'default' : 'secondary'}>
+                      {ROLES.find(r => r.value === selectedProfile.role)?.label || selectedProfile.role}
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                      <User className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Nombre Completo</p>
+                        <p className="font-medium">{selectedProfile.first_name} {selectedProfile.last_name}</p>
+                      </div>
+                    </div>
+                    
+                    {selectedProfile.paternal_surname && (
+                      <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                        <User className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Apellidos</p>
+                          <p className="font-medium">{selectedProfile.paternal_surname} {selectedProfile.maternal_surname}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                      <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Correo Electrónico</p>
+                        <p className="font-medium text-sm break-all">{selectedProfile.email}</p>
+                      </div>
+                    </div>
+                    
+                    {selectedProfile.phone && (
+                      <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                        <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Teléfono</p>
+                          <p className="font-medium">{selectedProfile.phone}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Información de Documento (Solo Estudiantes) */}
+                {selectedProfile.role === 'student' && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Información Académica</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {selectedProfile.student_code && (
+                        <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                          <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-xs text-muted-foreground">Código de Estudiante</p>
+                            <p className="font-medium">{selectedProfile.student_code}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedProfile.document_number && (
+                        <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                          <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-xs text-muted-foreground">{selectedProfile.document_type || 'Documento'}</p>
+                            <p className="font-medium">{selectedProfile.document_number}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedProfile.education_level && (
+                        <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                          <GraduationCap className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-xs text-muted-foreground">Nivel Educativo</p>
+                            <p className="font-medium">{selectedProfile.education_level}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Información Personal */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Información Personal</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedProfile.birth_date && (
+                      <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                        <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Fecha de Nacimiento</p>
+                          <p className="font-medium">{new Date(selectedProfile.birth_date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {selectedProfile.gender && (
+                      <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                        <User className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Género</p>
+                          <p className="font-medium">{selectedProfile.gender === 'M' ? 'Masculino' : selectedProfile.gender === 'F' ? 'Femenino' : selectedProfile.gender}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {selectedProfile.country && (
+                      <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                        <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">País</p>
+                          <p className="font-medium">{selectedProfile.country}</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {selectedProfile.created_at && (
+                      <div className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                        <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Registrado</p>
+                          <p className="font-medium">{new Date(selectedProfile.created_at).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <Button onClick={() => setDetailsModalOpen(false)}>
+                    Cerrar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

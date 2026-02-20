@@ -80,10 +80,18 @@ interface Enrollment {
 }
 
 interface StudentFormData {
+  document_type: string;
+  document_number: string;
+  student_code: string;
+  paternal_surname: string;
+  maternal_surname: string;
   first_name: string;
-  last_name: string;
   email: string;
   phone: string;
+  gender: string;
+  birth_date: string;
+  country: string;
+  education_level: string;
 }
 
 const AdminStudentManagement = () => {
@@ -104,11 +112,20 @@ const AdminStudentManagement = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedCourseForEnrollment, setSelectedCourseForEnrollment] = useState('');
   const [formData, setFormData] = useState<StudentFormData>({
+    document_type: 'DNI',
+    document_number: '',
+    student_code: '',
+    paternal_surname: '',
+    maternal_surname: '',
     first_name: '',
-    last_name: '',
     email: '',
-    phone: ''
+    phone: '',
+    gender: '',
+    birth_date: '',
+    country: 'Perú',
+    education_level: ''
   });
+  const [customCountry, setCustomCountry] = useState('');
 
   // Redirect if not admin
   if (profile?.role !== 'admin') {
@@ -224,6 +241,9 @@ const AdminStudentManagement = () => {
     e.preventDefault();
     
     try {
+      // Generar el apellido completo (last_name)
+      const last_name = `${formData.paternal_surname} ${formData.maternal_surname}`.trim();
+      
       // Create user in auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
@@ -231,7 +251,7 @@ const AdminStudentManagement = () => {
         options: {
           data: {
             first_name: formData.first_name,
-            last_name: formData.last_name,
+            last_name: last_name,
             role: 'student'
           }
         }
@@ -252,7 +272,14 @@ const AdminStudentManagement = () => {
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
+            document_type: formData.document_type,
+            document_number: formData.document_number,
+            student_code: formData.student_code,
             phone: formData.phone || null,
+            gender: formData.gender || null,
+            birth_date: formData.birth_date || null,
+            country: formData.country === 'Otro' ? customCountry : formData.country || null,
+            education_level: formData.education_level || null,
             role: 'student'
           })
           .eq('id', authData.user.id);
@@ -285,12 +312,22 @@ const AdminStudentManagement = () => {
     if (!editingStudent) return;
 
     try {
+        // Generar el apellido completo (last_name)
+        const last_name = `${formData.paternal_surname} ${formData.maternal_surname}`.trim();
+        
         const { error } = await supabase
           .from('profiles')
           .update({
             first_name: formData.first_name,
-            last_name: formData.last_name,
+            last_name: last_name,
+            document_type: formData.document_type,
+            document_number: formData.document_number,
+            student_code: formData.student_code,
             phone: formData.phone || null,
+            gender: formData.gender || null,
+            birth_date: formData.birth_date || null,
+            country: formData.country === 'Otro' ? customCountry : formData.country || null,
+            education_level: formData.education_level || null,
           })
           .eq('id', editingStudent.id);      if (error) {
         console.error('Error updating student:', error);
@@ -429,12 +466,39 @@ const AdminStudentManagement = () => {
 
   const openEditModal = (student: Student) => {
     setEditingStudent(student);
+    
+    // Separar last_name en apellidos paterno y materno si es posible
+    const lastNameParts = (student.last_name || '').split(' ');
+    const paternal = lastNameParts[0] || '';
+    const maternal = lastNameParts.slice(1).join(' ') || '';
+    
+    // Lista de países estándar
+    const standardCountries = ['Perú', 'Argentina', 'Bolivia', 'Brasil', 'Chile', 'Colombia', 
+      'Costa Rica', 'Cuba', 'Ecuador', 'El Salvador', 'España', 'Guatemala', 'Honduras', 
+      'México', 'Nicaragua', 'Panamá', 'Paraguay', 'Puerto Rico', 'República Dominicana', 
+      'Uruguay', 'Venezuela', 'Estados Unidos', 'Canadá'];
+    
+    const studentCountry = (student as any).country || 'Perú';
+    const isStandardCountry = standardCountries.includes(studentCountry);
+    
     setFormData({
+      document_type: (student as any).document_type || 'DNI',
+      document_number: (student as any).document_number || '',
+      student_code: (student as any).student_code || '',
+      paternal_surname: paternal,
+      maternal_surname: maternal,
       first_name: student.first_name,
-      last_name: student.last_name,
       email: student.email,
-      phone: student.phone || ''
+      phone: student.phone || '',
+      gender: (student as any).gender || '',
+      birth_date: (student as any).birth_date || '',
+      country: isStandardCountry ? studentCountry : 'Otro',
+      education_level: (student as any).education_level || '',
     });
+    
+    // Si el país no es estándar, guardarlo en customCountry
+    setCustomCountry(isStandardCountry ? '' : studentCountry);
+    
     setIsEditModalOpen(true);
   };
 
@@ -446,11 +510,20 @@ const AdminStudentManagement = () => {
 
   const resetForm = () => {
     setFormData({
+      document_type: 'DNI',
+      document_number: '',
+      student_code: '',
+      paternal_surname: '',
+      maternal_surname: '',
       first_name: '',
-      last_name: '',
       email: '',
-      phone: ''
+      phone: '',
+      gender: '',
+      birth_date: '',
+      country: 'Perú',
+      education_level: ''
     });
+    setCustomCountry('');
   };
 
   // Filter students based on search and filters
@@ -468,31 +541,87 @@ const AdminStudentManagement = () => {
 
   const StudentForm = ({ onSubmit, isEdit = false }: { onSubmit: (e: React.FormEvent) => void, isEdit?: boolean }) => (
     <form onSubmit={onSubmit} className="space-y-4">
+      {/* Tipo y Número de Documento */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="first_name">Nombres</Label>
-          <Input
-            id="first_name"
-            value={formData.first_name}
-            onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-            required
-            placeholder="Nombres del estudiante"
-          />
+          <Label htmlFor="document_type">Tipo de Documento *</Label>
+          <Select
+            value={formData.document_type}
+            onValueChange={(value) => setFormData({ ...formData, document_type: value })}
+          >
+            <SelectTrigger id="document_type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DNI">DNI</SelectItem>
+              <SelectItem value="CE">Carnet de Extranjería</SelectItem>
+              <SelectItem value="PASAPORTE">Pasaporte</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="last_name">Apellidos</Label>
+          <Label htmlFor="document_number">Número de Documento *</Label>
           <Input
-            id="last_name"
-            value={formData.last_name}
-            onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+            id="document_number"
+            value={formData.document_number}
+            onChange={(e) => setFormData({ ...formData, document_number: e.target.value })}
             required
-            placeholder="Apellidos del estudiante"
+            placeholder="Ej: 12345678"
           />
         </div>
       </div>
 
+      {/* Código del Estudiante */}
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="student_code">Código del Estudiante *</Label>
+        <Input
+          id="student_code"
+          value={formData.student_code}
+          onChange={(e) => setFormData({ ...formData, student_code: e.target.value })}
+          required
+          placeholder="Ej: EST001"
+        />
+      </div>
+
+      {/* Apellidos */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="paternal_surname">Apellido Paterno *</Label>
+          <Input
+            id="paternal_surname"
+            value={formData.paternal_surname}
+            onChange={(e) => setFormData({ ...formData, paternal_surname: e.target.value })}
+            required
+            placeholder="Apellido paterno"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="maternal_surname">Apellido Materno *</Label>
+          <Input
+            id="maternal_surname"
+            value={formData.maternal_surname}
+            onChange={(e) => setFormData({ ...formData, maternal_surname: e.target.value })}
+            required
+            placeholder="Apellido materno"
+          />
+        </div>
+      </div>
+
+      {/* Nombres */}
+      <div className="space-y-2">
+        <Label htmlFor="first_name">Nombres *</Label>
+        <Input
+          id="first_name"
+          value={formData.first_name}
+          onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+          required
+          placeholder="Nombres del estudiante"
+        />
+      </div>
+
+      {/* Email */}
+      <div className="space-y-2">
+        <Label htmlFor="email">Email *</Label>
         <Input
           id="email"
           type="email"
@@ -504,16 +633,122 @@ const AdminStudentManagement = () => {
         />
       </div>
 
+      {/* Teléfono y Sexo */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="phone">Teléfono</Label>
+          <Label htmlFor="phone">Teléfono (con código de país)</Label>
           <Input
             id="phone"
+            type="tel"
             value={formData.phone}
             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            placeholder="Número de teléfono"
+            placeholder="+51 987654321"
           />
+          <p className="text-xs text-muted-foreground">
+            Incluye el código de país (Ej: +51 para Perú)
+          </p>
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="gender">Sexo</Label>
+          <Select
+            value={formData.gender}
+            onValueChange={(value) => setFormData({ ...formData, gender: value })}
+          >
+            <SelectTrigger id="gender">
+              <SelectValue placeholder="Seleccionar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="M">Masculino</SelectItem>
+              <SelectItem value="F">Femenino</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Fecha de Nacimiento */}
+      <div className="space-y-2">
+        <Label htmlFor="birth_date">Fecha de Nacimiento</Label>
+        <Input
+          id="birth_date"
+          type="date"
+          value={formData.birth_date}
+          onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+        />
+      </div>
+
+      {/* País */}
+      <div className="space-y-2">
+        <Label htmlFor="country">País</Label>
+        <Select
+          value={formData.country}
+          onValueChange={(value) => {
+            setFormData({ ...formData, country: value });
+            if (value !== 'Otro') {
+              setCustomCountry('');
+            }
+          }}
+        >
+          <SelectTrigger id="country">
+            <SelectValue placeholder="Seleccionar país" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Perú">Perú</SelectItem>
+            <SelectItem value="Argentina">Argentina</SelectItem>
+            <SelectItem value="Bolivia">Bolivia</SelectItem>
+            <SelectItem value="Brasil">Brasil</SelectItem>
+            <SelectItem value="Chile">Chile</SelectItem>
+            <SelectItem value="Colombia">Colombia</SelectItem>
+            <SelectItem value="Costa Rica">Costa Rica</SelectItem>
+            <SelectItem value="Cuba">Cuba</SelectItem>
+            <SelectItem value="Ecuador">Ecuador</SelectItem>
+            <SelectItem value="El Salvador">El Salvador</SelectItem>
+            <SelectItem value="España">España</SelectItem>
+            <SelectItem value="Guatemala">Guatemala</SelectItem>
+            <SelectItem value="Honduras">Honduras</SelectItem>
+            <SelectItem value="México">México</SelectItem>
+            <SelectItem value="Nicaragua">Nicaragua</SelectItem>
+            <SelectItem value="Panamá">Panamá</SelectItem>
+            <SelectItem value="Paraguay">Paraguay</SelectItem>
+            <SelectItem value="Puerto Rico">Puerto Rico</SelectItem>
+            <SelectItem value="República Dominicana">República Dominicana</SelectItem>
+            <SelectItem value="Uruguay">Uruguay</SelectItem>
+            <SelectItem value="Venezuela">Venezuela</SelectItem>
+            <SelectItem value="Estados Unidos">Estados Unidos</SelectItem>
+            <SelectItem value="Canadá">Canadá</SelectItem>
+            <SelectItem value="Otro">Otro</SelectItem>
+          </SelectContent>
+        </Select>
+        {formData.country === 'Otro' && (
+          <Input
+            id="custom_country"
+            value={customCountry}
+            onChange={(e) => setCustomCountry(e.target.value)}
+            placeholder="Ingresa el nombre del país"
+            className="mt-2"
+          />
+        )}
+      </div>
+
+      {/* Nivel Educativo */}
+      <div className="space-y-2">
+        <Label htmlFor="education_level">Nivel Educativo</Label>
+        <Select
+          value={formData.education_level}
+          onValueChange={(value) => setFormData({ ...formData, education_level: value })}
+        >
+          <SelectTrigger id="education_level">
+            <SelectValue placeholder="Seleccionar nivel" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Primaria Completa">Primaria Completa</SelectItem>
+            <SelectItem value="Primaria Incompleta">Primaria Incompleta</SelectItem>
+            <SelectItem value="Secundaria Completa">Secundaria Completa</SelectItem>
+            <SelectItem value="Secundaria Incompleta">Secundaria Incompleta</SelectItem>
+            <SelectItem value="Universidad Completa">Universidad Completa</SelectItem>
+            <SelectItem value="Universidad Incompleta">Universidad Incompleta</SelectItem>
+            <SelectItem value="Superior / Instituto">Superior / Instituto</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex justify-end gap-2 pt-4">

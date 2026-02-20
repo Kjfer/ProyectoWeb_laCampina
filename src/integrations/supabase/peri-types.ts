@@ -102,7 +102,7 @@ export interface Matricula {
   usuario_id: string; // Quien registró la matrícula
   modulos_matriculados: ModuloMatriculado[]; // JSONB
   num_cursos: number;
-  moneda_monto: 'PEN' | 'USD' | 'EUR';
+  moneda_monto: Moneda;
   valor_matricula: number;
   descuento: number;
   id_clases_grabadas?: string | null;
@@ -119,7 +119,9 @@ export interface ModuloMatriculado {
   modulo_id: string;
   nombre: string;
   code: string;
+  course_id?: string;
   course_name?: string;
+  course_code?: string;
   start_date?: string;
   end_date?: string;
 }
@@ -146,7 +148,7 @@ export interface Pago {
   monto_pago: number;
   fecha_pago: string;
   metodo_pago: 'BCP' | 'Interbank' | 'Banco de la Nación' | 'BBVA' | 'Scotiabank' | 'Yape' | 'Plin' | 'Tarjeta LINK' | 'En efectivo' | 'Paypal';
-  moneda_pago: 'PEN' | 'USD' | 'EUR';
+  moneda_pago: Moneda;
   estado_pago: 'primera_cuota' | 'pago_regular' | 'cuotas_restantes';
   usuario_id: string;
   estudiante_id?: string | null;
@@ -364,7 +366,7 @@ export interface MatriculaFormData {
   modulos_seleccionados: string[]; // IDs de módulos
   valor_matricula: number;
   descuento: number;
-  moneda: 'PEN' | 'USD' | 'EUR';
+  moneda: Moneda;
   incluir_clases_grabadas: boolean;
   id_clases_grabadas?: string;
   valor_clase_grabada?: number;
@@ -385,7 +387,7 @@ export interface PagoFormData {
   monto_pago: number;
   fecha_pago: string;
   metodo_pago: 'BCP' | 'Interbank' | 'Banco de la Nación' | 'BBVA' | 'Scotiabank' | 'Yape' | 'Plin' | 'Tarjeta LINK' | 'En efectivo' | 'Paypal';
-  moneda_pago: 'PEN' | 'USD' | 'EUR';
+  moneda_pago: Moneda;
   estado_pago: 'primera_cuota' | 'pago_regular' | 'cuotas_restantes';
   comprobante?: string;
   observaciones?: string;
@@ -435,6 +437,8 @@ export const MONEDAS = [
   'PYG', // Paraguay - Guaraní
   'VES', // Venezuela - Bolívar
 ] as const;
+export type Moneda = typeof MONEDAS[number];
+
 export const TIPOS_MATERIAL = ['book', 'kit'] as const;
 export const ESTADOS_PAGO = ['pendiente', 'pagado', 'cancelado'] as const;
 export const METODOS_PAGO = [

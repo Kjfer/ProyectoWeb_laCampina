@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Eye, Search, FileText, DollarSign, Calendar } from 'lucide-react';
+import { Plus, Eye, Search, FileText, DollarSign, Calendar, Filter } from 'lucide-react';
 
 interface Course {
   id: string;
@@ -45,8 +45,8 @@ export function MatriculasTab() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchType, setSearchType] = useState<'codigo' | 'fecha' | 'curso'>('codigo');
-  const [selectedCourseId, setSelectedCourseId] = useState<string>('all');
+  const [searchType, setSearchType] = useState<'codigo' | 'fecha'>('codigo');
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('all');
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedMatricula, setSelectedMatricula] = useState<MatriculaWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -88,43 +88,30 @@ export function MatriculasTab() {
 
       if (matriculasError) throw matriculasError;
 
-      // Para cada matrícula, obtener los módulos enrollados
-      const matriculasConModulos = await Promise.all(
-        (matriculasData || []).map(async (mat: any) => {
-          // Obtener enrollments del estudiante
-          const { data: enrollments } = await supabase
-            .from('course_enrollments')
-            .select(`
-              modulo_id,
-              modulos!course_enrollments_modulo_id_fkey(
-                id,
-                name,
-                code,
-                course_id
-              )
-            `)
-            .eq('student_id', mat.estudiante_id);
+      // Cargar pagos, planes de cuotas y cuotas en paralelo
+      const [pagosResult, planesResult, cuotasResult] = await Promise.all([
+        supabase.from('pagos' as any).select('*').eq('categoria_producto', 'matricula'),
+        supabase.from('plan_cuotas_matricula' as any).select('*'),
+        supabase.from('cuotas_matricula' as any).select('*'),
+      ]);
 
-          return {
-            ...mat,
-            modulos_matriculados: enrollments?.map(e => e.modulos).filter(Boolean) || []
-          };
-        })
-      );
+      const pagosData = pagosResult.data || [];
+      const planesData = planesResult.data || [];
+      const cuotasData = cuotasResult.data || [];
 
-      // Cargar pagos relacionados
-      const { data: pagosData } = await supabase
-        .from('pagos' as any)
-        .select('*')
-        .eq('categoria_producto', 'matricula');
+      // Asociar pagos, plan y cuotas con matrículas (usando modulos_matriculados del JSONB)
+      const matriculasConDatos = (matriculasData || []).map((mat: any) => {
+        const plan = planesData.find((p: any) => p.matricula_id === mat.id);
+        const cuotas = plan ? cuotasData.filter((c: any) => c.plan_cuotas_id === plan.id) : [];
+        return {
+          ...mat,
+          pagos: pagosData.filter((pago: any) => pago.codigo_producto === mat.cod_matricula),
+          plan_cuotas: plan || null,
+          cuotas,
+        };
+      });
 
-      // Asociar pagos con matrículas
-      const matriculasConPagos = matriculasConModulos.map((mat: any) => ({
-        ...mat,
-        pagos: (pagosData || []).filter((pago: any) => pago.codigo_producto === mat.cod_matricula)
-      }));
-
-      setMatriculas(matriculasConPagos as any);
+      setMatriculas(matriculasConDatos as any);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -145,38 +132,60 @@ export function MatriculasTab() {
     navigate('/admin/matriculas/nueva');
   };
 
-  // Filtrar matrículas por búsqueda
+  // Filtrar matrículas por búsqueda y curso
   const filteredMatriculas = matriculas.filter(mat => {
     const searchLower = searchTerm.toLowerCase();
 
     // Filtrar por tipo de búsqueda
+    let matchesSearch = true;
     if (searchType === 'codigo') {
-      return mat.cod_matricula.toLowerCase().includes(searchLower);
+      matchesSearch = mat.cod_matricula.toLowerCase().includes(searchLower);
     } else if (searchType === 'fecha') {
-      if (!selectedDate) return true;
-      // Usar getLocalDateFromTimestamp para obtener la fecha en zona horaria local
-      const matriculaDate = getLocalDateFromTimestamp(mat.created_at);
-      return matriculaDate === selectedDate;
-    } else if (searchType === 'curso') {
-      if (!selectedCourseId || selectedCourseId === 'all') return true;
-      // Verificar si algún módulo matriculado pertenece al curso seleccionado
+      if (selectedDate) {
+        const matriculaDate = getLocalDateFromTimestamp(mat.created_at);
+        matchesSearch = matriculaDate === selectedDate;
+      }
+    }
+
+    // Filtrar por curso (independiente del tipo de búsqueda)
+    let matchesCourse = true;
+    if (selectedCourseFilter !== 'all') {
       const modulos = mat.modulos_matriculados || [];
-      return modulos.some((modulo: any) => {
-        // Buscar si el módulo tiene relación con el curso seleccionado
-        return modulo.course_id === selectedCourseId;
+      matchesCourse = modulos.some((modulo: any) => {
+        return modulo.course_id === selectedCourseFilter;
       });
     }
 
-    return true;
+    return matchesSearch && matchesCourse;
   });
 
-  // Calcular totales
+  // Calcular totales por moneda
   const totalMatriculas = filteredMatriculas.length;
-  const totalIngresos = filteredMatriculas.reduce((sum, mat) => sum + mat.precio_final, 0);
-  const totalPagado = filteredMatriculas.reduce((sum, mat) => {
+  
+  // Agrupar ingresos por moneda
+  const ingresosPorMoneda = filteredMatriculas.reduce((acc, mat) => {
+    const moneda = mat.moneda_monto || 'PEN';
+    acc[moneda] = (acc[moneda] || 0) + mat.precio_final;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  // Agrupar pagos por moneda
+  const pagadoPorMoneda = filteredMatriculas.reduce((acc, mat) => {
     const pagos = mat.pagos || [];
-    return sum + pagos.reduce((s, p) => s + p.monto_pago, 0);
-  }, 0);
+    pagos.forEach(p => {
+      const moneda = p.moneda_pago || 'PEN';
+      acc[moneda] = (acc[moneda] || 0) + p.monto_pago;
+    });
+    return acc;
+  }, {} as Record<string, number>);
+  
+  // Calcular pendiente por moneda
+  const pendientePorMoneda = Object.keys(ingresosPorMoneda).reduce((acc, moneda) => {
+    const ingreso = ingresosPorMoneda[moneda] || 0;
+    const pagado = pagadoPorMoneda[moneda] || 0;
+    acc[moneda] = ingreso - pagado;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <div className="space-y-4">
@@ -199,7 +208,7 @@ export function MatriculasTab() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Opciones de búsqueda */}
+          {/* Opciones de búsqueda y filtros */}
           <div className="mb-6 space-y-4">
             <div className="flex items-center gap-4">
               <div className="w-48">
@@ -211,7 +220,6 @@ export function MatriculasTab() {
                   <SelectContent>
                     <SelectItem value="codigo">Código de Matrícula</SelectItem>
                     <SelectItem value="fecha">Fecha de Matrícula</SelectItem>
-                    <SelectItem value="curso">Curso</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -244,24 +252,26 @@ export function MatriculasTab() {
                 </div>
               )}
 
-              {searchType === 'curso' && (
-                <div className="flex-1">
-                  <Label>Curso</Label>
-                  <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un curso" />
+              {/* Filtro de curso - siempre visible */}
+              <div className="min-w-[250px]">
+                <Label>Filtrar por curso</Label>
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-gray-400" />
+                  <Select value={selectedCourseFilter} onValueChange={setSelectedCourseFilter}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos los cursos" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos los cursos</SelectItem>
-                      {courses.map(course => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.code} - {course.name}
+                      {courses.map((curso) => (
+                        <SelectItem key={curso.id} value={curso.id}>
+                          {curso.name} ({curso.code})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -280,8 +290,15 @@ export function MatriculasTab() {
                 <CardDescription>Ingresos Totales</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  S/ {totalIngresos.toFixed(2)}
+                <div className="space-y-1">
+                  {Object.entries(ingresosPorMoneda).map(([moneda, monto]) => (
+                    <div key={moneda} className="text-xl font-bold">
+                      {moneda} {monto.toFixed(2)}
+                    </div>
+                  ))}
+                  {Object.keys(ingresosPorMoneda).length === 0 && (
+                    <div className="text-2xl font-bold">S/ 0.00</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -290,11 +307,22 @@ export function MatriculasTab() {
                 <CardDescription>Pagado</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  S/ {totalPagado.toFixed(2)}
-                </div>
-                <div className="text-xs text-gray-500">
-                  Pendiente: S/ {(totalIngresos - totalPagado).toFixed(2)}
+                <div className="space-y-1">
+                  {Object.entries(pagadoPorMoneda).map(([moneda, monto]) => (
+                    <div key={moneda}>
+                      <div className="text-xl font-bold text-green-600">
+                        {moneda} {monto.toFixed(2)}
+                      </div>
+                      {pendientePorMoneda[moneda] > 0 && (
+                        <div className="text-xs text-gray-500">
+                          Pendiente: {moneda} {pendientePorMoneda[moneda].toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {Object.keys(pagadoPorMoneda).length === 0 && (
+                    <div className="text-2xl font-bold text-green-600">S/ 0.00</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -320,10 +348,11 @@ export function MatriculasTab() {
               </TableHeader>
               <TableBody>
                 {filteredMatriculas.map((matricula) => {
-                  const totalPagadoMatricula = matricula.pagos?.reduce(
-                    (sum, pago) => sum + pago.monto_pago,
-                    0
-                  ) || 0;
+                  // Calcular total pagado solo con pagos de la misma moneda que la matrícula
+                  const monedaMatricula = matricula.moneda_monto || 'PEN';
+                  const totalPagadoMatricula = matricula.pagos
+                    ?.filter(p => p.moneda_pago === monedaMatricula)
+                    .reduce((sum, pago) => sum + pago.monto_pago, 0) || 0;
                   const pendiente = matricula.precio_final - totalPagadoMatricula;
 
                   return (
@@ -408,6 +437,186 @@ export function MatriculasTab() {
 
           {selectedMatricula && (
             <div className="space-y-4">
+
+              {/* Ediciones / Cursos */}
+              <div>
+                <h3 className="font-semibold mb-2 text-blue-800">📚 Ediciones / Cursos</h3>
+                <div className="space-y-2">
+                  {(() => {
+                    const mods: any[] = Array.isArray((selectedMatricula as any).modulos_matriculados)
+                      ? (selectedMatricula as any).modulos_matriculados
+                      : [];
+                    if (mods.length === 0) {
+                      return <p className="text-sm text-gray-500">Sin módulos matriculados</p>;
+                    }
+                    const cursosUnicos = mods.reduce((acc: any[], m: any) => {
+                      const key = m.course_id || m.course_name || 'sin-curso';
+                      const existe = acc.find((c: any) => c.key === key);
+                      if (!existe) {
+                        acc.push({ key, course_name: m.course_name || null, course_code: m.course_code, modulos: [m] });
+                      } else {
+                        existe.modulos.push(m);
+                      }
+                      return acc;
+                    }, []);
+                    return cursosUnicos.map((curso: any) => (
+                      <div key={curso.key} className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="flex-1">
+                            <div className="font-semibold text-base text-blue-900">
+                              {curso.course_name || <span className="italic text-blue-500">Edición sin nombre</span>}
+                            </div>
+                            {curso.course_code && <div className="text-xs text-blue-600">Código: {curso.course_code}</div>}
+                          </div>
+                          <Badge variant="secondary">
+                            {curso.modulos.length} {curso.modulos.length === 1 ? 'módulo' : 'módulos'}
+                          </Badge>
+                        </div>
+                        <div className="space-y-1">
+                          {curso.modulos.map((m: any, i: number) => (
+                            <div key={i} className="text-sm text-blue-800">
+                              • {m.nombre || m.name} {(m.code) ? `(${m.code})` : ''}
+                              {(m.start_date || m.end_date) && (
+                                <span className="text-xs text-blue-500 ml-2">{m.start_date} – {m.end_date}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* Plan de Cuotas */}
+              <div>
+                <h3 className="font-semibold mb-2 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Plan de Cuotas
+                </h3>
+                {!(selectedMatricula as any).plan_cuotas ? (
+                  <p className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    Esta matrícula no tiene un plan de cuotas registrado.
+                  </p>
+                ) : (
+                  <>
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600 text-xs">Núm. Cuotas</span>
+                          <p className="font-bold text-lg text-blue-900">{(selectedMatricula as any).plan_cuotas.numero_cuotas}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 text-xs">Tipo</span>
+                          <p className="font-medium text-blue-900 capitalize">
+                            {(selectedMatricula as any).plan_cuotas.tipo_plan?.replace(/_/g, ' ')}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 text-xs">Monto por Cuota</span>
+                          <p className="font-bold text-lg text-blue-900">
+                            {(selectedMatricula as any).moneda_monto} {(selectedMatricula as any).plan_cuotas.monto_por_cuota?.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 text-xs">Creado</span>
+                          <p className="font-medium text-blue-900">
+                            {formatDate((selectedMatricula as any).plan_cuotas.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {(() => {
+                      const cuotas: any[] = (selectedMatricula as any).cuotas || [];
+                      const pagadas = cuotas.filter(c => c.estado === 'pagado').length;
+                      const parciales = cuotas.filter(c => c.estado === 'parcial').length;
+                      const pendientes = cuotas.filter(c => c.estado === 'pendiente').length;
+                      const vencidas = cuotas.filter(c => c.estado === 'vencido').length;
+                      const totalPagado = cuotas.reduce((s, c) => s + (c.monto_pagado || 0), 0);
+                      const totalPendiente = cuotas.reduce((s, c) => s + (c.monto_cuota - c.monto_pagado), 0);
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                              <div className="text-xs text-green-700">✅ Pagadas</div>
+                              <div className="font-bold text-2xl text-green-900">{pagadas}</div>
+                            </div>
+                            {parciales > 0 && (
+                              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                <div className="text-xs text-yellow-700">⚠️ Parciales</div>
+                                <div className="font-bold text-2xl text-yellow-900">{parciales}</div>
+                              </div>
+                            )}
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                              <div className="text-xs text-gray-700">⏳ Pendientes</div>
+                              <div className="font-bold text-2xl text-gray-900">{pendientes}</div>
+                            </div>
+                            {vencidas > 0 && (
+                              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                <div className="text-xs text-red-700">🚨 Vencidas</div>
+                                <div className="font-bold text-2xl text-red-900">{vencidas}</div>
+                              </div>
+                            )}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 col-span-2">
+                              <div className="text-xs text-blue-700">💰 Total Pagado</div>
+                              <div className="font-bold text-xl text-blue-900">{(selectedMatricula as any).moneda_monto} {totalPagado.toFixed(2)}</div>
+                            </div>
+                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 col-span-2">
+                              <div className="text-xs text-orange-700">💳 Saldo Pendiente</div>
+                              <div className="font-bold text-xl text-orange-900">{(selectedMatricula as any).moneda_monto} {totalPendiente.toFixed(2)}</div>
+                            </div>
+                          </div>
+                          <div className="border-t pt-3">
+                            <h4 className="font-medium text-sm text-gray-700 mb-2">Detalle de Cuotas</h4>
+                            <div className="space-y-2">
+                              {cuotas.map((cuota: any) => {
+                                const saldo = cuota.monto_cuota - cuota.monto_pagado;
+                                return (
+                                  <div key={cuota.id} className={`p-3 border rounded-lg ${
+                                    cuota.estado === 'pagado' ? 'bg-green-50 border-green-200' :
+                                    cuota.estado === 'parcial' ? 'bg-yellow-50 border-yellow-200' :
+                                    cuota.estado === 'vencido' ? 'bg-red-50 border-red-200' :
+                                    'bg-white border-gray-200'
+                                  }`}>
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-semibold">Cuota {cuota.numero_cuota}</span>
+                                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                            cuota.estado === 'pagado' ? 'bg-green-100 text-green-700' :
+                                            cuota.estado === 'parcial' ? 'bg-yellow-100 text-yellow-700' :
+                                            cuota.estado === 'vencido' ? 'bg-red-100 text-red-700' :
+                                            'bg-gray-100 text-gray-700'
+                                          }`}>{cuota.estado?.toUpperCase()}</span>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-1">
+                                          <div>Vence: {formatDate(cuota.fecha_vencimiento)}</div>
+                                          <div>Monto: {(selectedMatricula as any).moneda_monto} {cuota.monto_cuota?.toFixed(2)}</div>
+                                          {cuota.monto_pagado > 0 && (
+                                            <div className="text-green-600">Pagado: {(selectedMatricula as any).moneda_monto} {cuota.monto_pagado?.toFixed(2)}</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {saldo > 0 && (
+                                        <div className="text-right">
+                                          <div className="text-xs text-gray-500">Saldo</div>
+                                          <div className="font-bold text-orange-600">{(selectedMatricula as any).moneda_monto} {saldo.toFixed(2)}</div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
+
+              {/* Info del estudiante */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Estudiante</Label>
@@ -425,20 +634,7 @@ export function MatriculasTab() {
                 </div>
                 <div>
                   <Label>Fecha de Matrícula</Label>
-                  <p className="font-medium">
-                    {formatDate(selectedMatricula.created_at)}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <Label>Módulos Matriculados</Label>
-                <div className="mt-2 space-y-2">
-                  {selectedMatricula.modulos_matriculados?.map((modulo, index) => (
-                    <Badge key={index} variant="outline" className="mr-2">
-                      {modulo.name || `Módulo ${index + 1}`}
-                    </Badge>
-                  ))}
+                  <p className="font-medium">{formatDate(selectedMatricula.created_at)}</p>
                 </div>
               </div>
 
@@ -446,19 +642,19 @@ export function MatriculasTab() {
                 <div>
                   <Label>Valor Matrícula</Label>
                   <p className="font-medium">
-                    {selectedMatricula.moneda} {selectedMatricula.valor_matricula.toFixed(2)}
+                    {(selectedMatricula as any).moneda_monto} {selectedMatricula.valor_matricula.toFixed(2)}
                   </p>
                 </div>
                 <div>
                   <Label>Descuento</Label>
                   <p className="font-medium">
-                    {selectedMatricula.moneda} {selectedMatricula.descuento.toFixed(2)}
+                    {(selectedMatricula as any).moneda_monto} {selectedMatricula.descuento.toFixed(2)}
                   </p>
                 </div>
                 <div>
                   <Label>Precio Final</Label>
                   <p className="font-bold text-lg">
-                    {selectedMatricula.moneda} {selectedMatricula.precio_final.toFixed(2)}
+                    {(selectedMatricula as any).moneda_monto} {selectedMatricula.precio_final.toFixed(2)}
                   </p>
                 </div>
               </div>

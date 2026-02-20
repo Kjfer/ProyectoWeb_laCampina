@@ -135,22 +135,51 @@ const Courses = () => {
           return acc;
         }, {});
         
-        // Calcular estudiantes únicos por edición
+        // Calcular estudiantes únicos por edición usando RPC con SECURITY DEFINER (bypasea RLS)
         const edicionesArray = Object.values(grouped);
         
-        // Obtener estudiantes únicos por edición usando course_enrollments
-        for (const edicion of edicionesArray) {
-          const moduloIds = edicion.modulos.map(m => m.id);
+        // Ordenar módulos dentro de cada edición por código o fecha de inicio
+        edicionesArray.forEach(edicion => {
+          edicion.modulos.sort((a, b) => {
+            // Intentar ordenar por num_modulo si está disponible en el código
+            const numA = parseInt((a.code || '').replace(/\D/g, ''), 10);
+            const numB = parseInt((b.code || '').replace(/\D/g, ''), 10);
+            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+            // Fallback: ordenar por fecha de inicio
+            return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+          });
+        });
+
+        // Ordenar ediciones por nombre de programa + nombre de edición
+        edicionesArray.sort((a, b) =>
+          `${a.program_name} ${a.course_name}`.localeCompare(`${b.program_name} ${b.course_name}`)
+        );
+
+        const courseIds = edicionesArray.map(e => e.course_id).filter(id => id !== 'sin-edicion');
+        
+        if (courseIds.length > 0) {
+          // Intentar obtener conteos reales vía RPC (requiere función SQL desplegada)
+          const { data: countData, error: rpcError } = await supabase.rpc('get_students_count_by_course', {
+            course_ids: courseIds
+          });
           
-          // Contar estudiantes únicos matriculados en cualquier módulo de esta edición
-          const { data: uniqueStudents } = await supabase
-            .from('course_enrollments')
-            .select('student_id')
-            .in('modulo_id', moduloIds);
-          
-          // Usar Set para obtener IDs únicos
-          const uniqueStudentIds = new Set(uniqueStudents?.map(e => e.student_id) || []);
-          edicion.total_students = uniqueStudentIds.size;
+          if (!rpcError && countData) {
+            // RPC disponible: usar conteos únicos reales
+            const countMap: Record<string, number> = {};
+            (countData || []).forEach((row: { course_id: string; student_count: number }) => {
+              countMap[row.course_id] = Number(row.student_count) || 0;
+            });
+            edicionesArray.forEach(edicion => {
+              edicion.total_students = countMap[edicion.course_id] || 0;
+            });
+          } else {
+            // Fallback: sumar conteos por módulo que vienen del Edge Function (service role key)
+            edicionesArray.forEach(edicion => {
+              edicion.total_students = edicion.modulos.reduce(
+                (sum, m) => sum + (m.enrollments?.[0]?.count || 0), 0
+              );
+            });
+          }
         }
         
         setEdiciones(edicionesArray);
@@ -255,10 +284,12 @@ const Courses = () => {
                       <Calendar className="w-3.5 h-3.5" />
                       {edicion.academic_year} - {edicion.semester}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5" />
-                      {edicion.total_students} estudiantes únicos
-                    </span>
+                    {profile?.role !== 'student' && (
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" />
+                        {edicion.total_students} estudiantes únicos
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <BookOpen className="w-3.5 h-3.5" />
                       {edicion.modulos.length} {edicion.modulos.length === 1 ? 'módulo' : 'módulos'}

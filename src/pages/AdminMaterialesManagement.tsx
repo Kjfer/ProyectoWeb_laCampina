@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/lib/dateUtils.ts';
+import { MONEDAS } from '@/integrations/supabase/peri-types';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,6 +86,13 @@ interface Matricula {
   };
 }
 
+interface EdicionDisponible {
+  course_id: string;
+  course_name: string;
+  course_code: string;
+  matriculas_asociadas: string[];
+}
+
 export default function AdminMaterialesManagement() {
   const [materiales, setMateriales] = useState<Material[]>([]);
   const [students, setStudents] = useState<Profile[]>([]);
@@ -98,6 +106,8 @@ export default function AdminMaterialesManagement() {
   const [searchType, setSearchType] = useState<'nombre' | 'codigo' | 'dni'>('nombre');
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [studentMatriculas, setStudentMatriculas] = useState<Matricula[]>([]);
+  const [edicionesDisponibles, setEdicionesDisponibles] = useState<EdicionDisponible[]>([]);
+  const [todasLasEdiciones, setTodasLasEdiciones] = useState<EdicionDisponible[]>([]);
   const [formData, setFormData] = useState({
     tipo_material: 'book' as 'book' | 'kit',
     estudiante_id: '',
@@ -205,47 +215,119 @@ export default function AdminMaterialesManagement() {
 
       if (error) throw error;
 
-      // Obtener IDs únicos de cursos de las matrículas
-      const courseIds = new Set<string>();
-      data?.forEach((mat: any) => {
-        mat.modulos_matriculados?.forEach((mod: any) => {
-          if (mod.course_id) courseIds.add(mod.course_id);
-        });
-      });
+      // Extraer EDICIONES (courses) únicas de todas las matrículas
+      const edicionesMap = new Map<string, { course_id: string; course_name: string; course_code: string; matriculas: string[] }>();
 
-      // Obtener información de los cursos
-      const matriculasConCursos = await Promise.all(
-        (data || []).map(async (mat: any) => {
-          // Obtener el primer módulo para sacar el course_id
-          const firstModulo = mat.modulos_matriculados?.[0];
-          if (firstModulo?.modulo_id) {
+      for (const mat of data || []) {
+        const modulos = mat.modulos_matriculados || [];
+        
+        for (const mod of modulos) {
+          if (mod.modulo_id) {
+            // Obtener información del módulo para extraer el course_id
             const { data: moduloData } = await supabase
               .from('modulos' as any)
-              .select('course_id, course:courses(id, name, code)')
-              .eq('id', firstModulo.modulo_id)
+              .select('course_id')
+              .eq('id', mod.modulo_id)
               .single();
             
-            return {
-              ...mat,
-              course: moduloData?.course,
-            };
+            if (moduloData?.course_id) {
+              const courseId = moduloData.course_id;
+              
+              // Si no tenemos este course, obtener su información
+              if (!edicionesMap.has(courseId)) {
+                const { data: courseData } = await supabase
+                  .from('courses')
+                  .select('id, name, code')
+                  .eq('id', courseId)
+                  .single();
+                
+                if (courseData) {
+                  edicionesMap.set(courseId, {
+                    course_id: courseData.id,
+                    course_name: courseData.name,
+                    course_code: courseData.code,
+                    matriculas: [mat.cod_matricula],
+                  });
+                }
+              } else {
+                const existing = edicionesMap.get(courseId)!;
+                if (!existing.matriculas.includes(mat.cod_matricula)) {
+                  existing.matriculas.push(mat.cod_matricula);
+                }
+              }
+            }
           }
-          return mat;
-        })
-      );
+        }
+      }
 
-      setStudentMatriculas(matriculasConCursos);
+      // Convertir Map a array de EdicionDisponible
+      const edicionesArray: EdicionDisponible[] = Array.from(edicionesMap.values()).map(ed => ({
+        course_id: ed.course_id,
+        course_name: ed.course_name,
+        course_code: ed.course_code,
+        matriculas_asociadas: ed.matriculas,
+      }));
+
+      setTodasLasEdiciones(edicionesArray);
+      setStudentMatriculas(data || []);
+      
+      // Filtrar ediciones según el tipo de material actual
+      await filtrarEdicionesPorMaterial(estudianteId, formData.tipo_material, edicionesArray);
     } catch (error: any) {
       console.error('Error al cargar matrículas:', error);
+      setEdicionesDisponibles([]);
+      setTodasLasEdiciones([]);
       setStudentMatriculas([]);
+    }
+  };
+
+  const filtrarEdicionesPorMaterial = async (
+    estudianteId: string,
+    tipoMaterial: 'book' | 'kit',
+    ediciones: EdicionDisponible[]
+  ) => {
+    try {
+      // Obtener materiales ya registrados del estudiante para este tipo
+      const { data: materialesRegistrados, error } = await supabase
+        .from('registro_compra_materiales' as any)
+        .select('course_id, tipo_material')
+        .eq('estudiante_id', estudianteId)
+        .eq('tipo_material', tipoMaterial);
+
+      if (error) throw error;
+
+      // Crear Set con los course_ids que ya tienen este tipo de material
+      const edicionesConMaterial = new Set(
+        (materialesRegistrados || []).map((m: any) => m.course_id)
+      );
+
+      // Filtrar ediciones que NO tienen este tipo de material registrado
+      const edicionesFiltradas = ediciones.filter(
+        (ed) => !edicionesConMaterial.has(ed.course_id)
+      );
+
+      setEdicionesDisponibles(edicionesFiltradas);
+    } catch (error: any) {
+      console.error('Error al filtrar ediciones:', error);
+      setEdicionesDisponibles(ediciones);
     }
   };
 
   const handleEstudianteChange = (estudianteId: string) => {
     setFormData({ ...formData, estudiante_id: estudianteId, course_id: '' });
     setStudentMatriculas([]);
+    setEdicionesDisponibles([]);
+    setTodasLasEdiciones([]);
     if (estudianteId) {
       fetchMatriculasEstudiante(estudianteId);
+    }
+  };
+
+  const handleTipoMaterialChange = (tipoMaterial: 'book' | 'kit') => {
+    setFormData({ ...formData, tipo_material: tipoMaterial, course_id: '' });
+    // Re-filtrar ediciones según el nuevo tipo de material
+    if (formData.estudiante_id && todasLasEdiciones.length > 0) {
+      filtrarEdicionesPorMaterial(formData.estudiante_id, tipoMaterial, todasLasEdiciones);
     }
   };
 
@@ -259,6 +341,8 @@ export default function AdminMaterialesManagement() {
     });
     setStudentSearch('');
     setStudentMatriculas([]);
+    setEdicionesDisponibles([]);
+    setTodasLasEdiciones([]);
     setDialogOpen(true);
   };
 
@@ -284,7 +368,7 @@ export default function AdminMaterialesManagement() {
     }
 
     try {
-      // Verificar si ya existe un registro del mismo tipo de material para este estudiante y edición
+      // Verificar si ya existe un registro del mismo tipo de material para este estudiante y edición (course)
       const { data: existingMaterials, error: checkError } = await supabase
         .from('registro_compra_materiales' as any)
         .select('id, tipo_material, nombre')
@@ -304,11 +388,11 @@ export default function AdminMaterialesManagement() {
         return;
       }
 
-      // Obtener información del curso
-      const selectedCourse = courses.find(c => c.id === formData.course_id);
+      // Obtener información de la edición seleccionada
+      const edicionSeleccionada = edicionesDisponibles.find(e => e.course_id === formData.course_id);
       const materialName = formData.tipo_material === 'book' 
-        ? `Book - ${selectedCourse?.name || 'Material de curso'}`
-        : `Kit - ${selectedCourse?.name || 'Material de curso'}`;
+        ? `Book - ${edicionSeleccionada?.course_name || 'Material de curso'}`
+        : `Kit - ${edicionSeleccionada?.course_name || 'Material de curso'}`;
 
       const dataToSave = {
         nombre: materialName,
@@ -647,6 +731,22 @@ export default function AdminMaterialesManagement() {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="tipo_material">Tipo de Material *</Label>
+                <Select
+                  value={formData.tipo_material}
+                  onValueChange={(value: any) => handleTipoMaterialChange(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="book">Book</SelectItem>
+                    <SelectItem value="kit">Kit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {formData.estudiante_id && (
                 <div className="space-y-2">
                   <Label htmlFor="course_id">Edición (según matrículas) *</Label>
@@ -658,35 +758,31 @@ export default function AdminMaterialesManagement() {
                       <SelectValue placeholder="Seleccione una edición" />
                     </SelectTrigger>
                     <SelectContent>
-                      {studentMatriculas.length === 0 ? (
-                        <div className="p-2 text-sm text-gray-500">El estudiante no tiene matrículas</div>
+                      {edicionesDisponibles.length === 0 ? (
+                        <div className="p-2 text-sm text-gray-500">
+                          No hay ediciones disponibles (sin material registrado de este tipo)
+                        </div>
                       ) : (
-                        studentMatriculas.map((matricula) => (
-                          <SelectItem key={matricula.id} value={matricula.course?.id || matricula.id}>
-                            {matricula.course?.name || 'Sin nombre'} - {matricula.cod_matricula}
+                        edicionesDisponibles.map((edicion) => (
+                          <SelectItem key={edicion.course_id} value={edicion.course_id}>
+                            {edicion.course_name} ({edicion.course_code})
                           </SelectItem>
                         ))
                       )}
                     </SelectContent>
                   </Select>
+                  {formData.course_id && (
+                    <p className="text-xs text-gray-500">
+                      ✓ Esta edición no tiene {formData.tipo_material === 'book' ? 'Book' : 'Kit'} registrado para este estudiante
+                    </p>
+                  )}
+                  {formData.estudiante_id && edicionesDisponibles.length === 0 && todasLasEdiciones.length > 0 && (
+                    <p className="text-xs text-amber-600">
+                      Todas las ediciones matriculadas ya tienen {formData.tipo_material === 'book' ? 'Book' : 'Kit'} registrado
+                    </p>
+                  )}
                 </div>
               )}
-
-              <div className="space-y-2">
-                <Label htmlFor="tipo_material">Tipo de Material *</Label>
-                <Select
-                  value={formData.tipo_material}
-                  onValueChange={(value: any) => setFormData({ ...formData, tipo_material: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="book">Book</SelectItem>
-                    <SelectItem value="kit">Kit</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -699,9 +795,11 @@ export default function AdminMaterialesManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="PEN">PEN</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
+                      {MONEDAS.map((moneda) => (
+                        <SelectItem key={moneda} value={moneda}>
+                          {moneda}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

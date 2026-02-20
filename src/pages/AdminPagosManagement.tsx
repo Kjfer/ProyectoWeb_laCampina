@@ -79,6 +79,7 @@ export default function AdminPagosManagement() {
   const [showProductoDropdown, setShowProductoDropdown] = useState(false);
   const [cuotasMatricula, setCuotasMatricula] = useState<CuotaMatricula[]>([]);
   const [cuotaSeleccionada, setCuotaSeleccionada] = useState<string | null>(null);
+  const [loadingCuotas, setLoadingCuotas] = useState(false);
   const [matriculasPorCurso, setMatriculasPorCurso] = useState<Map<string, string[]>>(new Map());
   const [materialesPorCurso, setMaterialesPorCurso] = useState<Map<string, string>>(new Map());
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
@@ -119,6 +120,19 @@ export default function AdminPagosManagement() {
       setFormData(prev => ({ ...prev, estado_pago: 'pago_regular' }));
     }
   }, [formData.categoria_producto]);
+
+  // Cargar cuotas automáticamente cuando se cambia el código de matrícula
+  useEffect(() => {
+    // Esperar 500ms después del último cambio antes de cargar cuotas
+    // Esto evita hacer muchas llamadas mientras el usuario está escribiendo
+    const timeoutId = setTimeout(() => {
+      if (dialogOpen && formData.categoria_producto === 'matricula' && formData.codigo_producto) {
+        fetchCuotasMatricula(formData.codigo_producto);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [formData.codigo_producto, formData.categoria_producto, dialogOpen]);
 
   useEffect(() => {
     // Cerrar dropdown al hacer clic fuera
@@ -294,10 +308,11 @@ export default function AdminPagosManagement() {
             precio_final,
             moneda_monto,
             estudiante_id,
+            estado_pago,
             estudiante:profiles!matriculas_estudiante_id_fkey(id, first_name, last_name)
           `)
-          .eq('estado_pago', 'pendiente')
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(500);
 
         if (error) throw error;
         
@@ -313,6 +328,7 @@ export default function AdminPagosManagement() {
             });
           }
         });
+        
       } else if (categoria === 'books' || categoria === 'kits') {
         // Filtrar materiales por tipo (book o kit)
         const { data, error } = await supabase
@@ -409,11 +425,7 @@ export default function AdminPagosManagement() {
         moneda_pago: (producto.moneda as any) || formData.moneda_pago,
       });
       setSearchProducto(codigo);
-      
-      // Si es una matrícula, cargar sus cuotas
-      if (formData.categoria_producto === 'matricula') {
-        await fetchCuotasMatricula(codigo);
-      }
+      // NOTA: El useEffect se encarga de cargar las cuotas automáticamente
     } else {
       setFormData({
         ...formData,
@@ -428,16 +440,30 @@ export default function AdminPagosManagement() {
 
   const fetchCuotasMatricula = async (codMatricula: string) => {
     try {
+      // No hacer nada si el código está vacío
+      if (!codMatricula || codMatricula.trim() === '') {
+        setCuotasMatricula([]);
+        return;
+      }
+
+      setLoadingCuotas(true);
+
       // Obtener la matrícula
       const { data: matriculaData, error: matriculaError } = await supabase
         .from('matriculas' as any)
         .select('id')
         .eq('cod_matricula', codMatricula)
-        .single();
+        .maybeSingle();
 
-      if (matriculaError) throw matriculaError;
+      if (matriculaError) {
+        setCuotasMatricula([]);
+        setLoadingCuotas(false);
+        return;
+      }
+      
       if (!matriculaData) {
         setCuotasMatricula([]);
+        setLoadingCuotas(false);
         return;
       }
 
@@ -446,10 +472,17 @@ export default function AdminPagosManagement() {
         .from('plan_cuotas_matricula' as any)
         .select('id')
         .eq('matricula_id', matriculaData.id)
-        .single();
+        .maybeSingle();
 
-      if (planError || !planData) {
+      if (planError) {
         setCuotasMatricula([]);
+        setLoadingCuotas(false);
+        return;
+      }
+
+      if (!planData) {
+        setCuotasMatricula([]);
+        setLoadingCuotas(false);
         return;
       }
 
@@ -460,19 +493,24 @@ export default function AdminPagosManagement() {
         .eq('plan_cuotas_id', planData.id)
         .order('numero_cuota');
 
-      if (cuotasError) throw cuotasError;
+      if (cuotasError) {
+        setCuotasMatricula([]);
+        setLoadingCuotas(false);
+        return;
+      }
 
       setCuotasMatricula(cuotasData || []);
+      setLoadingCuotas(false);
       
-      // Auto-seleccionar la primera cuota pendiente
-      const primeraCuotaPendiente = cuotasData?.find(c => c.estado === 'pendiente' || c.estado === 'parcial');
+      // Auto-seleccionar la primera cuota pendiente, parcial o vencida
+      const primeraCuotaPendiente = cuotasData?.find(c => c.estado === 'pendiente' || c.estado === 'parcial' || c.estado === 'vencido');
       if (primeraCuotaPendiente) {
         setCuotaSeleccionada(primeraCuotaPendiente.id);
         setFormData(prev => ({ ...prev, monto_pago: primeraCuotaPendiente.monto_cuota - primeraCuotaPendiente.monto_pagado }));
       }
     } catch (error: any) {
-      console.error('Error al cargar cuotas:', error);
       setCuotasMatricula([]);
+      setLoadingCuotas(false);
     }
   };
 
@@ -495,6 +533,7 @@ export default function AdminPagosManagement() {
     setCuotasMatricula([]);
     setCuotaSeleccionada(null);
     setComprobanteFile(null);
+    setLoadingCuotas(false);
     fetchProductosPorCategoria('matricula');
     setDialogOpen(true);
   };
@@ -504,6 +543,7 @@ export default function AdminPagosManagement() {
     setCuotasMatricula([]);
     setCuotaSeleccionada(null);
     setComprobanteFile(null);
+    setLoadingCuotas(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -516,6 +556,31 @@ export default function AdminPagosManagement() {
         variant: 'destructive',
       });
       return;
+    }
+
+    // Validar que haya cuotas disponibles para pagar (solo para matrículas)
+    if (formData.categoria_producto === 'matricula' && cuotasMatricula.length > 0) {
+      const cuotasPagables = cuotasMatricula.filter(c => 
+        c.estado === 'pendiente' || c.estado === 'parcial' || c.estado === 'vencido'
+      );
+      
+      if (cuotasPagables.length === 0) {
+        toast({
+          title: 'Error',
+          description: 'Todas las cuotas de esta matrícula ya están pagadas',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (!cuotaSeleccionada) {
+        toast({
+          title: 'Error',
+          description: 'Debe seleccionar una cuota para aplicar el pago',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     if (!currentUser) {
@@ -568,21 +633,41 @@ export default function AdminPagosManagement() {
 
       if (error) throw error;
 
-      // Si hay una cuota seleccionada, actualizar su monto pagado
+      // Si hay una cuota seleccionada, actualizar su monto pagado y estado
       if (cuotaSeleccionada) {
         const cuota = cuotasMatricula.find(c => c.id === cuotaSeleccionada);
         if (cuota) {
           const nuevoMontoPagado = cuota.monto_pagado + formData.monto_pago;
           
+          // Determinar el nuevo estado de la cuota
+          let nuevoEstado: 'pendiente' | 'pagado' | 'parcial' | 'vencido';
+          if (nuevoMontoPagado >= cuota.monto_cuota) {
+            nuevoEstado = 'pagado';
+          } else if (nuevoMontoPagado > 0) {
+            nuevoEstado = 'parcial';
+          } else {
+            nuevoEstado = cuota.estado; // Mantener estado actual si no hay cambio
+          }
+          
           const { error: updateError } = await supabase
             .from('cuotas_matricula' as any)
-            .update({ monto_pagado: nuevoMontoPagado })
+            .update({ 
+              monto_pagado: nuevoMontoPagado,
+              estado: nuevoEstado
+            })
             .eq('id', cuotaSeleccionada);
 
           if (updateError) {
             console.error('Error actualizando cuota:', updateError);
           }
+          
+          // Verificar si todas las cuotas están pagadas para actualizar el estado de la matrícula
+          await verificarYActualizarEstadoMatricula(formData.codigo_producto);
         }
+      } else if (formData.categoria_producto === 'matricula') {
+        // Si no hay cuota seleccionada (pago único sin plan de cuotas)
+        // Verificar el total pagado vs el precio final de la matrícula
+        await verificarYActualizarEstadoMatricula(formData.codigo_producto);
       }
 
       toast({
@@ -603,6 +688,73 @@ export default function AdminPagosManagement() {
         description: `Error al registrar pago: ${error.message}`,
         variant: 'destructive',
       });
+    }
+  };
+
+  // Función para verificar y actualizar el estado de pago de una matrícula
+  const verificarYActualizarEstadoMatricula = async (codMatricula: string) => {
+    try {
+      // Obtener la matrícula
+      const { data: matriculaData, error: matriculaError } = await supabase
+        .from('matriculas' as any)
+        .select('id, precio_final')
+        .eq('cod_matricula', codMatricula)
+        .single();
+
+      if (matriculaError || !matriculaData) return;
+
+      // Obtener el plan de cuotas
+      const { data: planData } = await supabase
+        .from('plan_cuotas_matricula' as any)
+        .select('id')
+        .eq('matricula_id', matriculaData.id)
+        .single();
+
+      if (planData) {
+        // Tiene plan de cuotas: verificar si todas las cuotas están pagadas
+        const { data: cuotasData } = await supabase
+          .from('cuotas_matricula' as any)
+          .select('estado')
+          .eq('plan_cuotas_id', planData.id);
+
+        const todasPagadas = cuotasData?.every(c => c.estado === 'pagado');
+        
+        if (todasPagadas) {
+          // Todas las cuotas están pagadas, actualizar estado de la matrícula
+          await supabase
+            .from('matriculas' as any)
+            .update({ estado_pago: 'pagado' })
+            .eq('id', matriculaData.id);
+        }
+      } else {
+        // No tiene plan de cuotas (pago único): verificar el total pagado
+        const { data: pagosData } = await supabase
+          .from('pagos' as any)
+          .select('monto_pago, moneda_pago')
+          .eq('codigo_producto', codMatricula)
+          .eq('categoria_producto', 'matricula');
+
+        // Sumar todos los pagos de la misma moneda que la matrícula
+        const { data: matriculaCompleta } = await supabase
+          .from('matriculas' as any)
+          .select('moneda_monto')
+          .eq('cod_matricula', codMatricula)
+          .single();
+
+        const totalPagado = pagosData
+          ?.filter(p => p.moneda_pago === matriculaCompleta?.moneda_monto)
+          .reduce((sum, p) => sum + p.monto_pago, 0) || 0;
+
+        if (totalPagado >= matriculaData.precio_final) {
+          // El total pagado cubre el precio final, marcar como pagado
+          await supabase
+            .from('matriculas' as any)
+            .update({ estado_pago: 'pagado' })
+            .eq('id', matriculaData.id);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error al verificar estado de matrícula:', error);
     }
   };
 
@@ -635,11 +787,21 @@ export default function AdminPagosManagement() {
     return true;
   });
 
-  // Estadísticas
-  const totalMonto = filteredPagos.reduce((sum, pago) => {
-    // Convertir todo a PEN para el total (simplificado)
-    return sum + pago.monto_pago;
-  }, 0);
+  // Estadísticas agrupadas por moneda
+  const montosPorMoneda = filteredPagos.reduce((acc, pago) => {
+    const moneda = pago.moneda_pago || 'PEN';
+    if (!acc[moneda]) {
+      acc[moneda] = 0;
+    }
+    acc[moneda] += pago.monto_pago;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const totalPEN = montosPorMoneda['PEN'] || 0;
+  const totalUSD = montosPorMoneda['USD'] || 0;
+  const totalEUR = montosPorMoneda['EUR'] || 0;
+  const totalMXN = montosPorMoneda['MXN'] || 0;
+  const totalCOP = montosPorMoneda['COP'] || 0;
 
   return (
     <DashboardLayout>
@@ -761,7 +923,7 @@ export default function AdminPagosManagement() {
           </div>
 
           {/* Estadísticas */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-4 mb-6">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total Pagos</CardDescription>
@@ -772,22 +934,42 @@ export default function AdminPagosManagement() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription>Monto Total (PEN)</CardDescription>
+                <CardDescription>Total (PEN)</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">S/ {totalMonto.toFixed(2)}</div>
+                <div className="text-xl font-bold">S/ {totalPEN.toFixed(2)}</div>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription>Último Pago</CardDescription>
+                <CardDescription>Total (USD)</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-sm">
-                  {filteredPagos.length > 0
-                    ? formatDate(filteredPagos[0].fecha_pago)
-                    : '-'}
-                </div>
+                <div className="text-xl font-bold">$ {totalUSD.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total (EUR)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">€ {totalEUR.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total (MXN)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">$ {totalMXN.toFixed(2)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total (COP)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold">$ {totalCOP.toFixed(2)}</div>
               </CardContent>
             </Card>
           </div>
@@ -957,8 +1139,11 @@ export default function AdminPagosManagement() {
                         placeholder="Escriba para buscar código (ej: MAT-2026-00001)..."
                         value={searchProducto}
                         onChange={(e) => {
-                          setSearchProducto(e.target.value);
+                          const newValue = e.target.value;
+                          setSearchProducto(newValue);
                           setShowProductoDropdown(true);
+                          // Actualizar también el código en formData para que se carguen las cuotas automáticamente
+                          setFormData(prev => ({ ...prev, codigo_producto: newValue }));
                         }}
                         onFocus={() => setShowProductoDropdown(true)}
                         className="pr-10"
@@ -1034,74 +1219,109 @@ export default function AdminPagosManagement() {
             </Card>
 
             {/* Sección de Cuotas (solo para matrículas) */}
-            {formData.categoria_producto === 'matricula' && cuotasMatricula.length > 0 && (
+            {formData.categoria_producto === 'matricula' && formData.codigo_producto && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium">Cuotas de la Matrícula</CardTitle>
-                  <CardDescription>Seleccione la cuota a la que desea aplicar el pago</CardDescription>
+                  <CardDescription>
+                    {loadingCuotas 
+                      ? 'Cargando cuotas...' 
+                      : cuotasMatricula.length > 0 
+                        ? (() => {
+                            const cuotasPagables = cuotasMatricula.filter(c => 
+                              c.estado === 'pendiente' || c.estado === 'parcial' || c.estado === 'vencido'
+                            );
+                            return cuotasPagables.length > 0 
+                              ? 'Seleccione la cuota a la que desea aplicar el pago'
+                              : '⚠️ Todas las cuotas ya están pagadas';
+                          })()
+                        : 'No se encontraron cuotas para esta matrícula'}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {cuotasMatricula.map((cuota) => {
-                      const saldoPendiente = cuota.monto_cuota - cuota.monto_pagado;
-                      const isPendiente = cuota.estado === 'pendiente' || cuota.estado === 'parcial';
-                      
-                      return (
-                        <div
-                          key={cuota.id}
-                          onClick={() => {
-                            if (isPendiente) {
-                              setCuotaSeleccionada(cuota.id);
-                              setFormData(prev => ({ ...prev, monto_pago: saldoPendiente }));
-                            }
-                          }}
-                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                            cuotaSeleccionada === cuota.id
-                              ? 'border-blue-500 bg-blue-50'
-                              : cuota.estado === 'pagado'
-                              ? 'border-green-200 bg-green-50 opacity-60 cursor-not-allowed'
-                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold">Cuota {cuota.numero_cuota}</span>
-                                <span className={`text-xs px-2 py-1 rounded-full ${
-                                  cuota.estado === 'pagado' ? 'bg-green-100 text-green-700' :
-                                  cuota.estado === 'parcial' ? 'bg-yellow-100 text-yellow-700' :
-                                  cuota.estado === 'vencido' ? 'bg-red-100 text-red-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {cuota.estado.toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="text-sm text-gray-600 mt-1">
-                                <div>Vence: {formatSimpleDate(cuota.fecha_vencimiento)}</div>
-                                <div>Monto: {formData.moneda_pago} {cuota.monto_cuota.toFixed(2)}</div>
-                                {cuota.monto_pagado > 0 && (
-                                  <div className="text-green-600">
-                                    Pagado: {formData.moneda_pago} {cuota.monto_pagado.toFixed(2)}
+                  {loadingCuotas ? (
+                    <div className="text-sm text-gray-500 p-4 bg-gray-50 rounded text-center">
+                      Buscando cuotas...
+                    </div>
+                  ) : cuotasMatricula.length === 0 ? (
+                    <div className="text-sm text-gray-500 p-4 bg-yellow-50 rounded text-center">
+                      No hay cuotas registradas para esta matrícula o el código es incorrecto.
+                    </div>
+                  ) : (() => {
+                      const cuotasPagables = cuotasMatricula.filter(c => 
+                        c.estado === 'pendiente' || c.estado === 'parcial' || c.estado === 'vencido'
+                      );
+                      return cuotasPagables.length === 0 ? (
+                        <div className="text-sm p-4 bg-green-50 border border-green-200 rounded text-center">
+                          <div className="text-green-700 font-medium mb-2">✅ Todas las cuotas pagadas</div>
+                          <div className="text-green-600 text-xs">Esta matrícula ha sido completamente pagada.</div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {cuotasMatricula.map((cuota) => {
+                            const saldoPendiente = cuota.monto_cuota - cuota.monto_pagado;
+                            const isSeleccionable = cuota.estado === 'pendiente' || cuota.estado === 'parcial' || cuota.estado === 'vencido';
+                            
+                            return (
+                              <div
+                                key={cuota.id}
+                                onClick={() => {
+                                  if (isSeleccionable) {
+                                    setCuotaSeleccionada(cuota.id);
+                                    setFormData(prev => ({ ...prev, monto_pago: saldoPendiente }));
+                                  }
+                                }}
+                                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                                  cuotaSeleccionada === cuota.id
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : cuota.estado === 'pagado'
+                                    ? 'border-green-200 bg-green-50 opacity-60 cursor-not-allowed'
+                                    : cuota.estado === 'vencido'
+                                    ? 'border-red-200 hover:border-blue-300 hover:bg-gray-50'
+                                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold">Cuota {cuota.numero_cuota}</span>
+                                      <span className={`text-xs px-2 py-1 rounded-full ${
+                                        cuota.estado === 'pagado' ? 'bg-green-100 text-green-700' :
+                                        cuota.estado === 'parcial' ? 'bg-yellow-100 text-yellow-700' :
+                                        cuota.estado === 'vencido' ? 'bg-red-100 text-red-700' :
+                                        'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {cuota.estado.toUpperCase()}
+                                      </span>
+                                    </div>
+                                    <div className="text-sm text-gray-600 mt-1">
+                                      <div>Vence: {formatSimpleDate(cuota.fecha_vencimiento)}</div>
+                                      <div>Monto: {formData.moneda_pago} {cuota.monto_cuota.toFixed(2)}</div>
+                                      {cuota.monto_pagado > 0 && (
+                                        <div className="text-green-600">
+                                          Pagado: {formData.moneda_pago} {cuota.monto_pagado.toFixed(2)}
+                                        </div>
+                                      )}
+                                      {saldoPendiente > 0 && (
+                                        <div className="text-orange-600 font-medium">
+                                          Saldo: {formData.moneda_pago} {saldoPendiente.toFixed(2)}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                )}
-                                {saldoPendiente > 0 && (
-                                  <div className="text-orange-600 font-medium">
-                                    Saldo: {formData.moneda_pago} {saldoPendiente.toFixed(2)}
-                                  </div>
-                                )}
+                                  {cuotaSeleccionada === cuota.id && (
+                                    <div className="text-blue-600">
+                                      ✓
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            {cuotaSeleccionada === cuota.id && (
-                              <div className="text-blue-600">
-                                ✓
-                              </div>
-                            )}
-                          </div>
+                            );
+                          })}
                         </div>
                       );
-                    })}
-                  </div>
-                  {cuotaSeleccionada && (
+                    })()}
+                  {!loadingCuotas && cuotasMatricula.length > 0 && cuotaSeleccionada && (
                     <p className="text-xs text-green-600 mt-3">
                       ✓ Cuota seleccionada. El monto del pago se actualizará automáticamente.
                     </p>
@@ -1270,7 +1490,15 @@ export default function AdminPagosManagement() {
               <Button type="button" variant="outline" onClick={handleCloseDialog} disabled={uploadingComprobante}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={uploadingComprobante}>
+              <Button 
+                type="submit" 
+                disabled={
+                  uploadingComprobante || 
+                  (formData.categoria_producto === 'matricula' && 
+                   cuotasMatricula.length > 0 && 
+                   cuotasMatricula.filter(c => c.estado === 'pendiente' || c.estado === 'parcial' || c.estado === 'vencido').length === 0)
+                }
+              >
                 <DollarSign className="mr-2 h-4 w-4" />
                 {uploadingComprobante ? 'Subiendo...' : 'Registrar Pago'}
               </Button>

@@ -24,19 +24,23 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Eye, Search, FileText, DollarSign } from 'lucide-react';
+import { Plus, Eye, Search, FileText, DollarSign, Filter } from 'lucide-react';
 
 export default function AdminMatriculasManagement() {
   const navigate = useNavigate();
   const [matriculas, setMatriculas] = useState<MatriculaWithRelations[]>([]);
+  const [cursos, setCursos] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('all');
   const [selectedMatricula, setSelectedMatricula] = useState<MatriculaWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchMatriculas();
+    fetchCursos();
   }, []);
 
   const fetchMatriculas = async () => {
@@ -97,6 +101,21 @@ export default function AdminMatriculasManagement() {
     }
   };
 
+  const fetchCursos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('courses' as any)
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setCursos(data || []);
+    } catch (error: any) {
+      console.error('Error al cargar cursos:', error);
+    }
+  };
+
   const handleViewDetail = (matricula: MatriculaWithRelations) => {
     setSelectedMatricula(matricula);
     setDetailDialogOpen(true);
@@ -106,24 +125,54 @@ export default function AdminMatriculasManagement() {
     navigate('/admin/matriculas/nueva');
   };
 
-  // Filtrar matrículas por búsqueda
+  // Filtrar matrículas por búsqueda y curso
   const filteredMatriculas = matriculas.filter(mat => {
+    // Filtro por búsqueda
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const matchesSearch = (
       mat.cod_matricula.toLowerCase().includes(searchLower) ||
       mat.estudiante?.first_name.toLowerCase().includes(searchLower) ||
       mat.estudiante?.last_name.toLowerCase().includes(searchLower) ||
       mat.estudiante?.email.toLowerCase().includes(searchLower)
     );
+
+    // Filtro por curso
+    const matchesCourse = selectedCourseId === 'all' || 
+      mat.modulos_matriculados?.some((modulo: any) => {
+        // Buscar el módulo completo para obtener su course_id
+        return modulo.course_id === selectedCourseId || modulo.course_name?.includes(cursos.find(c => c.id === selectedCourseId)?.name || '');
+      });
+
+    return matchesSearch && matchesCourse;
   });
 
-  // Calcular totales
+  // Calcular totales por moneda
   const totalMatriculas = filteredMatriculas.length;
-  const totalIngresos = filteredMatriculas.reduce((sum, mat) => sum + mat.precio_final, 0);
-  const totalPagado = filteredMatriculas.reduce((sum, mat) => {
+  
+  // Agrupar ingresos por moneda
+  const ingresosPorMoneda = filteredMatriculas.reduce((acc, mat) => {
+    const moneda = mat.moneda_monto || 'PEN';
+    acc[moneda] = (acc[moneda] || 0) + mat.precio_final;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  // Agrupar pagos por moneda
+  const pagadoPorMoneda = filteredMatriculas.reduce((acc, mat) => {
     const pagos = mat.pagos || [];
-    return sum + pagos.reduce((s, p) => s + p.monto_pago, 0);
-  }, 0);
+    pagos.forEach(p => {
+      const moneda = p.moneda_pago || 'PEN';
+      acc[moneda] = (acc[moneda] || 0) + p.monto_pago;
+    });
+    return acc;
+  }, {} as Record<string, number>);
+  
+  // Calcular pendiente por moneda
+  const pendientePorMoneda = Object.keys(ingresosPorMoneda).reduce((acc, moneda) => {
+    const ingreso = ingresosPorMoneda[moneda] || 0;
+    const pagado = pagadoPorMoneda[moneda] || 0;
+    acc[moneda] = ingreso - pagado;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <DashboardLayout>
@@ -147,16 +196,34 @@ export default function AdminMatriculasManagement() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Buscador */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar por código, nombre o email del estudiante..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-md"
-              />
+          {/* Buscador y Filtros */}
+          <div className="mb-6 space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 flex-1">
+                <Search className="h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar por código, nombre o email del estudiante..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-md"
+                />
+              </div>
+              <div className="flex items-center gap-2 min-w-[250px]">
+                <Filter className="h-4 w-4 text-gray-400" />
+                <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Filtrar por curso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los cursos</SelectItem>
+                    {cursos.map((curso) => (
+                      <SelectItem key={curso.id} value={curso.id}>
+                        {curso.name} ({curso.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -175,8 +242,15 @@ export default function AdminMatriculasManagement() {
                 <CardDescription>Ingresos Totales</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  S/ {totalIngresos.toFixed(2)}
+                <div className="space-y-1">
+                  {Object.entries(ingresosPorMoneda).map(([moneda, monto]) => (
+                    <div key={moneda} className="text-xl font-bold">
+                      {moneda} {monto.toFixed(2)}
+                    </div>
+                  ))}
+                  {Object.keys(ingresosPorMoneda).length === 0 && (
+                    <div className="text-2xl font-bold">S/ 0.00</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -185,11 +259,22 @@ export default function AdminMatriculasManagement() {
                 <CardDescription>Pagado</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  S/ {totalPagado.toFixed(2)}
-                </div>
-                <div className="text-xs text-gray-500">
-                  Pendiente: S/ {(totalIngresos - totalPagado).toFixed(2)}
+                <div className="space-y-1">
+                  {Object.entries(pagadoPorMoneda).map(([moneda, monto]) => (
+                    <div key={moneda}>
+                      <div className="text-xl font-bold text-green-600">
+                        {moneda} {monto.toFixed(2)}
+                      </div>
+                      {pendientePorMoneda[moneda] > 0 && (
+                        <div className="text-xs text-gray-500">
+                          Pendiente: {moneda} {pendientePorMoneda[moneda].toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {Object.keys(pagadoPorMoneda).length === 0 && (
+                    <div className="text-2xl font-bold text-green-600">S/ 0.00</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -215,10 +300,11 @@ export default function AdminMatriculasManagement() {
               </TableHeader>
               <TableBody>
                 {filteredMatriculas.map((matricula) => {
-                  const totalPagadoMatricula = matricula.pagos?.reduce(
-                    (sum, p) => sum + p.monto_pago,
-                    0
-                  ) || 0;
+                  // Calcular total pagado solo con pagos de la misma moneda que la matrícula
+                  const monedaMatricula = matricula.moneda_monto || 'PEN';
+                  const totalPagadoMatricula = matricula.pagos
+                    ?.filter(p => p.moneda_pago === monedaMatricula)
+                    .reduce((sum, p) => sum + p.monto_pago, 0) || 0;
                   const pendiente = matricula.precio_final - totalPagadoMatricula;
                   
                   return (
@@ -309,6 +395,197 @@ export default function AdminMatriculasManagement() {
 
           {selectedMatricula && (
             <div className="space-y-6">
+
+              {/* Ediciones (Cursos) */}
+              <div>
+                <h3 className="font-semibold mb-2 text-blue-800">📚 Ediciones / Cursos</h3>
+                <div className="space-y-2">
+                  {(() => {
+                    const cursosUnicos = Array.isArray(selectedMatricula.modulos_matriculados)
+                      ? (selectedMatricula.modulos_matriculados as any[]).reduce((acc: any[], modulo: any) => {
+                          const key = modulo.course_id || modulo.course_name || 'sin-curso';
+                          const existe = acc.find((c: any) => c.key === key);
+                          if (!existe) {
+                            acc.push({
+                              key,
+                              course_id: modulo.course_id,
+                              course_name: modulo.course_name || null,
+                              course_code: modulo.course_code,
+                              modulos: [modulo]
+                            });
+                          } else {
+                            existe.modulos.push(modulo);
+                          }
+                          return acc;
+                        }, [])
+                      : [];
+                    if (cursosUnicos.length === 0) {
+                      return <p className="text-sm text-gray-500">Sin módulos matriculados</p>;
+                    }
+                    return cursosUnicos.map((curso: any) => (
+                      <div key={curso.key} className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="flex-1">
+                            {curso.course_name ? (
+                              <>
+                                <div className="font-semibold text-base text-blue-900">{curso.course_name}</div>
+                                {curso.course_code && <div className="text-xs text-blue-600">Código: {curso.course_code}</div>}
+                              </>
+                            ) : (
+                              <div className="font-semibold text-base text-blue-900 italic">Edición sin nombre registrado</div>
+                            )}
+                          </div>
+                          <Badge variant="secondary">
+                            {curso.modulos.length} {curso.modulos.length === 1 ? 'módulo' : 'módulos'}
+                          </Badge>
+                        </div>
+                        <div className="space-y-1">
+                          {curso.modulos.map((m: any, i: number) => (
+                            <div key={i} className="text-sm text-blue-800">
+                              • {m.nombre} {m.code ? `(${m.code})` : ''}
+                              {(m.start_date || m.end_date) && (
+                                <span className="text-xs text-blue-500 ml-2">{m.start_date} – {m.end_date}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* Plan de Cuotas */}
+              <div>
+                <h3 className="font-semibold mb-2 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Plan de Cuotas
+                </h3>
+                {!(selectedMatricula as any).plan_cuotas ? (
+                  <p className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    Esta matrícula no tiene un plan de cuotas registrado.
+                  </p>
+                ) : (
+                  <>
+                    {/* Resumen del Plan */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600 text-xs">Núm. Cuotas</span>
+                          <p className="font-bold text-lg text-blue-900">{(selectedMatricula as any).plan_cuotas.numero_cuotas}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 text-xs">Tipo</span>
+                          <p className="font-medium text-blue-900 capitalize">
+                            {(selectedMatricula as any).plan_cuotas.tipo_plan?.replace(/_/g, ' ')}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 text-xs">Monto por Cuota</span>
+                          <p className="font-bold text-lg text-blue-900">
+                            {selectedMatricula.moneda_monto} {(selectedMatricula as any).plan_cuotas.monto_por_cuota?.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 text-xs">Creado</span>
+                          <p className="font-medium text-blue-900">
+                            {formatSimpleDate((selectedMatricula as any).plan_cuotas.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Estadísticas */}
+                    {(() => {
+                      const cuotas: any[] = (selectedMatricula as any).cuotas || [];
+                      const pagadas = cuotas.filter(c => c.estado === 'pagado').length;
+                      const parciales = cuotas.filter(c => c.estado === 'parcial').length;
+                      const pendientes = cuotas.filter(c => c.estado === 'pendiente').length;
+                      const vencidas = cuotas.filter(c => c.estado === 'vencido').length;
+                      const totalPagado = cuotas.reduce((s, c) => s + (c.monto_pagado || 0), 0);
+                      const totalPendiente = cuotas.reduce((s, c) => s + (c.monto_cuota - c.monto_pagado), 0);
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                              <div className="text-xs text-green-700">✅ Pagadas</div>
+                              <div className="font-bold text-2xl text-green-900">{pagadas}</div>
+                            </div>
+                            {parciales > 0 && (
+                              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                <div className="text-xs text-yellow-700">⚠️ Parciales</div>
+                                <div className="font-bold text-2xl text-yellow-900">{parciales}</div>
+                              </div>
+                            )}
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                              <div className="text-xs text-gray-700">⏳ Pendientes</div>
+                              <div className="font-bold text-2xl text-gray-900">{pendientes}</div>
+                            </div>
+                            {vencidas > 0 && (
+                              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                <div className="text-xs text-red-700">🚨 Vencidas</div>
+                                <div className="font-bold text-2xl text-red-900">{vencidas}</div>
+                              </div>
+                            )}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 col-span-2">
+                              <div className="text-xs text-blue-700">💰 Total Pagado</div>
+                              <div className="font-bold text-xl text-blue-900">{selectedMatricula.moneda_monto} {totalPagado.toFixed(2)}</div>
+                            </div>
+                            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 col-span-2">
+                              <div className="text-xs text-orange-700">💳 Saldo Pendiente</div>
+                              <div className="font-bold text-xl text-orange-900">{selectedMatricula.moneda_monto} {totalPendiente.toFixed(2)}</div>
+                            </div>
+                          </div>
+                          {/* Detalle cuotas */}
+                          <div className="border-t pt-3">
+                            <h4 className="font-medium text-sm text-gray-700 mb-2">Detalle de Cuotas</h4>
+                            <div className="space-y-2">
+                              {cuotas.map((cuota: any) => {
+                                const saldo = cuota.monto_cuota - cuota.monto_pagado;
+                                return (
+                                  <div key={cuota.id} className={`p-3 border rounded-lg ${
+                                    cuota.estado === 'pagado' ? 'bg-green-50 border-green-200' :
+                                    cuota.estado === 'parcial' ? 'bg-yellow-50 border-yellow-200' :
+                                    cuota.estado === 'vencido' ? 'bg-red-50 border-red-200' :
+                                    'bg-white border-gray-200'
+                                  }`}>
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-semibold">Cuota {cuota.numero_cuota}</span>
+                                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                            cuota.estado === 'pagado' ? 'bg-green-100 text-green-700' :
+                                            cuota.estado === 'parcial' ? 'bg-yellow-100 text-yellow-700' :
+                                            cuota.estado === 'vencido' ? 'bg-red-100 text-red-700' :
+                                            'bg-gray-100 text-gray-700'
+                                          }`}>{cuota.estado?.toUpperCase()}</span>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-1">
+                                          <div>Vence: {formatSimpleDate(cuota.fecha_vencimiento)}</div>
+                                          <div>Monto: {selectedMatricula.moneda_monto} {cuota.monto_cuota?.toFixed(2)}</div>
+                                          {cuota.monto_pagado > 0 && (
+                                            <div className="text-green-600">Pagado: {selectedMatricula.moneda_monto} {cuota.monto_pagado?.toFixed(2)}</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {saldo > 0 && (
+                                        <div className="text-right">
+                                          <div className="text-xs text-gray-500">Saldo</div>
+                                          <div className="font-bold text-orange-600">{selectedMatricula.moneda_monto} {saldo.toFixed(2)}</div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
+
               {/* Información del Estudiante */}
               <div>
                 <h3 className="font-semibold mb-2">Información del Estudiante</h3>
@@ -364,6 +641,7 @@ export default function AdminMatriculasManagement() {
                 </div>
               </div>
 
+
               {/* Información Financiera */}
               <div>
                 <h3 className="font-semibold mb-2">Información Financiera</h3>
@@ -417,85 +695,6 @@ export default function AdminMatriculasManagement() {
                 </div>
               </div>
 
-              {/* Plan de Cuotas */}
-              {selectedMatricula.plan_cuotas && selectedMatricula.cuotas && (
-                <div>
-                  <h3 className="font-semibold mb-2 flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    Plan de Cuotas
-                  </h3>
-                  <div className="bg-gray-50 rounded-lg p-3 mb-3">
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-600">Número de Cuotas:</span>
-                        <p className="font-medium">{selectedMatricula.plan_cuotas.numero_cuotas}</p>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Tipo de Plan:</span>
-                        <p className="font-medium capitalize">
-                          {selectedMatricula.plan_cuotas.tipo_plan.replace('_', ' ')}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Monto por Cuota:</span>
-                        <p className="font-medium">
-                          {selectedMatricula.moneda_monto} {selectedMatricula.plan_cuotas.monto_por_cuota.toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    {selectedMatricula.cuotas.map((cuota: any) => {
-                      const saldoPendiente = cuota.monto_cuota - cuota.monto_pagado;
-                      return (
-                        <div
-                          key={cuota.id}
-                          className={`p-3 border rounded-lg ${
-                            cuota.estado === 'pagado' ? 'bg-green-50 border-green-200' :
-                            cuota.estado === 'parcial' ? 'bg-yellow-50 border-yellow-200' :
-                            cuota.estado === 'vencido' ? 'bg-red-50 border-red-200' :
-                            'bg-white border-gray-200'
-                          }`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold">Cuota {cuota.numero_cuota}</span>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                  cuota.estado === 'pagado' ? 'bg-green-100 text-green-700' :
-                                  cuota.estado === 'parcial' ? 'bg-yellow-100 text-yellow-700' :
-                                  cuota.estado === 'vencido' ? 'bg-red-100 text-red-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {cuota.estado.toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="text-sm text-gray-600 mt-1">
-                                <div>Vence: {formatSimpleDate(cuota.fecha_vencimiento)}</div>
-                                <div>Monto: {selectedMatricula.moneda_monto} {cuota.monto_cuota.toFixed(2)}</div>
-                                {cuota.monto_pagado > 0 && (
-                                  <div className="text-green-600">
-                                    Pagado: {selectedMatricula.moneda_monto} {cuota.monto_pagado.toFixed(2)}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            {saldoPendiente > 0 && (
-                              <div className="text-right">
-                                <div className="text-xs text-gray-500">Saldo</div>
-                                <div className="font-bold text-orange-600">
-                                  {selectedMatricula.moneda_monto} {saldoPendiente.toFixed(2)}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* Historial de Pagos */}
               <div>

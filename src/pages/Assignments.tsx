@@ -33,6 +33,11 @@ interface Assignment {
     id: string;
     name: string;
     course_id: string;
+    course: {
+      id: string;
+      name: string;
+      code: string;
+    } | null;
   } | null;
   submissions?: {
     id: string;
@@ -72,7 +77,12 @@ const Assignments = () => {
             modulo:modulos!inner (
               id,
               name,
-              course_id
+              course_id,
+              course:courses (
+                id,
+                name,
+                code
+              )
             ),
             submissions:assignment_submissions (
               id,
@@ -95,7 +105,12 @@ const Assignments = () => {
             modulo:modulos (
               id,
               name,
-              course_id
+              course_id,
+              course:courses (
+                id,
+                name,
+                code
+              )
             ),
             submissions:assignment_submissions (
               id,
@@ -279,7 +294,7 @@ const Assignments = () => {
               <SelectItem value="all">Todos los cursos</SelectItem>
               {uniqueCourses.map(modulo => (
                 <SelectItem key={modulo.course_id} value={modulo.course_id}>
-                  {modulo.name}
+                  {modulo.name} {modulo.course ? `- ${modulo.course.name}` : ''}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -344,11 +359,19 @@ const Assignments = () => {
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                           <Badge variant="secondary" className="text-xs">
                             Módulo
                           </Badge>
                           <span>{assignment.modulo?.name || 'Sin módulo'}</span>
+                          {assignment.modulo?.course && (
+                            <>
+                              <span className="text-xs">•</span>
+                              <Badge variant="outline" className="text-xs">
+                                {assignment.modulo.course.name}
+                              </Badge>
+                            </>
+                          )}
                         </div>
                       </div>
                       <FileText className="w-6 h-6 text-primary" />

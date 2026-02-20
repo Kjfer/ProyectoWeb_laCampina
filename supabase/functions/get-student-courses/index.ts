@@ -120,7 +120,7 @@ serve(async (req: Request) => {
       }
 
       // Transform the data to include enrollment info from course_enrollments
-      coursesData = data?.map(enrollment => {
+      const rawItems = data?.map(enrollment => {
         const modulo = enrollment.modulo
         if (!modulo) return null
         return {
@@ -135,11 +135,24 @@ serve(async (req: Request) => {
           teacher: modulo.teacher,
           enrolled_at: enrollment.enrolled_at,
           enrollment_status: 'enrolled',
-          course_id: modulo.course_id, // ID de la edición para agrupar
-          course_name: modulo.course?.name, // Nombre de la edición
-          program_name: modulo.course?.program?.name // Nombre del programa
+          course_id: modulo.course_id,
+          course_name: modulo.course?.name,
+          program_name: modulo.course?.program?.name,
+          enrollments: [{ count: 0 }]
         }
       }).filter(item => item && item.id) || []
+
+      // Obtener conteo real de estudiantes por módulo (sin restricción RLS, usando service key)
+      coursesData = await Promise.all(
+        rawItems.map(async (item) => {
+          const { count } = await supabaseClient
+            .from('course_enrollments')
+            .select('*', { count: 'exact', head: true })
+            .eq('modulo_id', item.id)
+          item.enrollments = [{ count: count || 0 }]
+          return item
+        })
+      )
 
     } else if (profile.role === 'teacher') {
       // For teachers: get modules they teach (primary or additional)
@@ -156,6 +169,7 @@ serve(async (req: Request) => {
           end_date,
           teacher_principal_id,
           aditional_teachers,
+          course_id,
           course:courses (
             id,
             name,
@@ -231,6 +245,7 @@ serve(async (req: Request) => {
           start_date,
           end_date,
           teacher_principal_id,
+          course_id,
           course:courses (
             id,
             name,

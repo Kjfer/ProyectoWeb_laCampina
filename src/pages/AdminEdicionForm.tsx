@@ -38,8 +38,6 @@ export default function AdminEdicionForm() {
   const [programas, setProgramas] = useState<Programa[]>([]);
   const [teachers, setTeachers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
-  const [bookFile, setBookFile] = useState<File | null>(null);
-  const [uploadingBook, setUploadingBook] = useState(false);
   const [formData, setFormData] = useState<Partial<CourseInsert>>({
     name: '',
     description: '',
@@ -52,8 +50,6 @@ export default function AdminEdicionForm() {
     start_date: '',
     end_date: '',
     numero_modulos: 1,
-    material: 'none',
-    book_url: '',
   });
 
   useEffect(() => {
@@ -105,7 +101,6 @@ export default function AdminEdicionForm() {
           start_date: courseData.start_date,
           end_date: courseData.end_date,
           numero_modulos: courseData.numero_modulos,
-          material: courseData.material,
         });
       }
     } catch (error: any) {
@@ -189,43 +184,7 @@ export default function AdminEdicionForm() {
     setFormData(newFormData);
   };
 
-  const uploadBookToStorage = async (): Promise<string | null> => {
-    if (!bookFile) return formData.book_url || null;
 
-    try {
-      setUploadingBook(true);
-      const fileExt = bookFile.name.split('.').pop();
-      const fileName = `book.${fileExt}`;
-      
-      // Usar el courseId que se generará o el id actual si estamos editando
-      const targetCourseId = id || 'temp';
-      const filePath = `${targetCourseId}/${fileName}`;
-
-      const { error } = await supabase.storage
-        .from('course-books')
-        .upload(filePath, bookFile, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from('course-books')
-        .getPublicUrl(filePath);
-
-      return urlData.publicUrl;
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: `Error al subir el libro: ${error.message}`,
-        variant: 'destructive',
-      });
-      return null;
-    } finally {
-      setUploadingBook(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,20 +213,9 @@ export default function AdminEdicionForm() {
       setLoading(true);
 
       if (isEditing) {
-        // Actualizar: primero subir el book si hay uno nuevo
-        let bookUrl = formData.book_url;
-        if (formData.material === 'book' && bookFile) {
-          const uploadedUrl = await uploadBookToStorage();
-          if (uploadedUrl) {
-            bookUrl = uploadedUrl;
-          }
-        }
-
-        const dataToSave = { ...formData, book_url: bookUrl };
-
         const { error } = await supabase
           .from('courses')
-          .update(dataToSave)
+          .update(formData)
           .eq('id', id);
 
         if (error) throw error;
@@ -277,47 +225,11 @@ export default function AdminEdicionForm() {
           description: 'Edición actualizada correctamente',
         });
       } else {
-        // Crear: primero crear la edición, luego subir el book
-        const { data: newCourse, error: courseError } = await supabase
+        const { error: courseError } = await supabase
           .from('courses')
-          .insert(formData as CourseInsert)
-          .select('id')
-          .single();
+          .insert(formData as CourseInsert);
 
         if (courseError) throw courseError;
-
-        // Si hay un book, subirlo usando el ID del curso recién creado
-        if (formData.material === 'book' && bookFile && newCourse) {
-          const fileExt = bookFile.name.split('.').pop();
-          const fileName = `book.${fileExt}`;
-          const filePath = `${newCourse.id}/${fileName}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('course-books')
-            .upload(filePath, bookFile, {
-              cacheControl: '3600',
-              upsert: true,
-            });
-
-          if (uploadError) {
-            console.error('Error al subir book:', uploadError);
-            toast({
-              title: 'Advertencia',
-              description: 'Edición creada pero hubo un error al subir el book. Puedes subirlo después.',
-              variant: 'destructive',
-            });
-          } else {
-            // Actualizar la URL del book en la edición
-            const { data: urlData } = supabase.storage
-              .from('course-books')
-              .getPublicUrl(filePath);
-
-            await supabase
-              .from('courses')
-              .update({ book_url: urlData.publicUrl })
-              .eq('id', newCourse.id);
-          }
-        }
 
         toast({
           title: 'Éxito',
@@ -488,59 +400,21 @@ export default function AdminEdicionForm() {
               </div>
             </div>
 
-            {/* Número de Módulos y Material */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="numero_modulos">Número de Módulos *</Label>
-                <Input
-                  id="numero_modulos"
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={formData.numero_modulos}
-                  onChange={(e) =>
-                    setFormData({ ...formData, numero_modulos: parseInt(e.target.value) })
-                  }
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="material">Material Asociado</Label>
-                <Select
-                  value={formData.material}
-                  onValueChange={(value: 'book' | 'none') =>
-                    setFormData({ ...formData, material: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Ninguno</SelectItem>
-                    <SelectItem value="book">Libro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Número de Módulos */}
+            <div className="space-y-2">
+              <Label htmlFor="numero_modulos">Número de Módulos *</Label>
+              <Input
+                id="numero_modulos"
+                type="number"
+                min="1"
+                max="20"
+                value={formData.numero_modulos}
+                onChange={(e) =>
+                  setFormData({ ...formData, numero_modulos: parseInt(e.target.value) })
+                }
+                required
+              />
             </div>
-
-            {/* Subir Libro (solo si material es 'book') */}
-            {formData.material === 'book' && (
-              <div className="space-y-2">
-                <Label htmlFor="book_file">Archivo del Libro (PDF) *</Label>
-                <Input
-                  id="book_file"
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setBookFile(e.target.files?.[0] || null)}
-                />
-                {bookFile && (
-                  <p className="text-sm text-gray-600">Archivo seleccionado: {bookFile.name}</p>
-                )}
-                {formData.book_url && !bookFile && (
-                  <p className="text-sm text-green-600">✓ Libro ya cargado</p>
-                )}
-              </div>
-            )}
 
             {/* Estado */}
             <div className="flex items-center space-x-2">

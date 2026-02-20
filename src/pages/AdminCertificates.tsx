@@ -4,15 +4,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Award, Send, Loader2, Search, CheckCircle2, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import { Award, Send, Loader2, Search, CheckCircle2, CheckCircle, XCircle, Clock, Filter } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -28,14 +29,15 @@ interface Course {
   id: string;
   name: string;
   code: string;
-  program: {
-    name: string;
-    code: string;
-  } | null;
+  program: { name: string; code: string } | null;
 }
 
-interface Student {
-  id: string;
+interface CertificateEntry {
+  log_id: string;
+  student_id: string;
+  status: 'pending' | 'sent' | 'failed';
+  sent_at: string | null;
+  error_message: string | null;
   first_name: string;
   last_name: string;
   paternal_surname: string;
@@ -44,44 +46,35 @@ interface Student {
   student_code: string;
 }
 
-interface CertificateLog {
-  id: string;
-  student_id: string;
-  sent_at: string;
-  status: 'pending' | 'sent' | 'failed';
-  error_message: string | null;
-}
+type StatusFilter = 'all' | 'pending' | 'sent' | 'failed';
 
 const AdminCertificates = () => {
   const { toast } = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
-  const [students, setStudents] = useState<Student[]>([]);
-  const [certificateLogs, setCertificateLogs] = useState<CertificateLog[]>([]);
-  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+  const [entries, setEntries] = useState<CertificateEntry[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [webhookUrl, setWebhookUrl] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [loadingCourses, setLoadingCourses] = useState(true);
-  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [loadingEntries, setLoadingEntries] = useState(false);
   const [sending, setSending] = useState(false);
+  const [updatingRowId, setUpdatingRowId] = useState<string | null>(null);
+  const [updatingBulk, setUpdatingBulk] = useState(false);
 
   useEffect(() => {
     fetchCourses();
-    // Cargar URL del webhook desde localStorage si existe
-    const savedWebhook = localStorage.getItem('n8n_webhook_url');
-    if (savedWebhook) {
-      setWebhookUrl(savedWebhook);
-    }
+    const saved = localStorage.getItem('n8n_webhook_url');
+    if (saved) setWebhookUrl(saved);
   }, []);
 
   useEffect(() => {
     if (selectedCourse) {
-      fetchEnrolledStudents(selectedCourse);
-      fetchCertificateLogs(selectedCourse);
+      fetchEntries(selectedCourse);
     } else {
-      setStudents([]);
-      setCertificateLogs([]);
-      setSelectedStudents(new Set());
+      setEntries([]);
+      setSelectedIds(new Set());
     }
   }, [selectedCourse]);
 
@@ -89,276 +82,148 @@ const AdminCertificates = () => {
     try {
       const { data, error } = await supabase
         .from('courses')
-        .select(`
-          id,
-          name,
-          code,
-          program:program_id (
-            name,
-            code
-          )
-        `)
+        .select('id, name, code, program:program_id(name, code)')
         .eq('is_active', true)
         .order('name');
-
       if (error) throw error;
       setCourses(data || []);
-    } catch (error) {
-      console.error('Error cargando cursos:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudieron cargar los cursos',
-        variant: 'destructive',
-      });
+    } catch {
+      toast({ title: 'Error', description: 'No se pudieron cargar los cursos', variant: 'destructive' });
     } finally {
       setLoadingCourses(false);
     }
   };
 
-  const fetchEnrolledStudents = async (courseId: string) => {
-    setLoadingStudents(true);
-    setSelectedStudents(new Set());
-    
+  const fetchEntries = async (courseId: string) => {
+    setLoadingEntries(true);
+    setSelectedIds(new Set());
     try {
-      console.log('🔍 Buscando estudiantes para curso:', courseId);
-      
-      // Obtener estudiantes que entregaron portafolio (registrados en certificate_logs)
-      // Solo se extraen registros con status='pending' (no enviados aún)
-      const { data: certificateLogs, error: logsError } = await (supabase as any)
+      const { data: logs, error: logsError } = await (supabase as any)
         .from('certificate_logs')
-        .select('student_id')
+        .select('id, student_id, status, sent_at, error_message')
         .eq('course_id', courseId)
-        .eq('status', 'pending');
+        .order('sent_at', { ascending: false });
 
-      console.log('📋 Certificate logs pendientes encontrados:', certificateLogs);
-      console.log('❌ Error en certificate_logs:', logsError);
+      if (logsError) throw logsError;
+      if (!logs || logs.length === 0) { setEntries([]); return; }
 
-      if (logsError) {
-        console.error('Error al obtener certificate_logs:', logsError);
-        throw logsError;
-      }
-
-      const studentIds = certificateLogs?.map((log: any) => log.student_id) || [];
-      console.log('👥 IDs de estudiantes:', studentIds);
-
-      if (studentIds.length === 0) {
-        console.log('⚠️ No hay estudiantes pendientes de certificado para este curso');
-        setStudents([]);
-        toast({
-          title: 'Sin estudiantes',
-          description: 'No hay estudiantes con certificados pendientes de envío',
-        });
-        return;
-      }
-
-      // Obtener datos de los estudiantes
-      const { data: studentsData, error: studentsError } = await supabase
+      const studentIds = [...new Set(logs.map((l: any) => l.student_id))] as string[];
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, paternal_surname, maternal_surname, email, student_code')
         .in('id', studentIds);
 
-      console.log('✅ Datos de estudiantes:', studentsData);
-      console.log('❌ Error en profiles:', studentsError);
+      if (profilesError) throw profilesError;
 
-      if (studentsError) {
-        console.error('Error al obtener profiles:', studentsError);
-        throw studentsError;
-      }
-
-      // Ordenar manualmente para manejar nulls
-      const sortedStudents = (studentsData || []).sort((a, b) => {
-        const surnameA = a.paternal_surname || a.last_name || '';
-        const surnameB = b.paternal_surname || b.last_name || '';
-        return surnameA.localeCompare(surnameB);
+      const profileMap = Object.fromEntries((profiles || []).map((p: any) => [p.id, p]));
+      const combined: CertificateEntry[] = logs.map((log: any) => {
+        const p = profileMap[log.student_id] || {};
+        return {
+          log_id: log.id, student_id: log.student_id, status: log.status,
+          sent_at: log.sent_at, error_message: log.error_message,
+          first_name: p.first_name || '', last_name: p.last_name || '',
+          paternal_surname: p.paternal_surname || '', maternal_surname: p.maternal_surname || '',
+          email: p.email || '', student_code: p.student_code || '',
+        };
       });
-
-      console.log('📊 Total estudiantes cargados:', sortedStudents.length);
-      setStudents(sortedStudents);
+      setEntries(combined);
     } catch (error: any) {
-      console.error('💥 Error completo:', error);
-      toast({
-        title: 'Error',
-        description: `No se pudieron cargar los estudiantes: ${error.message}`,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: `No se pudieron cargar los datos: ${error.message}`, variant: 'destructive' });
     } finally {
-      setLoadingStudents(false);
+      setLoadingEntries(false);
     }
   };
 
-  const fetchCertificateLogs = async (courseId: string) => {
+  const getFullName = (e: CertificateEntry) => {
+    if (e.paternal_surname && e.maternal_surname)
+      return `${e.paternal_surname} ${e.maternal_surname}, ${e.first_name}`;
+    return `${e.last_name || e.paternal_surname || ''}, ${e.first_name}`.trim();
+  };
+
+  const handleMarkRowAsSent = async (entry: CertificateEntry) => {
+    if (entry.status !== 'pending') return;
+    setUpdatingRowId(entry.log_id);
     try {
-      // Usar any temporalmente hasta que se generen los tipos
-      const { data, error } = await (supabase as any)
+      const { error } = await (supabase as any)
         .from('certificate_logs')
-        .select('id, student_id, sent_at, status, error_message')
-        .eq('course_id', courseId)
-        .order('sent_at', { ascending: false });
-
+        .update({ status: 'sent', sent_at: new Date().toISOString() })
+        .eq('id', entry.log_id);
       if (error) throw error;
-      setCertificateLogs((data || []) as CertificateLog[]);
-    } catch (error) {
-      console.error('Error cargando logs de certificados:', error);
-      // No mostrar toast para no interrumpir, es información adicional
+      setEntries(prev => prev.map(e => e.log_id === entry.log_id ? { ...e, status: 'sent' as const, sent_at: new Date().toISOString() } : e));
+      toast({ title: 'Actualizado', description: `Certificado de ${getFullName(entry)} marcado como Enviado.` });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally { setUpdatingRowId(null); }
+  };
+
+  const handleMarkBulkAsSent = async () => {
+    const pendingSelected = entries.filter(e => selectedIds.has(e.student_id) && e.status === 'pending');
+    if (pendingSelected.length === 0) {
+      toast({ title: 'Sin cambios', description: 'Los seleccionados ya están marcados como Enviado.' });
+      return;
     }
-  };
-
-  const toggleStudent = (studentId: string) => {
-    const newSelection = new Set(selectedStudents);
-    if (newSelection.has(studentId)) {
-      newSelection.delete(studentId);
-    } else {
-      newSelection.add(studentId);
-    }
-    setSelectedStudents(newSelection);
-  };
-
-  const selectAll = () => {
-    setSelectedStudents(new Set(filteredStudents.map(s => s.id)));
-  };
-
-  const clearSelection = () => {
-    setSelectedStudents(new Set());
+    setUpdatingBulk(true);
+    try {
+      const logIds = pendingSelected.map(e => e.log_id);
+      const { error } = await (supabase as any)
+        .from('certificate_logs')
+        .update({ status: 'sent', sent_at: new Date().toISOString() })
+        .in('id', logIds);
+      if (error) throw error;
+      setEntries(prev => prev.map(e => logIds.includes(e.log_id) ? { ...e, status: 'sent' as const, sent_at: new Date().toISOString() } : e));
+      setSelectedIds(new Set());
+      toast({ title: 'Estado actualizado', description: `${pendingSelected.length} certificado${pendingSelected.length !== 1 ? 's' : ''} marcado${pendingSelected.length !== 1 ? 's' : ''} como Enviado.` });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally { setUpdatingBulk(false); }
   };
 
   const handleSendCertificates = async () => {
-    if (!selectedCourse) {
-      toast({
-        title: 'Error',
-        description: 'Debes seleccionar un curso',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (selectedStudents.size === 0) {
-      toast({
-        title: 'Error',
-        description: 'Debes seleccionar al menos un estudiante',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!webhookUrl) {
-      toast({
-        title: 'Error',
-        description: 'Debes ingresar la URL del webhook de n8n',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Guardar webhook URL en localStorage
+    if (!selectedCourse || selectedIds.size === 0 || !webhookUrl) return;
     localStorage.setItem('n8n_webhook_url', webhookUrl);
-
     setSending(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No hay sesión activa');
-      }
-
-      const SUPABASE_URL = "https://bnbtmubibnupttnnhijr.supabase.co";
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/send-certificates`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            course_id: selectedCourse,
-            student_ids: Array.from(selectedStudents),
-            n8n_webhook_url: webhookUrl,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error enviando certificados');
-      }
-
+      if (!session) throw new Error('No hay sesión activa');
+      const response = await fetch('https://bnbtmubibnupttnnhijr.supabase.co/functions/v1/send-certificates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ course_id: selectedCourse, student_ids: Array.from(selectedIds), n8n_webhook_url: webhookUrl }),
+      });
+      if (!response.ok) { const e = await response.json(); throw new Error(e.error || 'Error enviando certificados'); }
       const result = await response.json();
-      
-      toast({
-        title: 'Éxito',
-        description: result.message,
-      });
-
-      // Limpiar selección
-      setSelectedStudents(new Set());
-      
-      // Recargar logs de certificados
-      await fetchCertificateLogs(selectedCourse);
+      toast({ title: 'Éxito', description: result.message });
+      setSelectedIds(new Set());
     } catch (error: any) {
-      console.error('Error enviando certificados:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudieron enviar los certificados',
-        variant: 'destructive',
-      });
-    } finally {
-      setSending(false);
-    }
+      toast({ title: 'Error', description: error.message || 'No se pudieron enviar los certificados', variant: 'destructive' });
+    } finally { setSending(false); }
   };
 
-  const getStudentFullName = (student: Student) => {
-    if (student.paternal_surname && student.maternal_surname) {
-      return `${student.paternal_surname} ${student.maternal_surname}, ${student.first_name}`;
-    }
-    return `${student.last_name || ''}, ${student.first_name}`.trim();
+  const toggleEntry = (studentId: string) => {
+    const next = new Set(selectedIds);
+    next.has(studentId) ? next.delete(studentId) : next.add(studentId);
+    setSelectedIds(next);
   };
 
-  // Obtener el estado del certificado para un estudiante
-  const getCertificateStatus = (studentId: string): 'sent' | 'failed' | 'pending' => {
-    const log = certificateLogs.find(log => log.student_id === studentId);
-    if (!log) return 'pending';
-    return log.status as 'sent' | 'failed';
-  };
+  const selectAllFiltered = () => setSelectedIds(new Set(filteredEntries.map(e => e.student_id)));
+  const clearSelection = () => setSelectedIds(new Set());
 
-  // Renderizar ícono de estado del certificado
-  const renderCertificateStatus = (studentId: string) => {
-    const status = getCertificateStatus(studentId);
-    const log = certificateLogs.find(log => log.student_id === studentId);
-
-    if (status === 'sent') {
-      return (
-        <div className="flex items-center gap-2 text-green-600">
-          <CheckCircle className="h-4 w-4" />
-          <span className="text-xs">Enviado</span>
-        </div>
-      );
-    } else if (status === 'failed') {
-      return (
-        <div className="flex items-center gap-2 text-red-600" title={log?.error_message || 'Error desconocido'}>
-          <XCircle className="h-4 w-4" />
-          <span className="text-xs">Fallido</span>
-        </div>
-      );
-    } else {
-      return (
-        <div className="flex items-center gap-2 text-gray-400">
-          <Clock className="h-4 w-4" />
-          <span className="text-xs">Pendiente</span>
-        </div>
-      );
-    }
-  };
-
-  const filteredStudents = students.filter(student => {
+  const filteredEntries = entries.filter(e => {
+    if (statusFilter !== 'all' && e.status !== statusFilter) return false;
     if (!searchTerm) return true;
-    const fullName = getStudentFullName(student).toLowerCase();
-    const code = student.student_code?.toLowerCase() || '';
-    const email = student.email.toLowerCase();
-    const search = searchTerm.toLowerCase();
-    return fullName.includes(search) || code.includes(search) || email.includes(search);
+    const s = searchTerm.toLowerCase();
+    return getFullName(e).toLowerCase().includes(s) || e.email.toLowerCase().includes(s) || e.student_code.toLowerCase().includes(s);
   });
 
+  const countByStatus = (s: StatusFilter) => s === 'all' ? entries.length : entries.filter(e => e.status === s).length;
   const selectedCourseData = courses.find(c => c.id === selectedCourse);
+  const pendingSelectedCount = entries.filter(e => selectedIds.has(e.student_id) && e.status === 'pending').length;
+
+  const StatusBadge = ({ status }: { status: string }) => {
+    if (status === 'sent') return <Badge className="bg-green-100 text-green-700 border-green-300 gap-1"><CheckCircle className="h-3 w-3" />Enviado</Badge>;
+    if (status === 'failed') return <Badge className="bg-red-100 text-red-700 border-red-300 gap-1"><XCircle className="h-3 w-3" />Fallido</Badge>;
+    return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300 gap-1"><Clock className="h-3 w-3" />Pendiente</Badge>;
+  };
 
   return (
     <DashboardLayout>
@@ -369,123 +234,84 @@ const AdminCertificates = () => {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-foreground">Gestión de Certificados</h1>
-            <p className="text-muted-foreground mt-1">
-              Envía certificados a estudiantes con portafolio entregado (solo pendientes de envío)
-            </p>
+            <p className="text-muted-foreground mt-1">Consulta y actualiza el estado de los certificados por curso</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Panel de configuración */}
           <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle>Configuración</CardTitle>
-              <CardDescription>
-                Selecciona el curso y configura el webhook
-              </CardDescription>
+              <CardDescription>Selecciona el curso y configura el webhook</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Selección de curso */}
               <div className="space-y-2">
                 <Label htmlFor="course">Curso</Label>
                 <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-                  <SelectTrigger id="course">
-                    <SelectValue placeholder="Selecciona un curso" />
-                  </SelectTrigger>
+                  <SelectTrigger id="course"><SelectValue placeholder="Selecciona un curso" /></SelectTrigger>
                   <SelectContent>
                     {courses.map(course => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course.code} - {course.name}
-                      </SelectItem>
+                      <SelectItem key={course.id} value={course.id}>{course.code} - {course.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {selectedCourseData?.program && (
-                  <p className="text-xs text-muted-foreground">
-                    Programa: {selectedCourseData.program.name}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Programa: {selectedCourseData.program.name}</p>
                 )}
               </div>
 
-              {/* URL del webhook */}
-              <div className="space-y-2">
-                <Label htmlFor="webhook">URL Webhook n8n</Label>
-                <Input
-                  id="webhook"
-                  type="url"
-                  placeholder="https://n8n.example.com/webhook/..."
-                  value={webhookUrl}
-                  onChange={(e) => setWebhookUrl(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  La URL del webhook de n8n donde se enviarán los datos
-                </p>
-              </div>
-
-              {/* Botón de envío */}
-              <Button
-                onClick={handleSendCertificates}
-                disabled={sending || selectedStudents.size === 0 || !selectedCourse || !webhookUrl}
-                className="w-full"
-              >
-                {sending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Enviar {selectedStudents.size} Certificado{selectedStudents.size !== 1 ? 's' : ''}
-                  </>
-                )}
-              </Button>
-
-              {/* Estadísticas */}
-              {selectedCourse && (
-                <div className="pt-4 border-t space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total estudiantes:</span>
-                    <span className="font-medium">{students.length}</span>
+              {selectedCourse && entries.length > 0 && (
+                <div className="pt-2 border-t space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resumen</p>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2">
+                      <div className="font-bold text-lg text-yellow-700">{countByStatus('pending')}</div>
+                      <div className="text-xs text-yellow-600">Pendientes</div>
+                    </div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                      <div className="font-bold text-lg text-green-700">{countByStatus('sent')}</div>
+                      <div className="text-xs text-green-600">Enviados</div>
+                    </div>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-2">
+                      <div className="font-bold text-lg text-red-700">{countByStatus('failed')}</div>
+                      <div className="text-xs text-red-600">Fallidos</div>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-sm pt-1">
                     <span className="text-muted-foreground">Seleccionados:</span>
-                    <span className="font-medium text-primary">{selectedStudents.size}</span>
+                    <span className="font-medium text-primary">{selectedIds.size}</span>
                   </div>
                 </div>
               )}
+
+              <div className="space-y-2 pt-2 border-t">
+                <Label htmlFor="webhook">URL Webhook n8n</Label>
+                <Input id="webhook" type="url" placeholder="https://n8n.example.com/webhook/..." value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} />
+              </div>
+
+              <Button variant="outline" onClick={handleMarkBulkAsSent} disabled={updatingBulk || selectedIds.size === 0 || !selectedCourse} className="w-full border-green-300 text-green-700 hover:bg-green-50">
+                {updatingBulk ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Actualizando...</> : <><CheckCircle className="w-4 h-4 mr-2" />Marcar {pendingSelectedCount > 0 ? pendingSelectedCount : selectedIds.size} como Enviado</>}
+              </Button>
+
+              <Button onClick={handleSendCertificates} disabled={sending || selectedIds.size === 0 || !selectedCourse || !webhookUrl} className="w-full">
+                {sending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando...</> : <><Send className="w-4 h-4 mr-2" />Enviar {selectedIds.size} Certificado{selectedIds.size !== 1 ? 's' : ''} vía n8n</>}
+              </Button>
             </CardContent>
           </Card>
 
-          {/* Lista de estudiantes */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <CardTitle>Estudiantes con Certificados Pendientes</CardTitle>
-                  <CardDescription>
-                    Solo se muestran estudiantes con certificados pendientes de envío
-                  </CardDescription>
+                  <CardTitle>Estudiantes</CardTitle>
+                  <CardDescription>{selectedCourse ? `${filteredEntries.length} registro${filteredEntries.length !== 1 ? 's' : ''}` : 'Selecciona un curso'}</CardDescription>
                 </div>
-                {students.length > 0 && (
+                {entries.length > 0 && (
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={selectAll}
-                      disabled={selectedStudents.size === filteredStudents.length}
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Seleccionar todos
+                    <Button variant="outline" size="sm" onClick={selectAllFiltered} disabled={selectedIds.size === filteredEntries.length && filteredEntries.length > 0}>
+                      <CheckCircle2 className="w-4 h-4 mr-1" />Seleccionar todos
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearSelection}
-                      disabled={selectedStudents.size === 0}
-                    >
-                      Limpiar
-                    </Button>
+                    <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedIds.size === 0}>Limpiar</Button>
                   </div>
                 )}
               </div>
@@ -496,118 +322,97 @@ const AdminCertificates = () => {
                   <Award className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>Selecciona un curso para ver los estudiantes</p>
                 </div>
-              ) : loadingStudents ? (
+              ) : loadingEntries ? (
                 <div className="text-center py-12">
                   <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
-                  <p className="mt-4 text-muted-foreground">Cargando estudiantes...</p>
+                  <p className="mt-4 text-muted-foreground">Cargando...</p>
                 </div>
-              ) : students.length === 0 ? (
+              ) : entries.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  <p>No hay estudiantes con certificados pendientes en este curso</p>
+                  <p>No hay registros de certificados para este curso</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {/* Búsqueda */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar por nombre, código o email..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
+                <div className="space-y-3">
+                  <div className="flex gap-2 flex-wrap">
+                    <div className="relative flex-1 min-w-[160px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input placeholder="Buscar por nombre, código o email..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-10" />
+                    </div>
+                    <Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
+                      <SelectTrigger className="w-48">
+                        <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos ({countByStatus('all')})</SelectItem>
+                        <SelectItem value="pending">Pendientes ({countByStatus('pending')})</SelectItem>
+                        <SelectItem value="sent">Enviados ({countByStatus('sent')})</SelectItem>
+                        <SelectItem value="failed">Fallidos ({countByStatus('failed')})</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Tabla de estudiantes */}
-                  <div className="border rounded-lg">
+                  <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-12"></TableHead>
+                          <TableHead className="w-10"></TableHead>
                           <TableHead>Código</TableHead>
                           <TableHead>Nombre</TableHead>
                           <TableHead>Email</TableHead>
                           <TableHead>Estado</TableHead>
+                          <TableHead className="w-36">Acción</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredStudents.map(student => (
-                          <TableRow key={student.id}>
+                        {filteredEntries.map(entry => (
+                          <TableRow key={entry.log_id} className={entry.status === 'sent' ? 'opacity-60' : ''}>
+                            <TableCell><Checkbox checked={selectedIds.has(entry.student_id)} onCheckedChange={() => toggleEntry(entry.student_id)} /></TableCell>
+                            <TableCell className="font-mono text-sm">{entry.student_code || '-'}</TableCell>
+                            <TableCell className="font-medium">{getFullName(entry)}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{entry.email}</TableCell>
+                            <TableCell><StatusBadge status={entry.status} /></TableCell>
                             <TableCell>
-                              <Checkbox
-                                checked={selectedStudents.has(student.id)}
-                                onCheckedChange={() => toggleStudent(student.id)}
-                              />
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {student.student_code || '-'}
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {getStudentFullName(student)}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {student.email}
-                            </TableCell>
-                            <TableCell>
-                              {renderCertificateStatus(student.id)}
+                              {entry.status === 'pending' ? (
+                                <Button variant="outline" size="sm" onClick={() => handleMarkRowAsSent(entry)} disabled={updatingRowId === entry.log_id} className="border-green-300 text-green-700 hover:bg-green-50 h-7 text-xs px-2">
+                                  {updatingRowId === entry.log_id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><CheckCircle className="h-3 w-3 mr-1" />Marcar enviado</>}
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  {entry.sent_at ? new Date(entry.sent_at).toLocaleDateString('es', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '-'}
+                                </span>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
+                        {filteredEntries.length === 0 && (
+                          <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No se encontraron registros con los filtros aplicados</TableCell></TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </div>
-
-                  {filteredStudents.length === 0 && searchTerm && (
-                    <p className="text-center text-muted-foreground py-4">
-                      No se encontraron estudiantes que coincidan con "{searchTerm}"
-                    </p>
-                  )}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Información adicional */}
         <Card className="bg-blue-50 border-blue-200">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Award className="w-5 h-5" />
-              ¿Cómo funciona?
-            </CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2"><Award className="w-5 h-5" />Como funciona</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent>
             <div className="bg-white p-3 rounded-lg border border-blue-200">
-              <p className="text-sm font-semibold text-blue-900 mb-2">
-                📋 Flujo del sistema:
-              </p>
+              <p className="text-sm font-semibold text-blue-900 mb-2">Flujo del sistema:</p>
               <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1 ml-2">
                 <li>El estudiante entrega su portafolio final</li>
-                <li>Automáticamente se registra en la lista de certificados (estado: pendiente)</li>
-                <li>Solo los estudiantes con estado 'pendiente' aparecen en esta vista</li>
-                <li>El administrador selecciona estudiantes y envía certificados vía n8n</li>
-                <li>Al enviar, el sistema marca los registros como 'sent' o 'failed'</li>
+                <li>Se registra automaticamente con estado Pendiente</li>
+                <li>Filtra por estado: Todos / Pendientes / Enviados / Fallidos</li>
+                <li>Marca individualmente con Marcar enviado en cada fila</li>
+                <li>O selecciona varios y usa Marcar como Enviado en el panel izquierdo</li>
+                <li>Tambien puedes enviar via webhook n8n para automatizar el envio del certificado</li>
               </ol>
             </div>
-            
-            <div className="bg-white p-3 rounded-lg border border-blue-200">
-              <p className="text-sm font-semibold text-blue-900 mb-2">
-                📤 Datos enviados al webhook de n8n:
-              </p>
-              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-2">
-                <li><strong>student_name</strong>: Nombre completo del estudiante</li>
-                <li><strong>student_email</strong>: Email de registro del estudiante</li>
-                <li><strong>course_name</strong>: Nombre del curso</li>
-                <li><strong>course_code</strong>: Código del curso</li>
-                <li><strong>program_name</strong>: Nombre del programa académico</li>
-                <li><strong>academic_year</strong>: Año académico</li>
-                <li><strong>semester</strong>: Semestre</li>
-              </ul>
-            </div>
-            
-            <p className="text-sm text-muted-foreground italic">
-              💡 Asegúrate de que tu workflow de n8n esté configurado para recibir estos datos.
-            </p>
           </CardContent>
         </Card>
       </div>

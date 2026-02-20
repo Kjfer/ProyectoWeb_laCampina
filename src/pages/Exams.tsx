@@ -42,6 +42,11 @@ interface Exam {
     id: string;
     name: string;
     course_id: string;
+    course: {
+      id: string;
+      name: string;
+      code: string;
+    } | null;
   };
   submission?: {
     score: string;  // Ahora es texto (AD, A, B, C)
@@ -111,7 +116,12 @@ const Exams = () => {
           modulo:modulos (
             id,
             name,
-            course_id
+            course_id,
+            course:courses (
+              id,
+              name,
+              code
+            )
           )
         `)
         .eq('is_published', true)
@@ -270,7 +280,7 @@ const Exams = () => {
               <SelectItem value="all">Todos los cursos</SelectItem>
               {uniqueCourses.map(modulo => (
                 <SelectItem key={modulo.course_id} value={modulo.course_id}>
-                  {modulo.name}
+                  {modulo.name} {modulo.course ? `- ${modulo.course.name}` : ''}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -324,11 +334,19 @@ const Exams = () => {
                             {status.label}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                           <Badge variant="secondary" className="text-xs">
                             Módulo
                           </Badge>
                           <span>{exam.modulo.name}</span>
+                          {exam.modulo.course && (
+                            <>
+                              <span className="text-xs">•</span>
+                              <Badge variant="outline" className="text-xs">
+                                {exam.modulo.course.name}
+                              </Badge>
+                            </>
+                          )}
                         </div>
                       </div>
                       <ClipboardList className="w-6 h-6 text-primary" />
