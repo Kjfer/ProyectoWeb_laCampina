@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Eye, Search, FileText, DollarSign, Calendar, Filter } from 'lucide-react';
+import { Plus, Eye, Search, FileText, DollarSign, Calendar, Filter, Loader2 } from 'lucide-react';
 
 interface Course {
   id: string;
@@ -47,6 +47,8 @@ export function MatriculasTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchType, setSearchType] = useState<'codigo' | 'fecha'>('codigo');
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('all');
+  const [courseModuloIds, setCourseModuloIds] = useState<Set<string> | null>(null);
+  const [loadingCourseFilter, setLoadingCourseFilter] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedMatricula, setSelectedMatricula] = useState<MatriculaWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -56,12 +58,38 @@ export function MatriculasTab() {
     fetchCourses();
   }, []);
 
+  // Cuando cambia el curso seleccionado, cargar los IDs de módulos reales desde BD
+  useEffect(() => {
+    if (selectedCourseFilter === 'all') {
+      setCourseModuloIds(null);
+      return;
+    }
+    const loadModuloIds = async () => {
+      setLoadingCourseFilter(true);
+      try {
+        const { data, error } = await supabase
+          .from('modulos' as any)
+          .select('id')
+          .eq('course_id', selectedCourseFilter);
+        if (!error && data) {
+          setCourseModuloIds(new Set((data as any[]).map(m => m.id)));
+        } else {
+          setCourseModuloIds(new Set());
+        }
+      } catch {
+        setCourseModuloIds(new Set());
+      } finally {
+        setLoadingCourseFilter(false);
+      }
+    };
+    loadModuloIds();
+  }, [selectedCourseFilter]);
+
   const fetchCourses = async () => {
     try {
       const { data, error } = await supabase
         .from('courses')
         .select('id, name, code')
-        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
@@ -150,10 +178,9 @@ export function MatriculasTab() {
     // Filtrar por curso (independiente del tipo de búsqueda)
     let matchesCourse = true;
     if (selectedCourseFilter !== 'all') {
-      const modulos = mat.modulos_matriculados || [];
-      matchesCourse = modulos.some((modulo: any) => {
-        return modulo.course_id === selectedCourseFilter;
-      });
+      matchesCourse = courseModuloIds !== null && ((mat.modulos_matriculados as any[])?.some(
+        (modulo: any) => courseModuloIds.has(modulo.modulo_id)
+      ) ?? false);
     }
 
     return matchesSearch && matchesCourse;
@@ -270,6 +297,7 @@ export function MatriculasTab() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {loadingCourseFilter && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
                 </div>
               </div>
             </div>

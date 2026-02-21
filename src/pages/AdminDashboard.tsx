@@ -115,33 +115,29 @@ const AdminDashboard = () => {
         });
       }
 
-      // Obtener últimas matrículas - consulta simplificada
+      // Obtener últimas matrículas
       const { data: enrollments, error: enrollmentError } = await supabase
-        .from('matriculas')
-        .select('id, created_at, student_id, edicion_id')
+        .from('matriculas' as any)
+        .select('id, created_at, estudiante_id, cod_matricula, modulos_matriculados')
         .order('created_at', { ascending: false })
         .limit(3);
 
       if (enrollments && !enrollmentError) {
-        // Obtener detalles adicionales para cada matrícula
-        for (const enrollment of enrollments) {
+        for (const enrollment of enrollments as any[]) {
           try {
             const { data: student } = await supabase
               .from('profiles')
               .select('first_name, last_name')
-              .eq('id', enrollment.student_id)
+              .eq('id', enrollment.estudiante_id)
               .single();
 
-            const { data: edicion } = await supabase
-              .from('ediciones')
-              .select('nombre')
-              .eq('id', enrollment.edicion_id)
-              .single();
+            const modulos: any[] = enrollment.modulos_matriculados || [];
+            const cursoNombre = modulos.length > 0 ? (modulos[0].course_name || modulos[0].nombre || 'Módulo') : 'Curso';
 
             activities.push({
               id: enrollment.id,
               type: 'matricula',
-              description: `Nueva matrícula: ${student?.first_name || ''} ${student?.last_name || ''} en ${edicion?.nombre || 'Edición'}`,
+              description: `Nueva matrícula: ${student?.first_name || ''} ${student?.last_name || ''} en ${cursoNombre}`,
               created_at: enrollment.created_at
             });
           } catch (err) {
@@ -150,37 +146,33 @@ const AdminDashboard = () => {
         }
       }
 
-      // Obtener últimos pagos - consulta simplificada
+      // Obtener últimos pagos
       const { data: payments, error: paymentsError } = await supabase
-        .from('pagos')
-        .select('id, monto, created_at, matricula_id')
+        .from('pagos' as any)
+        .select('id, monto_pago, moneda_pago, created_at, estudiante_id, codigo_producto, categoria_producto')
         .order('created_at', { ascending: false })
         .limit(3);
 
       if (payments && !paymentsError) {
-        // Obtener detalles adicionales para cada pago
-        for (const payment of payments) {
+        for (const payment of payments as any[]) {
           try {
-            const { data: matricula } = await supabase
-              .from('matriculas')
-              .select('student_id')
-              .eq('id', payment.matricula_id)
-              .single();
-
-            if (matricula) {
+            let studentName = '';
+            if (payment.estudiante_id) {
               const { data: student } = await supabase
                 .from('profiles')
                 .select('first_name, last_name')
-                .eq('id', matricula.student_id)
+                .eq('id', payment.estudiante_id)
                 .single();
-
-              activities.push({
-                id: payment.id,
-                type: 'pago',
-                description: `Pago registrado: S/.${payment.monto} de ${student?.first_name || ''} ${student?.last_name || ''}`,
-                created_at: payment.created_at
-              });
+              studentName = `${student?.first_name || ''} ${student?.last_name || ''}`.trim();
             }
+
+            const moneda = payment.moneda_pago === 'USD' ? '$' : 'S/';
+            activities.push({
+              id: payment.id,
+              type: 'pago',
+              description: `Pago registrado: ${moneda}${payment.monto_pago}${studentName ? ` de ${studentName}` : ''}`,
+              created_at: payment.created_at
+            });
           } catch (err) {
             console.error('Error fetching payment details:', err);
           }

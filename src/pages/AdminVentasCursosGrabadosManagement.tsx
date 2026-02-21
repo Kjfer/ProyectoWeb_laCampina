@@ -32,7 +32,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Plus, ShoppingCart } from 'lucide-react';
+import { Plus, ShoppingCart, AlertTriangle } from 'lucide-react';
 
 interface VentaCursoGrabado {
   id: string;
@@ -90,6 +90,8 @@ export default function AdminVentasCursosGrabadosManagement() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [duplicadoDetectado, setDuplicadoDetectado] = useState(false);
+  const [checkingDuplicado, setCheckingDuplicado] = useState(false);
   const [formData, setFormData] = useState({
     estudiante_id: '',
     id_clases_grabadas: '',
@@ -102,6 +104,31 @@ export default function AdminVentasCursosGrabadosManagement() {
     fetchData();
     getCurrentUser();
   }, []);
+
+  // Verificar duplicado en tiempo real cuando cambia estudiante o curso
+  useEffect(() => {
+    if (!formData.estudiante_id || !formData.id_clases_grabadas || !dialogOpen) {
+      setDuplicadoDetectado(false);
+      return;
+    }
+    const checkDuplicado = async () => {
+      setCheckingDuplicado(true);
+      try {
+        const { data, error } = await supabase
+          .from('venta_cursos_grabados' as any)
+          .select('id')
+          .eq('estudiante_id', formData.estudiante_id)
+          .eq('id_clases_grabadas', formData.id_clases_grabadas)
+          .limit(1);
+        if (!error) {
+          setDuplicadoDetectado((data?.length ?? 0) > 0);
+        }
+      } finally {
+        setCheckingDuplicado(false);
+      }
+    };
+    checkDuplicado();
+  }, [formData.estudiante_id, formData.id_clases_grabadas, dialogOpen]);
 
   useEffect(() => {
     if (!studentSearch.trim()) {
@@ -194,6 +221,7 @@ export default function AdminVentasCursosGrabadosManagement() {
     });
     setStudentSearch('');
     setShowStudentDropdown(false);
+    setDuplicadoDetectado(false);
     setDialogOpen(true);
   };
 
@@ -482,6 +510,14 @@ export default function AdminVentasCursosGrabadosManagement() {
                     ))}
                   </SelectContent>
                 </Select>
+                {duplicadoDetectado && (
+                  <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3">
+                    <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-red-700">
+                      <strong>Venta duplicada:</strong> Este estudiante ya tiene registrada una compra de este curso grabado. No se puede registrar dos veces el mismo curso para el mismo estudiante.
+                    </p>
+                  </div>
+                )}
                 <p className="text-xs text-gray-500">
                   💡 Nota: Las ventas asociadas a matrículas se registran automáticamente desde el formulario de matrícula
                 </p>
@@ -525,7 +561,9 @@ export default function AdminVentasCursosGrabadosManagement() {
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit">Registrar Venta</Button>
+                <Button type="submit" disabled={duplicadoDetectado || checkingDuplicado}>
+                  {checkingDuplicado ? 'Verificando...' : 'Registrar Venta'}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>

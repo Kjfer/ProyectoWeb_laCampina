@@ -26,7 +26,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Eye, Search, FileText, DollarSign, Filter } from 'lucide-react';
+import { Plus, Eye, Search, FileText, DollarSign, Filter, Loader2 } from 'lucide-react';
 
 export default function AdminMatriculasManagement() {
   const navigate = useNavigate();
@@ -35,6 +35,8 @@ export default function AdminMatriculasManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState<string>('all');
+  const [courseModuloIds, setCourseModuloIds] = useState<Set<string> | null>(null);
+  const [loadingCourseFilter, setLoadingCourseFilter] = useState(false);
   const [selectedMatricula, setSelectedMatricula] = useState<MatriculaWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
@@ -42,6 +44,34 @@ export default function AdminMatriculasManagement() {
     fetchMatriculas();
     fetchCursos();
   }, []);
+
+  // Cuando cambia el curso seleccionado, cargar los IDs de módulos reales desde BD
+  useEffect(() => {
+    if (selectedCourseId === 'all') {
+      setCourseModuloIds(null);
+      return;
+    }
+    const loadModuloIds = async () => {
+      setLoadingCourseFilter(true);
+      try {
+        const { data, error } = await supabase
+          .from('modulos' as any)
+          .select('id')
+          .eq('course_id', selectedCourseId);
+        if (!error && data) {
+          const ids = new Set((data as any[]).map(m => m.id));
+          setCourseModuloIds(ids);
+        } else {
+          setCourseModuloIds(new Set());
+        }
+      } catch (e) {
+        setCourseModuloIds(new Set());
+      } finally {
+        setLoadingCourseFilter(false);
+      }
+    };
+    loadModuloIds();
+  }, [selectedCourseId]);
 
   const fetchMatriculas = async () => {
     try {
@@ -106,7 +136,6 @@ export default function AdminMatriculasManagement() {
       const { data, error } = await supabase
         .from('courses' as any)
         .select('id, name, code')
-        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
@@ -126,6 +155,7 @@ export default function AdminMatriculasManagement() {
   };
 
   // Filtrar matrículas por búsqueda y curso
+  // courseModuloIds contiene los IDs reales de módulos del curso seleccionado (cargados desde BD)
   const filteredMatriculas = matriculas.filter(mat => {
     // Filtro por búsqueda
     const searchLower = searchTerm.toLowerCase();
@@ -136,12 +166,12 @@ export default function AdminMatriculasManagement() {
       mat.estudiante?.email.toLowerCase().includes(searchLower)
     );
 
-    // Filtro por curso
-    const matchesCourse = selectedCourseId === 'all' || 
-      mat.modulos_matriculados?.some((modulo: any) => {
-        // Buscar el módulo completo para obtener su course_id
-        return modulo.course_id === selectedCourseId || modulo.course_name?.includes(cursos.find(c => c.id === selectedCourseId)?.name || '');
-      });
+    // Filtro por curso: compara modulo_id de cada módulo matriculado
+    // contra los IDs reales de módulos del curso (obtenidos de la tabla modulos)
+    const matchesCourse = selectedCourseId === 'all' ||
+      (courseModuloIds !== null && (mat.modulos_matriculados as any[])?.some(
+        (modulo: any) => courseModuloIds.has(modulo.modulo_id)
+      ));
 
     return matchesSearch && matchesCourse;
   });
@@ -223,6 +253,7 @@ export default function AdminMatriculasManagement() {
                     ))}
                   </SelectContent>
                 </Select>
+                {loadingCourseFilter && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
               </div>
             </div>
           </div>

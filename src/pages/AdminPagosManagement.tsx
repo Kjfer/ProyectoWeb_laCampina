@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Plus, DollarSign, Filter, Calendar, FileText } from 'lucide-react';
+import { Plus, DollarSign, Filter, Calendar, FileText, Loader2 } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -80,7 +80,9 @@ export default function AdminPagosManagement() {
   const [cuotasMatricula, setCuotasMatricula] = useState<CuotaMatricula[]>([]);
   const [cuotaSeleccionada, setCuotaSeleccionada] = useState<string | null>(null);
   const [loadingCuotas, setLoadingCuotas] = useState(false);
-  const [matriculasPorCurso, setMatriculasPorCurso] = useState<Map<string, string[]>>(new Map());
+  const [matriculaModulosMap, setMatriculaModulosMap] = useState<Map<string, Set<string>>>(new Map());
+  const [courseModuloIds, setCourseModuloIds] = useState<Set<string> | null>(null);
+  const [loadingCourseFilter, setLoadingCourseFilter] = useState(false);
   const [materialesPorCurso, setMaterialesPorCurso] = useState<Map<string, string>>(new Map());
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [uploadingComprobante, setUploadingComprobante] = useState(false);
@@ -113,6 +115,33 @@ export default function AdminPagosManagement() {
     fetchMatriculasConModulos();
     fetchMaterialesConCursos();
   }, []);
+
+  // Cuando cambia el filtro de curso, cargar los IDs de módulos reales desde BD
+  useEffect(() => {
+    if (filters.curso === 'all') {
+      setCourseModuloIds(null);
+      return;
+    }
+    const loadModuloIds = async () => {
+      setLoadingCourseFilter(true);
+      try {
+        const { data, error } = await supabase
+          .from('modulos' as any)
+          .select('id')
+          .eq('course_id', filters.curso);
+        if (!error && data) {
+          setCourseModuloIds(new Set((data as any[]).map(m => m.id)));
+        } else {
+          setCourseModuloIds(new Set());
+        }
+      } catch {
+        setCourseModuloIds(new Set());
+      } finally {
+        setLoadingCourseFilter(false);
+      }
+    };
+    loadModuloIds();
+  }, [filters.curso]);
 
   // Resetear estado_pago a 'pago_regular' si se cambia a categoría diferente de matricula
   useEffect(() => {
@@ -206,30 +235,13 @@ export default function AdminPagosManagement() {
 
   const fetchCourses = async () => {
     try {
-      // Cargar cursos que tienen módulos activos
-      const { data: modulosData, error: modulosError } = await supabase
-        .from('modulos')
-        .select('course_id, courses(id, name, code)')
-        .eq('is_active', true);
+      const { data, error } = await supabase
+        .from('courses' as any)
+        .select('id, name, code')
+        .order('name');
 
-      if (modulosError) throw modulosError;
-
-      // Extraer cursos únicos
-      const coursesMap = new Map();
-      modulosData?.forEach((modulo: any) => {
-        if (modulo.courses && !coursesMap.has(modulo.courses.id)) {
-          coursesMap.set(modulo.courses.id, {
-            id: modulo.courses.id,
-            name: modulo.courses.name,
-            code: modulo.courses.code,
-          });
-        }
-      });
-
-      const uniqueCourses = Array.from(coursesMap.values()) as Course[];
-      uniqueCourses.sort((a, b) => a.name.localeCompare(b.name));
-      
-      setCourses(uniqueCourses);
+      if (error) throw error;
+      setCourses((data || []) as Course[]);
     } catch (error: any) {
       console.error('Error fetching courses:', error);
     }
@@ -237,34 +249,24 @@ export default function AdminPagosManagement() {
 
   const fetchMatriculasConModulos = async () => {
     try {
-      // Obtener todas las matrículas con sus enrollments
+      // Leer modulos_matriculados JSONB directamente desde la tabla matriculas
+      // y construir un mapa: cod_matricula -> Set<modulo_id>
       const { data: matriculas, error } = await supabase
         .from('matriculas' as any)
-        .select('cod_matricula, estudiante_id');
+        .select('cod_matricula, modulos_matriculados');
 
       if (error) throw error;
 
-      // Para cada matrícula, obtener los módulos enrollados
-      const matriculasCursoMap = new Map<string, string[]>();
-
-      for (const matricula of matriculas || []) {
-        const { data: enrollments } = await supabase
-          .from('course_enrollments')
-          .select('modulo_id, modulos!course_enrollments_modulo_id_fkey(course_id)')
-          .eq('student_id', matricula.estudiante_id);
-
-        if (enrollments && enrollments.length > 0) {
-          const courseIds = enrollments
-            .map((e: any) => e.modulos?.course_id)
-            .filter((id: any) => id);
-
-          if (courseIds.length > 0) {
-            matriculasCursoMap.set(matricula.cod_matricula, courseIds);
-          }
+      const modulosMap = new Map<string, Set<string>>();
+      for (const mat of (matriculas || []) as any[]) {
+        const modulos: any[] = Array.isArray(mat.modulos_matriculados) ? mat.modulos_matriculados : [];
+        const ids = new Set<string>(modulos.map((m: any) => m.modulo_id).filter(Boolean));
+        if (ids.size > 0) {
+          modulosMap.set(mat.cod_matricula, ids);
         }
       }
 
-      setMatriculasPorCurso(matriculasCursoMap);
+      setMatriculaModulosMap(modulosMap);
     } catch (error: any) {
       console.error('Error fetching matriculas con modulos:', error);
     }
@@ -767,9 +769,10 @@ export default function AdminPagosManagement() {
     // Filtro por curso
     if (filters.curso !== 'all') {
       if (pago.categoria_producto === 'matricula') {
-        // Para matrículas: verificar si está relacionado con el curso
-        const cursoIds = matriculasPorCurso.get(pago.codigo_producto);
-        if (!cursoIds || !cursoIds.includes(filters.curso)) {
+        // Para matrículas: verificar si alguno de sus modulo_ids pertenece al curso seleccionado
+        if (courseModuloIds === null) return false;
+        const modulosDeMatricula = matriculaModulosMap.get(pago.codigo_producto);
+        if (!modulosDeMatricula || ![...modulosDeMatricula].some(id => courseModuloIds.has(id))) {
           return false;
         }
       } else if (pago.categoria_producto === 'kits' || pago.categoria_producto === 'books') {
@@ -899,7 +902,10 @@ export default function AdminPagosManagement() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Curso</Label>
+                <Label className="flex items-center gap-2">
+                  Curso
+                  {loadingCourseFilter && <Loader2 className="h-3 w-3 animate-spin text-gray-400" />}
+                </Label>
                 <Select
                   value={filters.curso}
                   onValueChange={(value) =>
