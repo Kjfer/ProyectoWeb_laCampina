@@ -115,6 +115,14 @@ export const CourseGeneralResources = ({ courseId, canEdit }: { courseId: string
     setResources(data as any || []);
   };
 
+  // --- NUEVO: FUNCIÓN PARA ABRIR EL EDITOR ---
+  const handleOpenEdit = (res: Resource) => {
+    setEditingId(res.id);
+    setFormData({ type: res.type as any, title: res.title, content: res.content, description: res.description || '' });
+    setIsDialogOpen(true);
+  };
+  // ------------------------------------------
+
   const handleSubmit = async () => {
     if (!formData.title || !formData.content) { toast.error('Obligatorios'); return; }
     const { error } = editingId 
@@ -216,18 +224,27 @@ export const CourseGeneralResources = ({ courseId, canEdit }: { courseId: string
       {/* BOTONES ADMINISTRATIVOS ENCUESTA */}
       <div className="flex justify-between items-center pt-4 border-t">
         <h3 className="text-lg font-semibold text-gray-700">Enlaces y Recursos</h3>
-        <div className="flex gap-2">
+        
+        {/* NUEVO: SECCIÓN DE BOTONES CON EL PORTAFOLIO INCLUIDO Y LIMPIEZA DE FORMULARIO */}
+        <div className="flex flex-wrap gap-2">
+           {canEdit && !portfolio && (
+            <Button size="sm" onClick={() => setIsPortfolioDialogOpen(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+              <Briefcase className="h-4 w-4" /> Configurar Portafolio
+            </Button>
+          )}
+
            {canEdit && (
             <Button variant="outline" size="sm" onClick={() => setIsConfigOpen(true)} className="gap-2 border-orange-200 text-orange-700 hover:bg-orange-50">
               <ClipboardList className="h-4 w-4" /> Configurar Encuesta
             </Button>
           )}
-          {canEdit && <Button onClick={() => {setEditingId(null); setIsDialogOpen(true);}} size="sm" variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Agregar Enlace</Button>}
+          
+          {canEdit && <Button onClick={() => {setEditingId(null); setFormData({ type: 'link', title: '', content: '', description: '' }); setIsDialogOpen(true);}} size="sm" variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Agregar Enlace</Button>}
         </div>
       </div>
 
-      {/* LISTA DE RECURSOS */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* LISTA DE RECURSOS (AHORA CON EL LÁPIZ Y VISIBLES) */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
         {resources.map((res) => {
           const style = getResourceStyle(res.type);
           const Icon = style.icon;
@@ -235,13 +252,20 @@ export const CourseGeneralResources = ({ courseId, canEdit }: { courseId: string
             <Card key={res.id} className={`p-4 border ${style.bg} group relative shadow-sm hover:shadow-md transition-all`}>
               <div className="flex items-start gap-4">
                 <div className={`p-3 rounded-full bg-white shadow-inner ${style.color}`}><Icon className="h-6 w-6" /></div>
-                <div className="flex-1 min-w-0">
+                
+                <div className="flex-1 min-w-0 pr-16">
                   <h4 className="font-semibold truncate text-gray-900">{res.title}</h4>
                   <a href={res.content} target="_blank" className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1 mt-2">Abrir Enlace <ExternalLink className="h-3 w-3" /></a>
                 </div>
+                
                 {canEdit && (
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => handleDelete(res.id)}><Trash2 className="h-4 w-4" /></Button>
+                  <div className="absolute top-3 right-3 flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-500 bg-white shadow-sm border border-gray-200 hover:bg-blue-50" onClick={() => handleOpenEdit(res)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 bg-white shadow-sm border border-gray-200 hover:bg-red-50" onClick={() => handleDelete(res.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>

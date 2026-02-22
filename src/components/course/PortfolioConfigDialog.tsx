@@ -42,14 +42,14 @@ export const PortfolioConfigDialog = ({ editionId, isOpen, onClose, onSuccess, i
   }, [initialData, isOpen]);
 
   const handleSave = async () => {
-    if (!formData.title || !formData.due_date || (!file && !initialData)) {
+    if (!formData.title || !formData.due_date) {
       toast.error('Título, fecha límite y plantilla PDF son obligatorios');
       return;
     }
 
     try {
       setLoading(true);
-      let filePath = initialData?.template_file_path;
+      let filePath = initialData?.template_file_path || null;
 
       // 1. Subida de archivo (solo si hay uno nuevo)
       if (file) {
@@ -162,8 +162,9 @@ export const PortfolioConfigDialog = ({ editionId, isOpen, onClose, onSuccess, i
           </div>
 
           <div className="space-y-2">
+
             <Label className="flex items-center gap-2">
-              <Upload className="h-4 w-4" /> Plantilla del Portafolio (PDF)
+              <Upload className="h-4 w-4" /> Plantilla del Portafolio (Opcional)
             </Label>
             <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${file ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-blue-400'}`}>
               <input 
