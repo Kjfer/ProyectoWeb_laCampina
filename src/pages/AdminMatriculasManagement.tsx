@@ -39,6 +39,7 @@ export default function AdminMatriculasManagement() {
   const [loadingCourseFilter, setLoadingCourseFilter] = useState(false);
   const [selectedMatricula, setSelectedMatricula] = useState<MatriculaWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [redistribuyendo, setRedistribuyendo] = useState(false);
 
   useEffect(() => {
     fetchMatriculas();
@@ -72,6 +73,54 @@ export default function AdminMatriculasManagement() {
     };
     loadModuloIds();
   }, [selectedCourseId]);
+
+  const redistribuirExcedentes = async (cuotas: any[]) => {
+    if (!cuotas || cuotas.length === 0) return;
+    setRedistribuyendo(true);
+    try {
+      // Ordenar cuotas por número
+      const ordenadas = [...cuotas].sort((a, b) => a.numero_cuota - b.numero_cuota);
+
+      // Acumular excedentes y repartirlos en las cuotas siguientes
+      let excedente = 0;
+      for (let i = 0; i < ordenadas.length; i++) {
+        const c = ordenadas[i];
+        let nuevoMontoPagado = Math.round((c.monto_pagado + excedente) * 100) / 100;
+        excedente = 0;
+
+        if (nuevoMontoPagado > c.monto_cuota) {
+          excedente = Math.round((nuevoMontoPagado - c.monto_cuota) * 100) / 100;
+          nuevoMontoPagado = c.monto_cuota;
+        }
+
+        let nuevoEstado: string;
+        if (nuevoMontoPagado >= c.monto_cuota) {
+          nuevoEstado = 'pagado';
+        } else if (nuevoMontoPagado > 0) {
+          nuevoEstado = 'parcial';
+        } else {
+          nuevoEstado = c.estado === 'vencido' ? 'vencido' : 'pendiente';
+        }
+
+        if (nuevoMontoPagado !== c.monto_pagado || nuevoEstado !== c.estado) {
+          const { error } = await supabase
+            .from('cuotas_matricula' as any)
+            .update({ monto_pagado: nuevoMontoPagado, estado: nuevoEstado })
+            .eq('id', c.id);
+          if (error) throw error;
+        }
+      }
+
+      toast({ title: 'Excedentes redistribuidos', description: 'Las cuotas han sido corregidas correctamente.' });
+      await fetchMatriculas();
+      // Actualizar selectedMatricula con datos frescos
+      setDetailDialogOpen(false);
+    } catch (err: any) {
+      toast({ title: 'Error', description: `No se pudo redistribuir: ${err.message}`, variant: 'destructive' });
+    } finally {
+      setRedistribuyendo(false);
+    }
+  };
 
   const fetchMatriculas = async () => {
     try {
@@ -569,9 +618,31 @@ export default function AdminMatriculasManagement() {
                           {/* Detalle cuotas */}
                           <div className="border-t pt-3">
                             <h4 className="font-medium text-sm text-gray-700 mb-2">Detalle de Cuotas</h4>
+                            {/* Aviso de excedentes sin distribuir */}
+                            {cuotas.some((c: any) => c.monto_pagado > c.monto_cuota) && (
+                              <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-amber-800">⚠️ Hay cuotas con excedente no distribuido</p>
+                                  <p className="text-xs text-amber-700 mt-0.5">
+                                    Una o más cuotas tienen un monto pagado mayor al monto de la cuota. Esto puede ocurrir por pagos registrados con una versión anterior del sistema. Haz clic en "Redistribuir" para corregirlo automáticamente.
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="shrink-0 border-amber-400 text-amber-800 hover:bg-amber-100"
+                                  disabled={redistribuyendo}
+                                  onClick={() => redistribuirExcedentes(cuotas)}
+                                >
+                                  {redistribuyendo ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                                  {redistribuyendo ? 'Corrigiendo...' : 'Redistribuir'}
+                                </Button>
+                              </div>
+                            )}
                             <div className="space-y-2">
                               {cuotas.map((cuota: any) => {
-                                const saldo = cuota.monto_cuota - cuota.monto_pagado;
+                                const saldo = Math.max(0, cuota.monto_cuota - cuota.monto_pagado);
+                                const excedente = Math.max(0, cuota.monto_pagado - cuota.monto_cuota);
                                 return (
                                   <div key={cuota.id} className={`p-3 border rounded-lg ${
                                     cuota.estado === 'pagado' ? 'bg-green-50 border-green-200' :
@@ -602,6 +673,12 @@ export default function AdminMatriculasManagement() {
                                         <div className="text-right">
                                           <div className="text-xs text-gray-500">Saldo</div>
                                           <div className="font-bold text-orange-600">{selectedMatricula.moneda_monto} {saldo.toFixed(2)}</div>
+                                        </div>
+                                      )}
+                                      {excedente > 0 && (
+                                        <div className="text-right">
+                                          <div className="text-xs text-amber-600">⚠️ Excedente</div>
+                                          <div className="font-bold text-amber-700">{selectedMatricula.moneda_monto} {excedente.toFixed(2)}</div>
                                         </div>
                                       )}
                                     </div>

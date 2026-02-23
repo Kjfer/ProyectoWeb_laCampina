@@ -583,6 +583,20 @@ export default function AdminPagosManagement() {
         });
         return;
       }
+
+      // Validar que el monto no sea menor al saldo pendiente de la cuota seleccionada
+      const cuotaActual = cuotasMatricula.find(c => c.id === cuotaSeleccionada);
+      if (cuotaActual) {
+        const saldoPendienteCuota = Math.round((cuotaActual.monto_cuota - cuotaActual.monto_pagado) * 100) / 100;
+        if (formData.monto_pago < saldoPendienteCuota) {
+          toast({
+            title: 'Monto insuficiente',
+            description: `El monto ingresado (${formData.moneda_pago} ${formData.monto_pago.toFixed(2)}) es menor al saldo pendiente de la cuota ${cuotaActual.numero_cuota} (${formData.moneda_pago} ${saldoPendienteCuota.toFixed(2)}). Debe pagar al menos el monto completo de la cuota.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
     }
 
     if (!comprobanteFile) {
@@ -644,37 +658,52 @@ export default function AdminPagosManagement() {
 
       if (error) throw error;
 
-      // Si hay una cuota seleccionada, actualizar su monto pagado y estado
+      // Si hay una cuota seleccionada, distribuir el monto entre cuotas desde la seleccionada en adelante
       if (cuotaSeleccionada) {
-        const cuota = cuotasMatricula.find(c => c.id === cuotaSeleccionada);
-        if (cuota) {
-          const nuevoMontoPagado = cuota.monto_pagado + formData.monto_pago;
-          
-          // Determinar el nuevo estado de la cuota
+        // Ordenar cuotas por número para distribuir correctamente el excedente
+        const todasCuotas = [...cuotasMatricula].sort((a, b) => a.numero_cuota - b.numero_cuota);
+        const idxSeleccionada = todasCuotas.findIndex(c => c.id === cuotaSeleccionada);
+
+        let montoRestante = formData.monto_pago;
+
+        for (let i = idxSeleccionada; i < todasCuotas.length && montoRestante > 0; i++) {
+          const cuota = todasCuotas[i];
+
+          // Saltar cuotas ya pagadas completamente
+          if (cuota.estado === 'pagado') continue;
+
+          const saldoCuota = Math.round((cuota.monto_cuota - cuota.monto_pagado) * 100) / 100;
+
+          let nuevoMontoPagado: number;
           let nuevoEstado: 'pendiente' | 'pagado' | 'parcial' | 'vencido';
-          if (nuevoMontoPagado >= cuota.monto_cuota) {
+
+          if (montoRestante >= saldoCuota) {
+            // Pago cubre completamente esta cuota; el excedente pasa a la siguiente
+            nuevoMontoPagado = cuota.monto_cuota;
             nuevoEstado = 'pagado';
-          } else if (nuevoMontoPagado > 0) {
-            nuevoEstado = 'parcial';
+            montoRestante = Math.round((montoRestante - saldoCuota) * 100) / 100;
           } else {
-            nuevoEstado = cuota.estado; // Mantener estado actual si no hay cambio
+            // Pago parcial: queda debiendo el resto de esta cuota
+            nuevoMontoPagado = Math.round((cuota.monto_pagado + montoRestante) * 100) / 100;
+            nuevoEstado = 'parcial';
+            montoRestante = 0;
           }
-          
+
           const { error: updateError } = await supabase
             .from('cuotas_matricula' as any)
-            .update({ 
+            .update({
               monto_pagado: nuevoMontoPagado,
-              estado: nuevoEstado
+              estado: nuevoEstado,
             })
-            .eq('id', cuotaSeleccionada);
+            .eq('id', cuota.id);
 
           if (updateError) {
-            console.error('Error actualizando cuota:', updateError);
+            console.error(`Error actualizando cuota ${cuota.numero_cuota}:`, updateError);
           }
-          
-          // Verificar si todas las cuotas están pagadas para actualizar el estado de la matrícula
-          await verificarYActualizarEstadoMatricula(formData.codigo_producto);
         }
+
+        // Verificar si todas las cuotas están pagadas para actualizar el estado de la matrícula
+        await verificarYActualizarEstadoMatricula(formData.codigo_producto);
       } else if (formData.categoria_producto === 'matricula') {
         // Si no hay cuota seleccionada (pago único sin plan de cuotas)
         // Verificar el total pagado vs el precio final de la matrícula
@@ -1336,11 +1365,30 @@ export default function AdminPagosManagement() {
                         </div>
                       );
                     })()}
-                  {!loadingCuotas && cuotasMatricula.length > 0 && cuotaSeleccionada && (
-                    <p className="text-xs text-green-600 mt-3">
-                      ✓ Cuota seleccionada. El monto del pago se actualizará automáticamente.
-                    </p>
-                  )}
+                  {!loadingCuotas && cuotasMatricula.length > 0 && cuotaSeleccionada && (() => {
+                    const cuotaAct = cuotasMatricula.find(c => c.id === cuotaSeleccionada);
+                    const saldoAct = cuotaAct ? Math.round((cuotaAct.monto_cuota - cuotaAct.monto_pagado) * 100) / 100 : 0;
+                    const montoMenor = formData.monto_pago > 0 && formData.monto_pago < saldoAct;
+                    return (
+                      <div className="mt-3 space-y-1">
+                        {montoMenor ? (
+                          <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded p-2">
+                            ⚠️ El monto ingresado ({formData.moneda_pago} {formData.monto_pago.toFixed(2)}) es menor al saldo de la cuota ({formData.moneda_pago} {saldoAct.toFixed(2)}). No se puede registrar un pago menor al monto de la cuota.
+                          </p>
+                        ) : (
+                          <p className="text-xs text-green-600">
+                            ✓ Cuota seleccionada. Reglas de pago:
+                          </p>
+                        )}
+                        <p className="text-xs text-blue-600">
+                          • Si paga <strong>más</strong> del saldo de la cuota seleccionada, el excedente se aplicará automáticamente a las cuotas siguientes.
+                        </p>
+                        <p className="text-xs text-red-500">
+                          • <strong>No se permite</strong> registrar un monto menor al saldo pendiente de la cuota seleccionada.
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             )}
