@@ -82,20 +82,10 @@ serve(async (req: Request) => {
         )
       }
 
-      // Handle bulk import from Excel
+      // Handle bulk import from Excel (or single student creation without courseId)
       if (body.students && Array.isArray(body.students)) {
         const { students, courseId } = body;
-        console.log(`📊 Importación masiva: ${students.length} estudiantes al curso: ${courseId}`);
-
-        if (!courseId) {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: 'courseId es requerido para la importación masiva'
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-          );
-        }
+        console.log(`📊 Procesando ${students.length} estudiante(s)${courseId ? ` al curso: ${courseId}` : ' (sin matrícula a curso)'}`);
 
         const results = {
           success: [],
@@ -103,19 +93,21 @@ serve(async (req: Request) => {
         };
 
         // Normalizar los datos: convertir de camelCase a snake_case si es necesario
+        // Los campos opcionales usan null en lugar de string vacío para evitar errores en BD
+        const norm = (v: any) => (v === '' || v === undefined ? null : v);
         const normalizedStudents = students.map((student: any) => ({
-          first_name: student.first_name || student.firstName,
-          paternal_surname: student.paternal_surname || student.paternalSurname,
-          maternal_surname: student.maternal_surname || student.maternalSurname,
-          document_type: student.document_type || student.documentType || 'DNI',
-          document_number: student.document_number || student.documentNumber,
-          student_code: student.student_code || student.studentCode,
-          email: student.email,
-          gender: student.gender,
-          birth_date: student.birth_date || student.birthDate,
-          phone: student.phone,
-          country: student.country,
-          education_level: student.education_level || student.educationLevel,
+          first_name: norm(student.first_name || student.firstName),
+          paternal_surname: norm(student.paternal_surname || student.paternalSurname),
+          maternal_surname: norm(student.maternal_surname || student.maternalSurname),
+          document_type: norm(student.document_type || student.documentType) || 'DNI',
+          document_number: norm(student.document_number || student.documentNumber),
+          student_code: norm(student.student_code || student.studentCode),
+          email: norm(student.email),
+          gender: norm(student.gender),
+          birth_date: norm(student.birth_date || student.birthDate),
+          phone: norm(student.phone),
+          country: norm(student.country),
+          education_level: norm(student.education_level || student.educationLevel),
         }));
 
         for (const studentData of normalizedStudents) {

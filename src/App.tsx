@@ -30,6 +30,7 @@ import TutorDashboard from "./pages/TutorDashboard";
 import DirectivoDashboard from "./pages/DirectivoDashboard";
 import Calendar from "./pages/Calendar";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "./pages/ResetPassword";
 import AdminBulkStudentImport from "./pages/AdminBulkStudentImport";
 import AdminEnrollExistingStudents from "./pages/AdminEnrollExistingStudents";
 import AdminStudentManagementHub from "./pages/AdminStudentManagementHub";
@@ -276,6 +277,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -403,6 +403,14 @@ const AdminStudentManagementHub = () => {
 
       const responseData = await response.json();
 
+      // Verificar si el estudiante único falló internamente (la función siempre devuelve 200)
+      if (responseData.results?.errors?.length > 0 && responseData.results?.success?.length === 0) {
+        const firstError = responseData.results.errors[0];
+        const errMsg = firstError.error || 'No se pudo crear el estudiante';
+        console.error('Error interno al crear estudiante:', firstError);
+        throw new Error(errMsg);
+      }
+
       toast({
         title: "Éxito",
         description: "Estudiante creado exitosamente. Usa la pestaña 'Matrícula' para inscribirlo en un curso.",

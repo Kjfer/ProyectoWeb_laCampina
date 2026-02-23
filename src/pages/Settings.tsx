@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { setUserTimezone } from '@/lib/timezoneUtils';
+import { Input } from '@/components/ui/input';
 import { 
   Shield, 
   Lock,
@@ -16,7 +17,10 @@ import {
   Loader2,
   Moon,
   Sun,
-  Clock
+  Clock,
+  Eye,
+  EyeOff,
+  KeyRound
 } from 'lucide-react';
 
 interface UserPreferences {
@@ -29,6 +33,15 @@ export default function Settings() {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [loadingPrefs, setLoadingPrefs] = useState(true);
+  const [loadingPassword, setLoadingPassword] = useState(false);
+
+  // Estados para cambio de contraseña
+  const [passwordForm, setPasswordForm] = useState({
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Estados para configuraciones
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -114,29 +127,37 @@ export default function Settings() {
     }
   };
 
-  const handlePasswordReset = async () => {
-    if (!profile?.email) return;
-    
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+  const handlePasswordChange = async () => {
+    const { newPassword, confirmPassword } = passwordForm;
 
+    if (!newPassword || !confirmPassword) {
+      toast({ title: 'Error', description: 'Completa todos los campos.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: 'Error', description: 'La contraseña debe tener al menos 6 caracteres.', variant: 'destructive' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: 'Error', description: 'Las contraseñas no coinciden.', variant: 'destructive' });
+      return;
+    }
+
+    setLoadingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
-      toast({
-        title: 'Correo enviado',
-        description: 'Revisa tu bandeja de entrada para cambiar tu contraseña.',
-      });
+      toast({ title: '✅ Contraseña actualizada', description: 'Tu contraseña ha sido cambiada correctamente.' });
+      setPasswordForm({ newPassword: '', confirmPassword: '' });
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo enviar el correo de recuperación.',
+        description: error.message || 'No se pudo cambiar la contraseña.',
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setLoadingPassword(false);
     }
   };
 
@@ -270,24 +291,77 @@ export default function Settings() {
                 Seguridad
               </CardTitle>
               <CardDescription>
-                Administra la seguridad de tu cuenta
+                Cambia tu contraseña de acceso directamente desde aquí
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Cambiar Contraseña</Label>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Recibirás un correo con instrucciones para cambiar tu contraseña
-                </p>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  type="button"
-                  onClick={handlePasswordReset}
-                  disabled={loading}
+              <div className="space-y-4">
+                {/* Nueva contraseña */}
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">Nueva contraseña</Label>
+                  <div className="relative">
+                    <Input
+                      id="new-password"
+                      type={showNew ? 'text' : 'password'}
+                      placeholder="Mínimo 6 caracteres"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm(p => ({ ...p, newPassword: e.target.value }))}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNew(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirmar contraseña */}
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirmar nueva contraseña</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirm-password"
+                      type={showConfirm ? 'text' : 'password'}
+                      placeholder="Repite la nueva contraseña"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm(p => ({ ...p, confirmPassword: e.target.value }))}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {/* Indicador de coincidencia */}
+                  {passwordForm.confirmPassword.length > 0 && (
+                    <p className={`text-xs font-medium ${
+                      passwordForm.newPassword === passwordForm.confirmPassword
+                        ? 'text-green-600'
+                        : 'text-destructive'
+                    }`}>
+                      {passwordForm.newPassword === passwordForm.confirmPassword
+                        ? '✓ Las contraseñas coinciden'
+                        : '✗ Las contraseñas no coinciden'}
+                    </p>
+                  )}
+                </div>
+
+                <Button
+                  onClick={handlePasswordChange}
+                  disabled={loadingPassword}
+                  className="w-full"
                 >
-                  <Lock className="w-4 h-4 mr-2" />
-                  {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
+                  {loadingPassword ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cambiando...</>
+                  ) : (
+                    <><KeyRound className="w-4 h-4 mr-2" />Cambiar contraseña</>
+                  )}
                 </Button>
               </div>
             </CardContent>

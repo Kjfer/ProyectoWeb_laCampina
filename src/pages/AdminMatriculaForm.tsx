@@ -186,6 +186,46 @@ export default function AdminMatriculaForm() {
     }
   }, [studentSearch, searchType, students]);
 
+  // ── Envío de correo de confirmación (no bloquea el flujo principal) ────────
+  const sendEnrollmentEmail = async (
+    studentId: string,
+    codMatricula: string,
+    modulosMatriculados: ModuloMatriculado[],
+    precioFinal: number,
+    moneda: string
+  ) => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return;
+
+      const { data: fnData, error: fnError } = await supabase.functions.invoke(
+        'send-enrollment-email',
+        {
+          body: {
+            student_id: studentId,
+            cod_matricula: codMatricula,
+            modulos_matriculados: modulosMatriculados,
+            precio_final: precioFinal,
+            moneda,
+          },
+        }
+      );
+
+      if (fnError) {
+        console.warn('⚠️ No se pudo enviar el correo de confirmación:', fnError.message);
+      } else {
+        console.log('✅ Correo de confirmación enviado:', fnData?.message);
+        toast({
+          title: '📧 Correo enviado',
+          description: `Se envió la confirmación de matrícula al estudiante`,
+        });
+      }
+    } catch (err: any) {
+      console.warn('⚠️ Error al enviar correo de confirmación:', err.message);
+    }
+  };
+
   const getCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -652,6 +692,15 @@ export default function AdminMatriculaForm() {
         title: 'Éxito',
         description: `Matrícula ${codMatricula} registrada correctamente`,
       });
+
+      // Enviar correo de confirmación al estudiante (no bloquea la navegación)
+      sendEnrollmentEmail(
+        formData.estudiante_id,
+        codMatricula,
+        modulosMatriculados,
+        precioFinal,
+        formData.moneda
+      );
 
       navigate('/admin/matriculas');
     } catch (error: any) {
