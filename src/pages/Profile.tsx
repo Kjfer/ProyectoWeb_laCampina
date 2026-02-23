@@ -70,14 +70,14 @@ export default function Profile() {
         .update({
           first_name: data.first_name,
           last_name: data.last_name,
-          paternal_surname: data.paternal_surname,
-          maternal_surname: data.maternal_surname,
-          phone: data.phone,
-          avatar_url: data.avatar_url,
-          gender: data.gender,
-          birth_date: data.birth_date,
-          country: data.country,
-          education_level: data.education_level,
+          paternal_surname: data.paternal_surname || null,
+          maternal_surname: data.maternal_surname || null,
+          phone: data.phone || null,
+          avatar_url: data.avatar_url || null,
+          gender: data.gender || null,
+          birth_date: data.birth_date || null,
+          country: data.country || null,
+          education_level: data.education_level || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", profile.id);
