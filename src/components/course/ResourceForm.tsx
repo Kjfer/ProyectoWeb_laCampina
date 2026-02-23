@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { FileUpload } from '@/components/ui/file-upload';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { FileText, Video, ExternalLink, ClipboardList, GraduationCap, BookOpen, Upload, Calendar, Settings } from 'lucide-react';
+import { FileText, Video, ExternalLink, BookOpen, Upload } from 'lucide-react';
 
 interface ResourceFormProps {
   sectionId: string;
@@ -23,7 +23,7 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    resource_type: 'material' as 'material' | 'document' | 'video' | 'link' | 'assignment' | 'exam',
+    resource_type: 'material' as 'material' | 'document' | 'video' | 'link',
     resource_url: '',
     file_path: '',
     is_published: false,
@@ -36,8 +36,6 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
     { value: 'document', label: 'Archivo', icon: FileText, description: 'Documentos, hojas de trabajo, referencias' },
     { value: 'video', label: 'Video/Audio', icon: Video, description: 'Contenido multimedia educativo' },
     { value: 'link', label: 'Enlace Web', icon: ExternalLink, description: 'Enlaces a recursos externos' },
-    { value: 'assignment', label: 'Tarea', icon: ClipboardList, description: 'Actividad para entrega de estudiantes' },
-    { value: 'exam', label: 'Evaluación', icon: GraduationCap, description: 'Exámenes y cuestionarios' }
   ];
 
   const handleFileUpload = async (files: File[]) => {
@@ -226,12 +224,6 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
               {formData.resource_type === 'link' && (
                 <p><strong>Enlace Web:</strong> Enlaces a sitios web externos o recursos online.</p>
               )}
-              {formData.resource_type === 'assignment' && (
-                <p><strong>Tarea:</strong> Actividad con entrega de archivos y calificación.</p>
-              )}
-              {formData.resource_type === 'exam' && (
-                <p><strong>Examen:</strong> Evaluación con fecha límite y puntuación.</p>
-              )}
             </div>
           </div>
 
@@ -317,35 +309,6 @@ export function ResourceForm({ sectionId, onClose, onSuccess }: ResourceFormProp
                     ))}
                   </div>
                 )}
-              </div>
-            </div>
-          )}
-
-          {/* Configuraciones especiales para tareas y exámenes */}
-          {(formData.resource_type === 'assignment' || formData.resource_type === 'exam') && (
-            <div className="space-y-4 border rounded-lg p-4 bg-blue-50/50 dark:bg-blue-950/20">
-              <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                <Label className="font-medium">Configuración de Actividad</Label>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="assignment_deadline">Fecha límite</Label>
-                <Input
-                  id="assignment_deadline"
-                  type="datetime-local"
-                  value={formData.assignment_deadline}
-                  onChange={(e) => setFormData(prev => ({ ...prev, assignment_deadline: e.target.value }))}
-                />
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="allows_submissions"
-                  checked={formData.allows_student_submissions}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allows_student_submissions: checked }))}
-                />
-                <Label htmlFor="allows_submissions">Permitir entregas de estudiantes</Label>
               </div>
             </div>
           )}

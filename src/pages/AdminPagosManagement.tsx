@@ -585,6 +585,15 @@ export default function AdminPagosManagement() {
       }
     }
 
+    if (!comprobanteFile) {
+      toast({
+        title: 'Error',
+        description: 'Debe adjuntar el comprobante de pago',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!currentUser) {
       toast({
         title: 'Error',
@@ -1454,7 +1463,7 @@ export default function AdminPagosManagement() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="comprobante">Archivo de Comprobante</Label>
+                  <Label htmlFor="comprobante">Archivo de Comprobante <span className="text-destructive">*</span></Label>
                   <Input
                     id="comprobante"
                     type="file"
@@ -1464,6 +1473,7 @@ export default function AdminPagosManagement() {
                       setComprobanteFile(file || null);
                     }}
                     disabled={uploadingComprobante}
+                    required
                   />
                   {comprobanteFile && (
                     <p className="text-xs text-muted-foreground">
