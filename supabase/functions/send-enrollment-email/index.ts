@@ -228,11 +228,15 @@ function buildHtmlEmail(
           </td>
         </tr>
 
-        <!-- Botón de acceso -->
+        <!-- Botones de acceso -->
         <tr>
           <td style="padding:28px 40px 0;text-align:center;">
-            <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,${magenta},#a5366f);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(201,67,140,0.4);">
-              Ingresar al Aula Virtual &rarr;
+            <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,${magenta},#a5366f);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(201,67,140,0.4);margin-bottom:12px;">
+              Ingresar al Intranet &rarr;
+            </a>
+            <br/>
+            <a href="https://peri-institute.pericompanygroup.com" style="display:inline-block;background:linear-gradient(135deg,${navy},${navyDark});color:#ffffff;text-decoration:none;padding:12px 40px;border-radius:8px;font-size:15px;font-weight:600;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(43,63,92,0.35);margin-top:12px;">
+              &#127760; Visitar P&aacute;gina Web
             </a>
           </td>
         </tr>
@@ -242,8 +246,10 @@ function buildHtmlEmail(
           <td style="padding:24px 40px 0;">
             <div style="background:${bgPage};border-left:4px solid ${navy};border-radius:4px;padding:14px 18px;">
               <p style="margin:0;font-size:13px;color:${textPrimary};line-height:1.6;">
-                &#128161; Si tienes alguna consulta sobre tu matrícula, comunícate con nosotros respondiendo este correo
-                o a través de nuestros canales de soporte.
+                &#128161; Si tienes alguna consulta sobre tu matr&iacute;cula, com&uacute;nicate con nosotros a trav&eacute;s de nuestros canales de soporte.
+                Este correo es autom&aacute;tico y no permite respuestas directas.
+                <br/><br/>
+                &#128222; <strong>Soporte:</strong> <a href="https://wa.me/573234917892" style="color:${magenta};text-decoration:none;font-weight:600;">+57 323 491 7892</a>
               </p>
             </div>
           </td>
@@ -254,7 +260,7 @@ function buildHtmlEmail(
           <td style="padding:28px 40px 32px;text-align:center;">
             <div style="height:3px;background:linear-gradient(90deg,${navy},${magenta},${yellow});border-radius:2px;margin-bottom:20px;"></div>
             <p style="margin:0;font-size:13px;color:${textMuted};">
-              &copy; ${new Date().getFullYear()} <strong style="color:${navy};">PERI Institute</strong> &mdash; La Campiña
+              &copy; ${new Date().getFullYear()} <strong style="color:${navy};">PERI Institute</strong>
             </p>
             <p style="margin:6px 0 0;font-size:12px;color:#a8b8cc;">
               Este correo fue enviado automáticamente. Por favor no respondas directamente.
@@ -336,7 +342,7 @@ serve(async (req) => {
     const studentName = `${first_name} ${last_name}`.trim();
     const password    = student_code ?? "Tu código de estudiante";
     const studentCode = student_code ?? "—";
-    const loginUrl    = Deno.env.get("APP_URL") ?? "https://periinstitute.vercel.app";
+    const loginUrl    = Deno.env.get("APP_URL") ?? "https://intranet.peri-institute.pericompanygroup.com";
 
     // ── Construir HTML ───────────────────────────────────────────────────────
     const html = buildHtmlEmail(
