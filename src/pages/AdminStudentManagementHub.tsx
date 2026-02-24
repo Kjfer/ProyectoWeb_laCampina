@@ -329,20 +329,20 @@ const AdminStudentManagementHub = () => {
     setCreating(true);
 
     try {
-      // Validar que tenga email y DNI
-      if (!formData.email || !formData.document_number) {
+      // Validar que tenga email y código de estudiante
+      if (!formData.email || !formData.student_code) {
         toast({
           title: "Error",
-          description: "Email y DNI son requeridos",
+          description: "Email y Código de Estudiante son requeridos",
           variant: "destructive",
         });
         setCreating(false);
         return;
       }
 
-      // Usar el email ingresado y el DNI como contraseña
+      // Usar el email ingresado y el código de estudiante como contraseña
       const email = formData.email;
-      const password = formData.document_number;
+      const password = formData.student_code;
 
       // Llamar a la función edge para crear el estudiante
       const { data: { session } } = await supabase.auth.getSession();
@@ -726,16 +726,12 @@ const AdminStudentManagementHub = () => {
                         </div>
 
                         <div>
-                          <Label htmlFor="document_number">DNI *</Label>
+                          <Label htmlFor="document_number">DNI / Nro. Documento</Label>
                           <Input
                             id="document_number"
                             value={formData.document_number}
                             onChange={(e) => setFormData({ ...formData, document_number: e.target.value })}
-                            required
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            El DNI se usará como contraseña inicial del estudiante
-                          </p>
                         </div>
 
                         <div className="grid grid-cols-3 gap-4">
@@ -782,13 +778,12 @@ const AdminStudentManagementHub = () => {
                             </Select>
                           </div>
                           <div>
-                            <Label htmlFor="birth_date">Fecha de Nacimiento *</Label>
+                            <Label htmlFor="birth_date">Fecha de Nacimiento</Label>
                             <Input
                               id="birth_date"
                               type="date"
                               value={formData.birth_date}
                               onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                              required
                             />
                           </div>
                         </div>
@@ -884,7 +879,7 @@ const AdminStudentManagementHub = () => {
                         <div className="bg-muted p-3 rounded-lg text-sm">
                           <p className="font-medium mb-1">Credenciales de acceso:</p>
                           <p>Email: {formData.email || '(ingresa un email)'}</p>
-                          <p>Contraseña: {formData.document_number || '(se usará el DNI)'}</p>
+                          <p>Contraseña: {formData.student_code || '(se usará el código de estudiante)'}</p>
                           <p className="text-xs text-muted-foreground mt-2">
                             El estudiante podrá iniciar sesión con estas credenciales
                           </p>

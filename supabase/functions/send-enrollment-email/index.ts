@@ -334,7 +334,7 @@ serve(async (req) => {
 
     const { first_name, last_name, email: studentEmail, document_number, student_code } = studentProfile;
     const studentName = `${first_name} ${last_name}`.trim();
-    const password    = document_number ?? "Tu número de documento";
+    const password    = student_code ?? "Tu código de estudiante";
     const studentCode = student_code ?? "—";
     const loginUrl    = Deno.env.get("APP_URL") ?? "https://periinstitute.vercel.app";
 

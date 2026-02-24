@@ -114,7 +114,7 @@ serve(async (req: Request) => {
           try {
             // Usar el email proporcionado en los datos del estudiante
             const email = studentData.email;
-            const password = studentData.document_number || 'Temporal123';
+            const password = studentData.student_code || 'Temporal123';
             
             if (!email) {
               console.error(`❌ Email no proporcionado para: ${studentData.student_code}`);

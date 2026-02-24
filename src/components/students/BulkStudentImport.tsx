@@ -83,7 +83,7 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
       },
       {
         'TIPO DE DOCUMENTO': 'Valores: DNI, CE, PASAPORTE',
-        'NÚMERO DE DOCUMENTO': 'Campo obligatorio',
+        'NÚMERO DE DOCUMENTO': 'Opcional',
         'CÓDIGO DEL ESTUDIANTE': 'Campo obligatorio',
         'APELLIDO PATERNO': 'Campo obligatorio',
         'APELLIDO MATERNO': 'Campo obligatorio',
@@ -91,7 +91,7 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
         'EMAIL': 'Campo obligatorio - correo@dominio.com',
         'TELÉFONO': 'Opcional - Con código de país (Ej: +51 987654321)',
         'SEXO': 'Valores: M (Masculino) o F (Femenino)',
-        'FECHA DE NACIMIENTO': 'Formato: AAAA-MM-DD (Ej: 2010-05-15)',
+        'FECHA DE NACIMIENTO': 'Opcional - Formato: AAAA-MM-DD (Ej: 2010-05-15)',
         'PAÍS': 'Opcional - Países disponibles o escriba otro',
         'NIVEL EDUCATIVO': 'Opcional - Primaria/Secundaria/Universidad Completa/Incompleta, Superior/Instituto'
       }
@@ -155,7 +155,7 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
         birth_date: row['FECHA DE NACIMIENTO'] ? formatExcelDate(row['FECHA DE NACIMIENTO']) : '',
         country: row['PAÍS'] ? String(row['PAÍS']).trim() : undefined,
         education_level: row['NIVEL EDUCATIVO'] ? String(row['NIVEL EDUCATIVO']).trim() : undefined,
-      })).filter(student => student.document_number && student.student_code && student.first_name && student.email);
+      })).filter(student => student.student_code && student.first_name && student.email);
 
       if (students.length === 0) {
         toast({
@@ -299,7 +299,7 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
                   <strong className="text-foreground">Formato requerido:</strong>
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li>TIPO DE DOCUMENTO (DNI, CE, etc.)</li>
-                    <li>NÚMERO DE DOCUMENTO</li>
+                    <li>NÚMERO DE DOCUMENTO (opcional)</li>
                     <li>CÓDIGO DEL ESTUDIANTE</li>
                     <li>APELLIDO PATERNO</li>
                     <li>APELLIDO MATERNO</li>
@@ -307,14 +307,14 @@ export function BulkStudentImport({ classroom, courses, onImportComplete, onSucc
                     <li>EMAIL (correo del estudiante)</li>
                     <li>TELÉFONO (opcional)</li>
                     <li>SEXO (M/F)</li>
-                    <li>FECHA DE NACIMIENTO (YYYY-MM-DD)</li>
+                    <li>FECHA DE NACIMIENTO (opcional, YYYY-MM-DD)</li>
                   </ul>
                   <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
                     <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                       ℹ️ Credenciales de acceso
                     </p>
                     <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
-                      El EMAIL será usado para iniciar sesión y el NÚMERO DE DOCUMENTO será la contraseña inicial.
+                      El EMAIL será usado para iniciar sesión y el CÓDIGO DEL ESTUDIANTE será la contraseña inicial.
                     </p>
                   </div>
                   <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
