@@ -86,6 +86,7 @@ export default function AdminPagosManagement() {
   const [materialesPorCurso, setMaterialesPorCurso] = useState<Map<string, string>>(new Map());
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [uploadingComprobante, setUploadingComprobante] = useState(false);
+  const [metodoPagoPersonalizado, setMetodoPagoPersonalizado] = useState<string>('');
   
   const [filters, setFilters] = useState({
     categoria: 'all',
@@ -536,6 +537,7 @@ export default function AdminPagosManagement() {
     setCuotaSeleccionada(null);
     setComprobanteFile(null);
     setLoadingCuotas(false);
+    setMetodoPagoPersonalizado('');
     fetchProductosPorCategoria('matricula');
     setDialogOpen(true);
   };
@@ -546,6 +548,7 @@ export default function AdminPagosManagement() {
     setCuotaSeleccionada(null);
     setComprobanteFile(null);
     setLoadingCuotas(false);
+    setMetodoPagoPersonalizado('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -644,8 +647,14 @@ export default function AdminPagosManagement() {
         setUploadingComprobante(false);
       }
 
+      const metodoPagoFinal =
+        formData.metodo_pago === 'Otros'
+          ? metodoPagoPersonalizado.trim() || 'Otros'
+          : formData.metodo_pago;
+
       const pagoData: PagoInsert = {
         ...formData,
+        metodo_pago: metodoPagoFinal,
         comprobante: comprobanteUrl,
         usuario_id: currentUser.id,
         estudiante_id: formData.estudiante_id || null,
@@ -1453,9 +1462,10 @@ export default function AdminPagosManagement() {
                     <Label htmlFor="metodo_pago">Método de Pago *</Label>
                     <Select
                       value={formData.metodo_pago}
-                      onValueChange={(value: any) =>
-                        setFormData({ ...formData, metodo_pago: value })
-                      }
+                      onValueChange={(value: any) => {
+                        setFormData({ ...formData, metodo_pago: value });
+                        if (value !== 'Otros') setMetodoPagoPersonalizado('');
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -1468,6 +1478,15 @@ export default function AdminPagosManagement() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {formData.metodo_pago === 'Otros' && (
+                      <Input
+                        id="metodo_pago_personalizado"
+                        placeholder="Especifique el método de pago..."
+                        value={metodoPagoPersonalizado}
+                        onChange={(e) => setMetodoPagoPersonalizado(e.target.value)}
+                        required
+                      />
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="estado_pago">Estado del Pago *</Label>

@@ -147,7 +147,7 @@ export interface Pago {
   comprobante?: string | null;
   monto_pago: number;
   fecha_pago: string;
-  metodo_pago: 'BCP' | 'Interbank' | 'Banco de la Nación' | 'BBVA' | 'Scotiabank' | 'Yape' | 'Plin' | 'Tarjeta LINK' | 'En efectivo' | 'Paypal';
+  metodo_pago: string;
   moneda_pago: Moneda;
   estado_pago: 'primera_cuota' | 'pago_regular' | 'cuotas_restantes';
   usuario_id: string;
@@ -386,7 +386,7 @@ export interface PagoFormData {
   estudiante_id?: string;
   monto_pago: number;
   fecha_pago: string;
-  metodo_pago: 'BCP' | 'Interbank' | 'Banco de la Nación' | 'BBVA' | 'Scotiabank' | 'Yape' | 'Plin' | 'Tarjeta LINK' | 'En efectivo' | 'Paypal';
+  metodo_pago: string;
   moneda_pago: Moneda;
   estado_pago: 'primera_cuota' | 'pago_regular' | 'cuotas_restantes';
   comprobante?: string;
@@ -451,7 +451,11 @@ export const METODOS_PAGO = [
   'Plin',
   'Tarjeta LINK', 
   'En efectivo', 
-  'Paypal'
+  'Paypal',
+  'Banco Colombia',
+  'Banco Mexico',
+  'Banco Ecuador',
+  'Otros'
 ] as const;
 export const TIPOS_PAGO = ['primera_cuota', 'pago_regular', 'cuotas_restantes'] as const;
 export const CATEGORIAS_PRODUCTO = ['matricula', 'kits', 'books', 'clases_grabadas'] as const;
