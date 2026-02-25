@@ -587,19 +587,18 @@ export default function AdminPagosManagement() {
         return;
       }
 
-      // Validar que el monto no sea menor al saldo pendiente de la cuota seleccionada
-      const cuotaActual = cuotasMatricula.find(c => c.id === cuotaSeleccionada);
-      if (cuotaActual) {
-        const saldoPendienteCuota = Math.round((cuotaActual.monto_cuota - cuotaActual.monto_pagado) * 100) / 100;
-        if (formData.monto_pago < saldoPendienteCuota) {
-          toast({
-            title: 'Monto insuficiente',
-            description: `El monto ingresado (${formData.moneda_pago} ${formData.monto_pago.toFixed(2)}) es menor al saldo pendiente de la cuota ${cuotaActual.numero_cuota} (${formData.moneda_pago} ${saldoPendienteCuota.toFixed(2)}). Debe pagar al menos el monto completo de la cuota.`,
-            variant: 'destructive',
-          });
-          return;
-        }
+      // Validar que el monto ingresado sea mayor a 0
+      if (formData.monto_pago <= 0) {
+        toast({
+          title: 'Monto inválido',
+          description: 'El monto debe ser mayor a 0.',
+          variant: 'destructive',
+        });
+        return;
       }
+      // Nota: se permiten pagos parciales (montos menores al saldo de la cuota).
+      // La cuota quedará en estado "parcial" y se podrán registrar pagos adicionales
+      // hasta completarla.
     }
 
     if (!comprobanteFile) {
@@ -760,21 +759,30 @@ export default function AdminPagosManagement() {
         .single();
 
       if (planData) {
-        // Tiene plan de cuotas: verificar si todas las cuotas están pagadas
+        // Tiene plan de cuotas: determinar estado según el estado de las cuotas
         const { data: cuotasData } = await supabase
           .from('cuotas_matricula' as any)
-          .select('estado')
+          .select('estado, monto_pagado')
           .eq('plan_cuotas_id', planData.id);
 
         const todasPagadas = cuotasData?.every(c => c.estado === 'pagado');
-        
+        const algunaPagadaOParcial = cuotasData?.some(
+          c => c.estado === 'pagado' || c.estado === 'parcial' || (c.monto_pagado ?? 0) > 0
+        );
+
+        let nuevoEstado: string;
         if (todasPagadas) {
-          // Todas las cuotas están pagadas, actualizar estado de la matrícula
-          await supabase
-            .from('matriculas' as any)
-            .update({ estado_pago: 'pagado' })
-            .eq('id', matriculaData.id);
+          nuevoEstado = 'pagado';
+        } else if (algunaPagadaOParcial) {
+          nuevoEstado = 'parcial';
+        } else {
+          nuevoEstado = 'pendiente';
         }
+
+        await supabase
+          .from('matriculas' as any)
+          .update({ estado_pago: nuevoEstado })
+          .eq('id', matriculaData.id);
       } else {
         // No tiene plan de cuotas (pago único): verificar el total pagado
         const { data: pagosData } = await supabase
@@ -794,13 +802,19 @@ export default function AdminPagosManagement() {
           ?.filter(p => p.moneda_pago === matriculaCompleta?.moneda_monto)
           .reduce((sum, p) => sum + p.monto_pago, 0) || 0;
 
+        let nuevoEstado: string;
         if (totalPagado >= matriculaData.precio_final) {
-          // El total pagado cubre el precio final, marcar como pagado
-          await supabase
-            .from('matriculas' as any)
-            .update({ estado_pago: 'pagado' })
-            .eq('id', matriculaData.id);
+          nuevoEstado = 'pagado';
+        } else if (totalPagado > 0) {
+          nuevoEstado = 'parcial';
+        } else {
+          nuevoEstado = 'pendiente';
         }
+
+        await supabase
+          .from('matriculas' as any)
+          .update({ estado_pago: nuevoEstado })
+          .eq('id', matriculaData.id);
       }
     } catch (error: any) {
       console.error('Error al verificar estado de matrícula:', error);
@@ -1381,8 +1395,8 @@ export default function AdminPagosManagement() {
                     return (
                       <div className="mt-3 space-y-1">
                         {montoMenor ? (
-                          <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded p-2">
-                            ⚠️ El monto ingresado ({formData.moneda_pago} {formData.monto_pago.toFixed(2)}) es menor al saldo de la cuota ({formData.moneda_pago} {saldoAct.toFixed(2)}). No se puede registrar un pago menor al monto de la cuota.
+                          <p className="text-xs text-yellow-700 font-medium bg-yellow-50 border border-yellow-200 rounded p-2">
+                            🔶 Pago parcial: el monto ingresado ({formData.moneda_pago} {formData.monto_pago.toFixed(2)}) es menor al saldo de la cuota ({formData.moneda_pago} {saldoAct.toFixed(2)}). La cuota quedará como <strong>parcialmente pagada</strong> y podrás registrar pagos adicionales hasta completarla.
                           </p>
                         ) : (
                           <p className="text-xs text-green-600">
@@ -1392,8 +1406,8 @@ export default function AdminPagosManagement() {
                         <p className="text-xs text-blue-600">
                           • Si paga <strong>más</strong> del saldo de la cuota seleccionada, el excedente se aplicará automáticamente a las cuotas siguientes.
                         </p>
-                        <p className="text-xs text-red-500">
-                          • <strong>No se permite</strong> registrar un monto menor al saldo pendiente de la cuota seleccionada.
+                        <p className="text-xs text-blue-600">
+                          • Si paga <strong>menos</strong> del saldo, la cuota quedará como <strong>parcialmente pagada</strong> (estado: 🔶 PARCIAL).
                         </p>
                       </div>
                     );

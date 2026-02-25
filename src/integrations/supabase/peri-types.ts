@@ -110,6 +110,7 @@ export interface Matricula {
   book_incluido: boolean;
   kit_incluido: boolean;
   precio_final: number;
+  estado_pago?: 'pendiente' | 'pagado' | 'parcial' | 'cancelado' | null;
   observaciones?: string | null;
   created_at: string;
   updated_at: string;

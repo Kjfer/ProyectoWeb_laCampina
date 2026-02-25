@@ -40,6 +40,7 @@ export default function AdminMatriculasManagement() {
   const [selectedMatricula, setSelectedMatricula] = useState<MatriculaWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [redistribuyendo, setRedistribuyendo] = useState(false);
+  const [filterEstadoPago, setFilterEstadoPago] = useState<'all' | 'parcial' | 'pagado'>('all');
 
   useEffect(() => {
     fetchMatriculas();
@@ -203,7 +204,36 @@ export default function AdminMatriculasManagement() {
     navigate('/admin/matriculas/nueva');
   };
 
-  // Filtrar matrículas por búsqueda y curso
+  // Función auxiliar para calcular el estado efectivo de pago de una matrícula
+  const calcularEstadoPagoEfectivo = (mat: MatriculaWithRelations): string => {
+    // Si tiene estado_pago en DB, usarlo
+    const estadoDB = (mat as any).estado_pago as string | null | undefined;
+    if (estadoDB && estadoDB !== 'pendiente') return estadoDB;
+
+    // Calcular desde pagos y cuotas
+    const monedaMatricula = mat.moneda_monto || 'PEN';
+    const totalPagado = mat.pagos
+      ?.filter((p: any) => p.moneda_pago === monedaMatricula)
+      .reduce((sum: number, p: any) => sum + p.monto_pago, 0) || 0;
+
+    const cuotas: any[] = (mat as any).cuotas || [];
+    if (cuotas.length > 0) {
+      const todasPagadas = cuotas.every((c: any) => c.estado === 'pagado');
+      const algunaPagadaOParcial = cuotas.some(
+        (c: any) => c.estado === 'pagado' || c.estado === 'parcial' || (c.monto_pagado ?? 0) > 0
+      );
+      if (todasPagadas) return 'pagado';
+      if (algunaPagadaOParcial) return 'parcial';
+      return estadoDB || 'pendiente';
+    }
+
+    // Sin plan de cuotas: basado en monto total
+    if (totalPagado >= mat.precio_final) return 'pagado';
+    if (totalPagado > 0) return 'parcial';
+    return estadoDB || 'pendiente';
+  };
+
+  // Filtrar matrículas por búsqueda, curso y estado de pago
   // courseModuloIds contiene los IDs reales de módulos del curso seleccionado (cargados desde BD)
   const filteredMatriculas = matriculas.filter(mat => {
     // Filtro por búsqueda
@@ -222,7 +252,11 @@ export default function AdminMatriculasManagement() {
         (modulo: any) => courseModuloIds.has(modulo.modulo_id)
       ));
 
-    return matchesSearch && matchesCourse;
+    // Filtro por estado de pago
+    const matchesEstado = filterEstadoPago === 'all' ||
+      calcularEstadoPagoEfectivo(mat) === filterEstadoPago;
+
+    return matchesSearch && matchesCourse && matchesEstado;
   });
 
   // Calcular totales por moneda
@@ -304,6 +338,19 @@ export default function AdminMatriculasManagement() {
                 </Select>
                 {loadingCourseFilter && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
               </div>
+              <div className="flex items-center gap-2 min-w-[220px]">
+                <DollarSign className="h-4 w-4 text-gray-400" />
+                <Select value={filterEstadoPago} onValueChange={(v) => setFilterEstadoPago(v as any)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Filtrar por pago" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="parcial">🔶 Parcialmente pagado</SelectItem>
+                    <SelectItem value="pagado">✅ Pagado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
@@ -373,6 +420,7 @@ export default function AdminMatriculasManagement() {
                   <TableHead>Módulos</TableHead>
                   <TableHead>Precio Final</TableHead>
                   <TableHead>Pagado</TableHead>
+                  <TableHead>Estado Pago</TableHead>
                   <TableHead>Extras</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -422,6 +470,14 @@ export default function AdminMatriculasManagement() {
                             </span>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const estado = calcularEstadoPagoEfectivo(matricula);
+                          if (estado === 'pagado') return <Badge className="bg-green-100 text-green-800 border-green-300">✅ Pagado</Badge>;
+                          if (estado === 'parcial') return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">🔶 Parcial</Badge>;
+                          return <Badge className="bg-gray-100 text-gray-700 border-gray-300">⏳ Pendiente</Badge>;
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">

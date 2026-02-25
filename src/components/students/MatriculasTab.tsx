@@ -52,6 +52,7 @@ export function MatriculasTab() {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedMatricula, setSelectedMatricula] = useState<MatriculaWithRelations | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [filterEstadoPago, setFilterEstadoPago] = useState<'all' | 'parcial' | 'pagado'>('all');
 
   useEffect(() => {
     fetchMatriculas();
@@ -160,7 +161,33 @@ export function MatriculasTab() {
     navigate('/admin/matriculas/nueva');
   };
 
-  // Filtrar matrículas por búsqueda y curso
+  // Calcular estado efectivo de pago basado en cuotas y pagos
+  const calcularEstadoPagoEfectivo = (mat: MatriculaWithRelations): string => {
+    const estadoDB = (mat as any).estado_pago as string | null | undefined;
+    if (estadoDB && estadoDB !== 'pendiente') return estadoDB;
+
+    const monedaMatricula = mat.moneda_monto || 'PEN';
+    const totalPagado = mat.pagos
+      ?.filter((p: any) => p.moneda_pago === monedaMatricula)
+      .reduce((sum: number, p: any) => sum + p.monto_pago, 0) || 0;
+
+    const cuotas: any[] = (mat as any).cuotas || [];
+    if (cuotas.length > 0) {
+      const todasPagadas = cuotas.every((c: any) => c.estado === 'pagado');
+      const algunaPagadaOParcial = cuotas.some(
+        (c: any) => c.estado === 'pagado' || c.estado === 'parcial' || (c.monto_pagado ?? 0) > 0
+      );
+      if (todasPagadas) return 'pagado';
+      if (algunaPagadaOParcial) return 'parcial';
+      return estadoDB || 'pendiente';
+    }
+
+    if (totalPagado >= mat.precio_final) return 'pagado';
+    if (totalPagado > 0) return 'parcial';
+    return estadoDB || 'pendiente';
+  };
+
+  // Filtrar matrículas por búsqueda, curso y estado de pago
   const filteredMatriculas = matriculas.filter(mat => {
     const searchLower = searchTerm.toLowerCase();
 
@@ -183,7 +210,10 @@ export function MatriculasTab() {
       ) ?? false);
     }
 
-    return matchesSearch && matchesCourse;
+    const matchesEstado = filterEstadoPago === 'all' ||
+      calcularEstadoPagoEfectivo(mat) === filterEstadoPago;
+
+    return matchesSearch && matchesCourse && matchesEstado;
   });
 
   // Calcular totales por moneda
@@ -300,6 +330,24 @@ export function MatriculasTab() {
                   {loadingCourseFilter && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
                 </div>
               </div>
+
+              {/* Filtro de estado de pago */}
+              <div className="min-w-[220px]">
+                <Label>Estado de pago</Label>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-gray-400" />
+                  <Select value={filterEstadoPago} onValueChange={(v) => setFilterEstadoPago(v as any)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Todos los estados" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los estados</SelectItem>
+                      <SelectItem value="parcial">🔶 Parcialmente pagado</SelectItem>
+                      <SelectItem value="pagado">✅ Pagado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -369,7 +417,7 @@ export function MatriculasTab() {
                   <TableHead>Módulos</TableHead>
                   <TableHead>Precio Final</TableHead>
                   <TableHead>Pagado</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead>Estado Pago</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -401,29 +449,28 @@ export function MatriculasTab() {
                       </TableCell>
                       <TableCell>
                         <span className="font-semibold">
-                          {matricula.moneda} {matricula.precio_final.toFixed(2)}
+                          {monedaMatricula} {matricula.precio_final.toFixed(2)}
                         </span>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="text-green-600 font-medium">
-                            S/ {totalPagadoMatricula.toFixed(2)}
+                            {monedaMatricula} {totalPagadoMatricula.toFixed(2)}
                           </span>
                           {pendiente > 0 && (
-                            <span className="text-xs text-gray-500">
-                              Pend: S/ {pendiente.toFixed(2)}
+                            <span className="text-xs text-orange-600">
+                              Pend: {monedaMatricula} {pendiente.toFixed(2)}
                             </span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {pendiente <= 0 ? (
-                          <Badge className="bg-green-500">Pagado</Badge>
-                        ) : totalPagadoMatricula > 0 ? (
-                          <Badge className="bg-yellow-500">Parcial</Badge>
-                        ) : (
-                          <Badge variant="destructive">Pendiente</Badge>
-                        )}
+                        {(() => {
+                          const estado = calcularEstadoPagoEfectivo(matricula);
+                          if (estado === 'pagado') return <Badge className="bg-green-100 text-green-800 border-green-300">✅ Pagado</Badge>;
+                          if (estado === 'parcial') return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">🔶 Parcial</Badge>;
+                          return <Badge className="bg-gray-100 text-gray-700 border-gray-300">⏳ Pendiente</Badge>;
+                        })()}
                       </TableCell>
                       <TableCell>
                         {formatDate(matricula.created_at)}
