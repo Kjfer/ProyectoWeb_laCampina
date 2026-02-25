@@ -41,7 +41,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
-import { Save, UserPlus, Plus, Minus, DollarSign } from 'lucide-react';
+import { Save, UserPlus, DollarSign } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -68,6 +68,7 @@ export default function AdminMatriculaForm() {
   const [modulos, setModulos] = useState<ModuloConCurso[]>([]);
   const [cursosGrabados, setCursosGrabados] = useState<CursoGrabado[]>([]);
   const [selectedModulos, setSelectedModulos] = useState<string[]>([]);
+  const [selectedEdicion, setSelectedEdicion] = useState<string>('');
   const [modulosYaMatriculados, setModulosYaMatriculados] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [programCode, setProgramCode] = useState<string>('');
@@ -331,8 +332,9 @@ export default function AdminMatriculaForm() {
       student_code: student?.student_code || '',
     });
     
-    // Limpiar módulos seleccionados al cambiar de estudiante
+    // Limpiar selección al cambiar de estudiante
     setSelectedModulos([]);
+    setSelectedEdicion('');
     
     // Verificar módulos ya matriculados
     await fetchModulosYaMatriculados(estudianteId);
@@ -356,45 +358,23 @@ export default function AdminMatriculaForm() {
     }
   };
 
-  const handleModuloToggle = (moduloId: string) => {
-    // Evitar seleccionar módulos ya matriculados
-    if (modulosYaMatriculados.includes(moduloId)) {
-      toast({
-        title: 'Módulo no disponible',
-        description: 'El estudiante ya está matriculado en este módulo',
-        variant: 'destructive',
-      });
+  const handleEdicionChange = (courseId: string) => {
+    setSelectedEdicion(courseId);
+
+    if (!courseId) {
+      setSelectedModulos([]);
+      setFormData(prev => ({ ...prev, modulos_seleccionados: [] }));
       return;
     }
 
-    const newSelected = selectedModulos.includes(moduloId)
-      ? selectedModulos.filter(id => id !== moduloId)
-      : [...selectedModulos, moduloId];
-    
-    setSelectedModulos(newSelected);
-    setFormData({ ...formData, modulos_seleccionados: newSelected });
-  };
-
-  const handleSelectAllModulosCourse = (courseId: string) => {
-    // Obtener todos los módulos de esta edición
+    // Seleccionar automáticamente todos los módulos de la edición
     const courseModulos = modulos.filter(m => m.course_id === courseId);
-    const modulosDisponibles = courseModulos.filter(m => !modulosYaMatriculados.includes(m.id));
-    const modulosIds = modulosDisponibles.map(m => m.id);
-    
-    // Verificar si todos ya están seleccionados
-    const todosSeleccionados = modulosIds.every(id => selectedModulos.includes(id));
-    
-    let newSelected: string[];
-    if (todosSeleccionados) {
-      // Deseleccionar todos los módulos de esta edición
-      newSelected = selectedModulos.filter(id => !modulosIds.includes(id));
-    } else {
-      // Seleccionar todos los módulos disponibles de esta edición
-      newSelected = [...new Set([...selectedModulos, ...modulosIds])];
-    }
-    
-    setSelectedModulos(newSelected);
-    setFormData({ ...formData, modulos_seleccionados: newSelected });
+    const modulosDisponibles = courseModulos
+      .filter(m => !modulosYaMatriculados.includes(m.id))
+      .map(m => m.id);
+
+    setSelectedModulos(modulosDisponibles);
+    setFormData(prev => ({ ...prev, modulos_seleccionados: modulosDisponibles }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -409,10 +389,19 @@ export default function AdminMatriculaForm() {
       return;
     }
 
+    if (!selectedEdicion) {
+      toast({
+        title: 'Error',
+        description: 'Debe seleccionar una edición',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (selectedModulos.length === 0) {
       toast({
         title: 'Error',
-        description: 'Debe seleccionar al menos un módulo',
+        description: 'La edición seleccionada no tiene módulos disponibles para matricular',
         variant: 'destructive',
       });
       return;
@@ -730,7 +719,7 @@ export default function AdminMatriculaForm() {
             Nueva Matrícula
           </CardTitle>
           <CardDescription>
-            Registre la matrícula de un estudiante en módulos de ediciones
+            Registre la matrícula de un estudiante en una edición. Los módulos se asignan desde la lista de estudiantes.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -818,86 +807,78 @@ export default function AdminMatriculaForm() {
 
             <Separator />
 
-            {/* 2. SELECCIÓN DE MÓDULOS */}
+            {/* 2. SELECCIÓN DE EDICIÓN */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">2. Seleccionar Módulos *</h3>
+              <h3 className="text-lg font-semibold">2. Seleccionar Edición *</h3>
               {!formData.estudiante_id && (
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-                  ℹ️ Seleccione primero un estudiante para ver los módulos disponibles
+                  ℹ️ Seleccione primero un estudiante para ver las ediciones disponibles
                 </div>
               )}
-              {formData.estudiante_id && modulosYaMatriculados.length > 0 && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                  ℹ️ El estudiante ya está matriculado en {modulosYaMatriculados.length} módulo(s). Estos aparecen deshabilitados.
-                </div>
-              )}
-              <div className="space-y-4 max-h-96 overflow-y-auto border rounded-lg p-4">
-                {modulosPorCurso.map(({ course, modulos: courseModulos }) => {
-                  const modulosDisponibles = courseModulos.filter(m => !modulosYaMatriculados.includes(m.id));
-                  const modulosIds = modulosDisponibles.map(m => m.id);
-                  const todosSeleccionados = modulosIds.length > 0 && modulosIds.every(id => selectedModulos.includes(id));
-                  
-                  return (
-                  <div key={course.id} className="space-y-2">
-                    <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                      <div className="font-medium text-sm">
+              <div className="space-y-2">
+                <Label htmlFor="edicion_id">Edición *</Label>
+                <Select
+                  value={selectedEdicion}
+                  onValueChange={handleEdicionChange}
+                  disabled={!formData.estudiante_id}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione una edición" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {modulosPorCurso.map(({ course }) => (
+                      <SelectItem key={course.id} value={course.id}>
                         {course.name} ({course.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Vista previa de módulos de la edición seleccionada */}
+              {selectedEdicion && (() => {
+                const edicionData = modulosPorCurso.find(g => g.course.id === selectedEdicion);
+                if (!edicionData) return null;
+                const todosMatriculados = edicionData.modulos.every(m => modulosYaMatriculados.includes(m.id));
+                return (
+                  <div className="border rounded-lg p-4 space-y-3">
+                    <p className="text-sm font-medium text-gray-700">
+                      Módulos que se incluirán en la matrícula:
+                    </p>
+                    {todosMatriculados && (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                        ⚠️ El estudiante ya está matriculado en todos los módulos de esta edición.
                       </div>
-                      {modulosDisponibles.length > 0 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSelectAllModulosCourse(course.id)}
-                          className="text-xs h-7"
-                        >
-                          {todosSeleccionados ? (
-                            <><Minus className="h-3 w-3 mr-1" /> Deseleccionar todos</>
-                          ) : (
-                            <><Plus className="h-3 w-3 mr-1" /> Seleccionar todos</>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 ml-4">
-                      {courseModulos.map((modulo) => {
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      {edicionData.modulos.map((modulo) => {
                         const yaMatriculado = modulosYaMatriculados.includes(modulo.id);
                         return (
-                          <div 
-                            key={modulo.id} 
-                            className={`flex items-center space-x-2 ${yaMatriculado ? 'opacity-50' : ''}`}
+                          <div
+                            key={modulo.id}
+                            className={`flex items-center gap-2 text-sm p-2 rounded ${
+                              yaMatriculado
+                                ? 'bg-gray-100 text-gray-400 line-through'
+                                : 'bg-green-50 text-green-800'
+                            }`}
                           >
-                            <Checkbox
-                              id={modulo.id}
-                              checked={selectedModulos.includes(modulo.id)}
-                              onCheckedChange={() => handleModuloToggle(modulo.id)}
-                              disabled={yaMatriculado}
-                            />
-                            <Label
-                              htmlFor={modulo.id}
-                              className={`text-sm font-normal ${yaMatriculado ? 'cursor-not-allowed line-through' : 'cursor-pointer'}`}
-                            >
-                              M{modulo.num_modulo}: {modulo.name}
-                              <span className="text-xs text-gray-500 ml-2">
-                                ({formatDate(modulo.start_date)})
-                              </span>
-                              {yaMatriculado && (
-                                <span className="text-xs text-red-600 ml-2 font-medium">
-                                  ✓ Ya matriculado
-                                </span>
-                              )}
-                            </Label>
+                            <span>{yaMatriculado ? '✗' : '✓'}</span>
+                            <span>M{modulo.num_modulo}: {modulo.name}</span>
+                            <span className="text-xs ml-auto">
+                              {yaMatriculado ? 'Ya matriculado' : formatDate(modulo.start_date)}
+                            </span>
                           </div>
                         );
                       })}
                     </div>
+                    {!todosMatriculados && (
+                      <p className="text-xs text-gray-500">
+                        Se matricularán {selectedModulos.length} módulo(s). El acceso individual a módulos se gestiona desde la lista de estudiantes.
+                      </p>
+                    )}
                   </div>
-                  );
-                })}
-              </div>
-              <div className="text-sm text-gray-600">
-                Módulos seleccionados: {selectedModulos.length}
-              </div>
+                );
+              })()}
             </div>
 
             <Separator />
