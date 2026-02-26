@@ -64,6 +64,9 @@ interface ProductoDisponible {
   estudiante_nombre: string;
   monto?: number;
   moneda?: string;
+  // Para compras de cursos grabados
+  monto_pagado?: number;
+  compra_id?: string;
 }
 
 export default function AdminPagosManagement() {
@@ -87,6 +90,15 @@ export default function AdminPagosManagement() {
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [uploadingComprobante, setUploadingComprobante] = useState(false);
   const [metodoPagoPersonalizado, setMetodoPagoPersonalizado] = useState<string>('');
+  // Saldo de compra de cursos grabados seleccionada
+  const [compraGrabadaInfo, setCompraGrabadaInfo] = useState<{
+    compra_id: string;
+    codigo_compra: string;
+    valor_total: number;
+    monto_pagado: number;
+    moneda: string;
+    cursos: string[];
+  } | null>(null);
   
   const [filters, setFilters] = useState({
     categoria: 'all',
@@ -144,9 +156,9 @@ export default function AdminPagosManagement() {
     loadModuloIds();
   }, [filters.curso]);
 
-  // Resetear estado_pago a 'pago_regular' si se cambia a categoría diferente de matricula
+  // Resetear estado_pago a 'pago_regular' solo si se cambia a materiales (books/kits)
   useEffect(() => {
-    if (formData.categoria_producto !== 'matricula' && formData.estado_pago !== 'pago_regular') {
+    if ((formData.categoria_producto === 'books' || formData.categoria_producto === 'kits') && formData.estado_pago !== 'pago_regular') {
       setFormData(prev => ({ ...prev, estado_pago: 'pago_regular' }));
     }
   }, [formData.categoria_producto]);
@@ -365,31 +377,38 @@ export default function AdminPagosManagement() {
           }
         });
       } else if (categoria === 'clases_grabadas') {
+        // Consultar cabeceras de compra (compra_cursos_grabados) con estado pendiente o parcial
         const { data, error } = await supabase
-          .from('venta_cursos_grabados' as any)
+          .from('compra_cursos_grabados' as any)
           .select(`
             id,
-            codigo_venta,
-            valor_venta,
-            moneda_venta,
+            codigo_compra,
+            valor_total,
+            monto_pagado,
+            moneda,
+            estado_pago,
             estudiante_id,
-            estudiante:profiles!venta_cursos_grabados_estudiante_id_fkey(id, first_name, last_name),
-            curso_grabado:cursos_grabados(name)
+            estudiante:profiles!compra_cursos_grabados_estudiante_id_fkey(id, first_name, last_name),
+            items:venta_cursos_grabados(id, curso_grabado:cursos_grabados(name))
           `)
-          .eq('estado_pago', 'pendiente')
+          .in('estado_pago', ['pendiente', 'parcial'])
           .order('created_at', { ascending: false });
 
         if (error) throw error;
         
-        data?.forEach((venta: any) => {
-          if (venta.estudiante) {
+        data?.forEach((compra: any) => {
+          if (compra.estudiante) {
+            const saldo = compra.valor_total - compra.monto_pagado;
+            const cursosNombres = (compra.items ?? []).map((it: any) => it.curso_grabado?.name).filter(Boolean).join(', ');
             productos.push({
-              codigo: venta.codigo_venta,
-              descripcion: `${venta.curso_grabado?.name || 'Curso grabado'}`,
-              estudiante_id: venta.estudiante_id,
-              estudiante_nombre: `${venta.estudiante.first_name} ${venta.estudiante.last_name}`,
-              monto: venta.valor_venta,
-              moneda: venta.moneda_venta,
+              codigo: compra.codigo_compra,
+              descripcion: cursosNombres || 'Cursos grabados',
+              estudiante_id: compra.estudiante_id,
+              estudiante_nombre: `${compra.estudiante.first_name} ${compra.estudiante.last_name}`,
+              monto: saldo,        // Sugerir el saldo pendiente como monto a pagar
+              moneda: compra.moneda,
+              monto_pagado: compra.monto_pagado,
+              compra_id: compra.id,
             });
           }
         });
@@ -414,6 +433,7 @@ export default function AdminPagosManagement() {
       codigo_producto: '',
       estudiante_id: '',
     });
+    setCompraGrabadaInfo(null);
     fetchProductosPorCategoria(categoria);
   };
 
@@ -428,7 +448,35 @@ export default function AdminPagosManagement() {
         moneda_pago: (producto.moneda as any) || formData.moneda_pago,
       });
       setSearchProducto(codigo);
-      // NOTA: El useEffect se encarga de cargar las cuotas automáticamente
+      // NOTA: El useEffect se encarga de cargar las cuotas automáticamente para matrículas
+
+      // Para clases grabadas: cargar información de saldo de la compra
+      if (formData.categoria_producto === 'clases_grabadas' && producto.compra_id) {
+        const { data: compraData } = await supabase
+          .from('compra_cursos_grabados' as any)
+          .select(`
+            id, codigo_compra, valor_total, monto_pagado, moneda,
+            items:venta_cursos_grabados(id, curso_grabado:cursos_grabados(name))
+          `)
+          .eq('id', producto.compra_id)
+          .single();
+
+        if (compraData) {
+          const cursos = ((compraData as any).items ?? [])
+            .map((it: any) => it.curso_grabado?.name)
+            .filter(Boolean);
+          setCompraGrabadaInfo({
+            compra_id: (compraData as any).id,
+            codigo_compra: (compraData as any).codigo_compra,
+            valor_total: (compraData as any).valor_total,
+            monto_pagado: (compraData as any).monto_pagado,
+            moneda: (compraData as any).moneda,
+            cursos,
+          });
+        }
+      } else if (formData.categoria_producto !== 'clases_grabadas') {
+        setCompraGrabadaInfo(null);
+      }
     } else {
       setFormData({
         ...formData,
@@ -437,6 +485,7 @@ export default function AdminPagosManagement() {
       setSearchProducto(codigo);
       setCuotasMatricula([]);
       setCuotaSeleccionada(null);
+      setCompraGrabadaInfo(null);
     }
     setShowProductoDropdown(false);
   };
@@ -538,6 +587,7 @@ export default function AdminPagosManagement() {
     setComprobanteFile(null);
     setLoadingCuotas(false);
     setMetodoPagoPersonalizado('');
+    setCompraGrabadaInfo(null);
     fetchProductosPorCategoria('matricula');
     setDialogOpen(true);
   };
@@ -549,6 +599,7 @@ export default function AdminPagosManagement() {
     setComprobanteFile(null);
     setLoadingCuotas(false);
     setMetodoPagoPersonalizado('');
+    setCompraGrabadaInfo(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -723,6 +774,11 @@ export default function AdminPagosManagement() {
         description: 'Pago registrado correctamente',
       });
 
+      // Si el pago es de clases grabadas: actualizar monto_pagado y estado_pago en compra_cursos_grabados
+      if (formData.categoria_producto === 'clases_grabadas' && compraGrabadaInfo) {
+        await actualizarSaldoCompraGrabada(compraGrabadaInfo.compra_id, formData.monto_pago);
+      }
+
       handleCloseDialog();
       fetchPagos();
       
@@ -736,6 +792,50 @@ export default function AdminPagosManagement() {
         description: `Error al registrar pago: ${error.message}`,
         variant: 'destructive',
       });
+    }
+  };
+
+  // Actualizar saldo y estado de una compra de cursos grabados tras recibir un pago
+  const actualizarSaldoCompraGrabada = async (compraId: string, montoPagado: number) => {
+    try {
+      // Obtener datos actuales de la compra
+      const { data: compraData, error: compraErr } = await supabase
+        .from('compra_cursos_grabados' as any)
+        .select('valor_total, monto_pagado')
+        .eq('id', compraId)
+        .single();
+
+      if (compraErr || !compraData) return;
+
+      const nuevoMontoPagado = Math.round(((compraData as any).monto_pagado + montoPagado) * 100) / 100;
+      const valorTotal = (compraData as any).valor_total;
+
+      let nuevoEstado: string;
+      if (nuevoMontoPagado >= valorTotal) {
+        nuevoEstado = 'pagado';
+      } else if (nuevoMontoPagado > 0) {
+        nuevoEstado = 'parcial';
+      } else {
+        nuevoEstado = 'pendiente';
+      }
+
+      await supabase
+        .from('compra_cursos_grabados' as any)
+        .update({
+          monto_pagado: nuevoMontoPagado,
+          estado_pago: nuevoEstado,
+        })
+        .eq('id', compraId);
+
+      // Si la compra quedó pagada, marcar todos sus items como pagados
+      if (nuevoEstado === 'pagado') {
+        await supabase
+          .from('venta_cursos_grabados' as any)
+          .update({ estado_pago: 'pagado' })
+          .eq('compra_id', compraId);
+      }
+    } catch (err: any) {
+      console.error('Error actualizando saldo de compra grabada:', err.message);
     }
   };
 
@@ -1256,6 +1356,12 @@ export default function AdminPagosManagement() {
                                   <span className="text-xs text-gray-400">
                                     {producto.estudiante_nombre}
                                   </span>
+                                  {/* Saldo para compras de cursos grabados */}
+                                  {formData.categoria_producto === 'clases_grabadas' && producto.monto !== undefined && (
+                                    <span className="text-xs font-semibold text-orange-600">
+                                      Saldo pendiente: {producto.moneda} {producto.monto.toFixed(2)}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             ))
@@ -1416,6 +1522,65 @@ export default function AdminPagosManagement() {
               </Card>
             )}
 
+            {/* Sección de Saldo — solo para Clases Grabadas */}
+            {formData.categoria_producto === 'clases_grabadas' && compraGrabadaInfo && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Saldo de la Compra</CardTitle>
+                  <CardDescription>
+                    Compra <strong>{compraGrabadaInfo.codigo_compra}</strong> — puede realizar abonos parciales
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Cursos incluidos */}
+                  {compraGrabadaInfo.cursos.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-semibold">Cursos:</span>{' '}
+                      {compraGrabadaInfo.cursos.join(' · ')}
+                    </div>
+                  )}
+                  {/* Resumen financiero */}
+                  <div className="grid grid-cols-3 gap-2 rounded-lg border overflow-hidden">
+                    <div className="p-3 text-center bg-muted/20">
+                      <p className="text-xs text-muted-foreground mb-1">Total compra</p>
+                      <p className="font-bold text-base">
+                        {compraGrabadaInfo.moneda} {compraGrabadaInfo.valor_total.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="p-3 text-center bg-green-50">
+                      <p className="text-xs text-muted-foreground mb-1">Ya pagado</p>
+                      <p className="font-bold text-base text-green-700">
+                        {compraGrabadaInfo.moneda} {compraGrabadaInfo.monto_pagado.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="p-3 text-center bg-orange-50">
+                      <p className="text-xs text-muted-foreground mb-1">Saldo pendiente</p>
+                      <p className="font-bold text-base text-orange-600">
+                        {compraGrabadaInfo.moneda}{' '}
+                        {Math.max(0, compraGrabadaInfo.valor_total - compraGrabadaInfo.monto_pagado).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  {/* Indicación de pago parcial */}
+                  {formData.monto_pago > 0 &&
+                    formData.monto_pago < (compraGrabadaInfo.valor_total - compraGrabadaInfo.monto_pagado) && (
+                      <p className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2">
+                        🔶 <strong>Abono parcial:</strong> el monto ingresado ({compraGrabadaInfo.moneda}{' '}
+                        {formData.monto_pago.toFixed(2)}) es menor al saldo pendiente. La compra quedará como{' '}
+                        <strong>parcialmente pagada</strong> y podrá registrar más abonos.
+                      </p>
+                    )}
+                  {formData.monto_pago > 0 &&
+                    formData.monto_pago >= (compraGrabadaInfo.valor_total - compraGrabadaInfo.monto_pagado) &&
+                    compraGrabadaInfo.monto_pagado < compraGrabadaInfo.valor_total && (
+                      <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded p-2">
+                        ✅ Este pago cubrirá el saldo pendiente. La compra quedará como <strong>pagada</strong>.
+                      </p>
+                    )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Sección 2: Detalles del Pago */}
             <Card>
               <CardHeader className="pb-3">
@@ -1514,22 +1679,22 @@ export default function AdminPagosManagement() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {formData.categoria_producto === 'matricula' ? (
-                          // Para matrículas: mostrar todas las opciones de pago
+                        {formData.categoria_producto === 'matricula' || formData.categoria_producto === 'clases_grabadas' ? (
+                          // Para matrículas y cursos grabados: mostrar todas las opciones de pago
                           TIPOS_PAGO.map((tipo) => (
                             <SelectItem key={tipo} value={tipo}>
                               {tipo.replace('_', ' ').charAt(0).toUpperCase() + tipo.replace('_', ' ').slice(1)}
                             </SelectItem>
                           ))
                         ) : (
-                          // Para materiales y cursos grabados: solo pago regular
+                          // Para materiales (books/kits): solo pago regular
                           <SelectItem value="pago_regular">Pago Regular</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
-                    {formData.categoria_producto !== 'matricula' && (
+                    {(formData.categoria_producto === 'books' || formData.categoria_producto === 'kits') && (
                       <p className="text-xs text-muted-foreground">
-                        Los materiales y cursos grabados solo admiten pago regular.
+                        Los materiales (books/kits) solo admiten pago regular.
                       </p>
                     )}
                   </div>

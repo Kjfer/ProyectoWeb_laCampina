@@ -136,9 +136,41 @@ export interface VentaCursoGrabado {
   valor_venta: number;
   moneda_venta?: string;
   matricula_id?: string | null;
+  compra_id?: string | null; // FK a compra_cursos_grabados
   estado_pago: 'pendiente' | 'pagado' | 'cancelado';
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Cabecera de compra de cursos grabados.
+ * Una compra agrupa uno o más VentaCursoGrabado y permite pagos parciales.
+ */
+export interface CompraGrabada {
+  id: string;
+  codigo_compra: string; // COC-XXXXXX
+  estudiante_id: string;
+  usuario_id: string;
+  valor_total: number;
+  moneda: string;
+  estado_pago: 'pendiente' | 'pagado' | 'parcial' | 'cancelado';
+  monto_pagado: number;
+  observaciones?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CompraGrabadaInsert = Omit<CompraGrabada, 'id' | 'created_at' | 'updated_at'>;
+
+export interface CompraGrabadaWithRelaciones extends CompraGrabada {
+  estudiante?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    student_code?: string;
+  };
+  items?: (VentaCursoGrabado & { curso_grabado?: { id: string; name: string } })[];
 }
 
 export interface Pago {
