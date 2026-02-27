@@ -767,7 +767,7 @@ export default function AdminMatriculasManagement() {
                   </div>
                   <div>
                     <Label className="text-gray-600">Código Estudiante</Label>
-                    <p className="font-medium">{selectedMatricula.student_code || '-'}</p>
+                    <p className="font-medium">{(selectedMatricula as any).codigo_estudiante || '-'}</p>
                   </div>
                   <div>
                     <Label className="text-gray-600">Registrado por</Label>
@@ -846,14 +846,19 @@ export default function AdminMatriculasManagement() {
               {/* Extras */}
               <div>
                 <h3 className="font-semibold mb-2">Extras Incluidos</h3>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {selectedMatricula.book_incluido && (
                     <Badge>📚 Libro Incluido</Badge>
                   )}
                   {selectedMatricula.kit_incluido && (
                     <Badge>🎒 Kit Incluido</Badge>
                   )}
-                  {!selectedMatricula.book_incluido && !selectedMatricula.kit_incluido && (
+                  {selectedMatricula.id_clases_grabadas && (
+                    <Badge>
+                      🎥 Clases Grabadas{selectedMatricula.curso_grabado?.name ? `: ${selectedMatricula.curso_grabado.name}` : ''}
+                    </Badge>
+                  )}
+                  {!selectedMatricula.book_incluido && !selectedMatricula.kit_incluido && !selectedMatricula.id_clases_grabadas && (
                     <span className="text-sm text-gray-500">Sin extras</span>
                   )}
                 </div>

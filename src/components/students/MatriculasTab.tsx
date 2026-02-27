@@ -418,6 +418,7 @@ export function MatriculasTab() {
                   <TableHead>Precio Final</TableHead>
                   <TableHead>Pagado</TableHead>
                   <TableHead>Estado Pago</TableHead>
+                  <TableHead>Extras</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -440,9 +441,7 @@ export function MatriculasTab() {
                         {matricula.estudiante?.first_name} {matricula.estudiante?.last_name}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
-                          {matricula.student_code}
-                        </Badge>
+                        {(matricula as any).codigo_estudiante || '-'}
                       </TableCell>
                       <TableCell>
                         <Badge>{matricula.modulos_matriculados?.length || 0} módulos</Badge>
@@ -471,6 +470,25 @@ export function MatriculasTab() {
                           if (estado === 'parcial') return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">🔶 Parcial</Badge>;
                           return <Badge className="bg-gray-100 text-gray-700 border-gray-300">⏳ Pendiente</Badge>;
                         })()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {matricula.book_incluido && (
+                            <Badge variant="outline" className="text-xs">
+                              📚 Book
+                            </Badge>
+                          )}
+                          {matricula.kit_incluido && (
+                            <Badge variant="outline" className="text-xs">
+                              🎒 Kit
+                            </Badge>
+                          )}
+                          {matricula.id_clases_grabadas && (
+                            <Badge variant="outline" className="text-xs">
+                              🎥 Video
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {formatDate(matricula.created_at)}
@@ -691,53 +709,123 @@ export function MatriculasTab() {
                 )}
               </div>
 
-              {/* Info del estudiante */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Estudiante</Label>
-                  <p className="font-medium">
-                    {selectedMatricula.estudiante?.first_name} {selectedMatricula.estudiante?.last_name}
-                  </p>
-                </div>
-                <div>
-                  <Label>Código Estudiante</Label>
-                  <p className="font-medium">{selectedMatricula.student_code}</p>
-                </div>
-                <div>
-                  <Label>Email</Label>
-                  <p className="font-medium">{selectedMatricula.estudiante?.email}</p>
-                </div>
-                <div>
-                  <Label>Fecha de Matrícula</Label>
-                  <p className="font-medium">{formatDate(selectedMatricula.created_at)}</p>
+              {/* Información del Estudiante */}
+              <div>
+                <h3 className="font-semibold mb-2">Información del Estudiante</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <Label className="text-gray-600">Nombre</Label>
+                    <p className="font-medium">
+                      {selectedMatricula.estudiante?.first_name}{' '}
+                      {selectedMatricula.estudiante?.last_name}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-600">Email</Label>
+                    <p className="font-medium">{selectedMatricula.estudiante?.email}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-600">Código Estudiante</Label>
+                    <p className="font-medium">{(selectedMatricula as any).codigo_estudiante || '-'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-600">Registrado por</Label>
+                    <p className="font-medium">
+                      {(selectedMatricula as any).usuario?.first_name}{' '}
+                      {(selectedMatricula as any).usuario?.last_name}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label>Valor Matrícula</Label>
-                  <p className="font-medium">
-                    {(selectedMatricula as any).moneda_monto} {selectedMatricula.valor_matricula.toFixed(2)}
-                  </p>
+              {/* Módulos Matriculados */}
+              <div>
+                <h3 className="font-semibold mb-2">Módulos Matriculados</h3>
+                <div className="space-y-2">
+                  {Array.isArray(selectedMatricula.modulos_matriculados) &&
+                    (selectedMatricula.modulos_matriculados as any[]).map((modulo: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="font-medium">{modulo.nombre || modulo.name}</div>
+                        <div className="text-sm text-gray-600">
+                          Código: {modulo.code}
+                        </div>
+                        {modulo.course_name && (
+                          <div className="text-sm text-gray-600">
+                            Edición: {modulo.course_name}
+                          </div>
+                        )}
+                        {modulo.start_date && modulo.end_date && (
+                          <div className="text-xs text-gray-500">
+                            {modulo.start_date} - {modulo.end_date}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                 </div>
-                <div>
-                  <Label>Descuento</Label>
-                  <p className="font-medium">
-                    {(selectedMatricula as any).moneda_monto} {selectedMatricula.descuento.toFixed(2)}
-                  </p>
+              </div>
+
+              {/* Información Financiera */}
+              <div>
+                <h3 className="font-semibold mb-2">Información Financiera</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <Label className="text-gray-600">Valor Matrícula</Label>
+                    <p className="font-medium">
+                      {selectedMatricula.moneda_monto} {selectedMatricula.valor_matricula.toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-600">Descuento</Label>
+                    <p className="font-medium text-orange-600">
+                      - {selectedMatricula.moneda_monto} {selectedMatricula.descuento.toFixed(2)}
+                    </p>
+                  </div>
+                  {selectedMatricula.id_clases_grabadas && (
+                    <div>
+                      <Label className="text-gray-600">Clases Grabadas</Label>
+                      <p className="font-medium">
+                        {selectedMatricula.moneda_monto}{' '}
+                        {selectedMatricula.valor_clase_grabada.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {selectedMatricula.curso_grabado?.name}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <Label className="text-gray-600">Precio Final</Label>
+                    <p className="font-bold text-lg text-blue-600">
+                      {selectedMatricula.moneda_monto} {selectedMatricula.precio_final.toFixed(2)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <Label>Precio Final</Label>
-                  <p className="font-bold text-lg">
-                    {(selectedMatricula as any).moneda_monto} {selectedMatricula.precio_final.toFixed(2)}
-                  </p>
+              </div>
+
+              {/* Extras */}
+              <div>
+                <h3 className="font-semibold mb-2">Extras Incluidos</h3>
+                <div className="flex gap-2 flex-wrap">
+                  {selectedMatricula.book_incluido && (
+                    <Badge>📚 Libro Incluido</Badge>
+                  )}
+                  {selectedMatricula.kit_incluido && (
+                    <Badge>🎒 Kit Incluido</Badge>
+                  )}
+                  {selectedMatricula.id_clases_grabadas && (
+                    <Badge>
+                      🎥 Clases Grabadas{selectedMatricula.curso_grabado?.name ? `: ${selectedMatricula.curso_grabado.name}` : ''}
+                    </Badge>
+                  )}
+                  {!selectedMatricula.book_incluido && !selectedMatricula.kit_incluido && !selectedMatricula.id_clases_grabadas && (
+                    <span className="text-sm text-gray-500">Sin extras</span>
+                  )}
                 </div>
               </div>
 
               {selectedMatricula.observaciones && (
                 <div>
-                  <Label>Observaciones</Label>
-                  <p className="text-sm text-gray-600">{selectedMatricula.observaciones}</p>
+                  <h3 className="font-semibold mb-2">Observaciones</h3>
+                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded">{selectedMatricula.observaciones}</p>
                 </div>
               )}
 
@@ -764,9 +852,11 @@ export function MatriculasTab() {
                           <TableCell className="font-medium">
                             {pago.moneda_pago} {pago.monto_pago.toFixed(2)}
                           </TableCell>
-                          <TableCell>{pago.metodo_pago}</TableCell>
+                      <TableCell>{pago.metodo_pago.toUpperCase()}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{pago.estado_pago}</Badge>
+                            <Badge variant="secondary">
+                              {pago.estado_pago.replace('_', ' ').toUpperCase()}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             {pago.comprobante ? (
@@ -788,6 +878,14 @@ export function MatriculasTab() {
                   </Table>
                 ) : (
                   <p className="text-sm text-gray-500 mt-2">No hay pagos registrados</p>
+                )}
+              </div>
+
+              {/* Fechas */}
+              <div className="text-xs text-gray-500 border-t pt-4">
+                <p>Creado: {formatDate(selectedMatricula.created_at)}</p>
+                {(selectedMatricula as any).updated_at && (
+                  <p>Actualizado: {formatDate((selectedMatricula as any).updated_at)}</p>
                 )}
               </div>
             </div>
