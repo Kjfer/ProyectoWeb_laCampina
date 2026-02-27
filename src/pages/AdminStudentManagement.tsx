@@ -126,6 +126,7 @@ const AdminStudentManagement = () => {
     education_level: ''
   });
   const [customCountry, setCustomCountry] = useState('');
+  const [studentCodeError, setStudentCodeError] = useState('');
 
   // Redirect if not admin
   if (profile?.role !== 'admin') {
@@ -241,6 +242,30 @@ const AdminStudentManagement = () => {
     e.preventDefault();
     
     try {
+      // Validar longitud exacta del código de estudiante
+      if (formData.student_code.length !== 9) {
+        const msg = formData.student_code.length < 9
+          ? `El código debe tener exactamente 9 caracteres (faltan ${9 - formData.student_code.length}).`
+          : `El código no puede tener más de 9 caracteres (sobran ${formData.student_code.length - 9}).`;
+        setStudentCodeError(msg);
+        return;
+      }
+
+      // Verificar que el código de estudiante no esté ya registrado
+      const { data: existingCode } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('student_code', formData.student_code)
+        .maybeSingle();
+
+      if (existingCode) {
+        resetForm();
+        setStudentCodeError('Este código de estudiante ya está registrado. Completa nuevamente los datos.');
+        return;
+      }
+
+      setStudentCodeError('');
+
       // Generar el apellido completo (last_name)
       const last_name = `${formData.paternal_surname} ${formData.maternal_surname}`.trim();
       
@@ -524,6 +549,7 @@ const AdminStudentManagement = () => {
       education_level: ''
     });
     setCustomCountry('');
+    setStudentCodeError('');
   };
 
   // Filter students based on search and filters
@@ -577,10 +603,24 @@ const AdminStudentManagement = () => {
         <Input
           id="student_code"
           value={formData.student_code}
-          onChange={(e) => setFormData({ ...formData, student_code: e.target.value })}
+          onChange={(e) => {
+            setFormData({ ...formData, student_code: e.target.value });
+            if (studentCodeError) setStudentCodeError('');
+          }}
           required
-          placeholder="Ej: EST001"
+          maxLength={9}
+          placeholder="Ej: EST001234"
+          className={studentCodeError ? 'border-destructive focus-visible:ring-destructive' : ''}
         />
+        <p className={`text-xs ${formData.student_code.length === 9 ? 'text-green-600' : 'text-muted-foreground'}`}>
+          {formData.student_code.length}/9 caracteres
+        </p>
+        {studentCodeError && (
+          <p className="text-xs text-destructive flex items-center gap-1">
+            <AlertCircle className="h-3 w-3" />
+            {studentCodeError}
+          </p>
+        )}
       </div>
 
       {/* Apellidos */}

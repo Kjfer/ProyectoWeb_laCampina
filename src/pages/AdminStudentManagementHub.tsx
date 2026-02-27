@@ -146,6 +146,7 @@ const AdminStudentManagementHub = () => {
     education_level: ''
   });
   const [customCountry, setCustomCountry] = useState('');
+  const [studentCodeError, setStudentCodeError] = useState('');
 
   if (profile?.role !== 'admin') {
     return (
@@ -340,6 +341,45 @@ const AdminStudentManagementHub = () => {
         return;
       }
 
+      // Validar longitud exacta del código de estudiante
+      if (formData.student_code.length !== 9) {
+        const msg = formData.student_code.length < 9
+          ? `El código debe tener exactamente 9 caracteres (faltan ${9 - formData.student_code.length}).`
+          : `El código no puede tener más de 9 caracteres (sobran ${formData.student_code.length - 9}).`;
+        setStudentCodeError(msg);
+        setCreating(false);
+        return;
+      }
+
+      // Verificar que el código de estudiante no esté ya registrado
+      const { data: existingCode } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('student_code', formData.student_code)
+        .maybeSingle();
+
+      if (existingCode) {
+        setFormData({
+          first_name: '',
+          paternal_surname: '',
+          maternal_surname: '',
+          student_code: '',
+          email: '',
+          phone: '',
+          document_number: '',
+          gender: 'M',
+          birth_date: '',
+          country: 'Perú',
+          education_level: ''
+        });
+        setCustomCountry('');
+        setStudentCodeError('Este código de estudiante ya está registrado. Completa nuevamente los datos.');
+        setCreating(false);
+        return;
+      }
+
+      setStudentCodeError('');
+
       // Usar el email ingresado y el código de estudiante como contraseña
       const email = formData.email;
       const password = formData.student_code;
@@ -431,6 +471,7 @@ const AdminStudentManagementHub = () => {
         education_level: ''
       });
       setCustomCountry('');
+      setStudentCodeError('');
       fetchStudents();
     } catch (error: any) {
       console.error('Error creating student:', error);
@@ -708,9 +749,23 @@ const AdminStudentManagementHub = () => {
                             <Input
                               id="student_code"
                               value={formData.student_code}
-                              onChange={(e) => setFormData({ ...formData, student_code: e.target.value })}
+                              onChange={(e) => {
+                                setFormData({ ...formData, student_code: e.target.value });
+                                if (studentCodeError) setStudentCodeError('');
+                              }}
                               required
+                              maxLength={9}
+                              className={studentCodeError ? 'border-destructive focus-visible:ring-destructive' : ''}
                             />
+                            <p className={`text-xs mt-1 ${formData.student_code.length === 9 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                              {formData.student_code.length}/9 caracteres
+                            </p>
+                            {studentCodeError && (
+                              <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                {studentCodeError}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <Label htmlFor="email">Correo Electrónico *</Label>
