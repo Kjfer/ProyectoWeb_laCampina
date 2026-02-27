@@ -70,6 +70,7 @@ export default function AdminMatriculaForm() {
   const [selectedModulos, setSelectedModulos] = useState<string[]>([]);
   const [selectedEdicion, setSelectedEdicion] = useState<string>('');
   const [modulosYaMatriculados, setModulosYaMatriculados] = useState<string[]>([]);
+  const [modoModuloIndividual, setModoModuloIndividual] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [programCode, setProgramCode] = useState<string>('');
   
@@ -360,6 +361,7 @@ export default function AdminMatriculaForm() {
 
   const handleEdicionChange = (courseId: string) => {
     setSelectedEdicion(courseId);
+    setModoModuloIndividual(false);
 
     if (!courseId) {
       setSelectedModulos([]);
@@ -367,7 +369,7 @@ export default function AdminMatriculaForm() {
       return;
     }
 
-    // Seleccionar automáticamente todos los módulos de la edición
+    // Seleccionar automáticamente todos los módulos disponibles de la edición
     const courseModulos = modulos.filter(m => m.course_id === courseId);
     const modulosDisponibles = courseModulos
       .filter(m => !modulosYaMatriculados.includes(m.id))
@@ -375,6 +377,31 @@ export default function AdminMatriculaForm() {
 
     setSelectedModulos(modulosDisponibles);
     setFormData(prev => ({ ...prev, modulos_seleccionados: modulosDisponibles }));
+  };
+
+  const handleToggleModoModuloIndividual = (checked: boolean) => {
+    setModoModuloIndividual(checked);
+    if (checked) {
+      // En modo individual, limpiar la selección para que el usuario elija manualmente
+      setSelectedModulos([]);
+      setFormData(prev => ({ ...prev, modulos_seleccionados: [] }));
+    } else {
+      // Volver a seleccionar todos los módulos disponibles
+      const courseModulos = modulos.filter(m => m.course_id === selectedEdicion);
+      const modulosDisponibles = courseModulos
+        .filter(m => !modulosYaMatriculados.includes(m.id))
+        .map(m => m.id);
+      setSelectedModulos(modulosDisponibles);
+      setFormData(prev => ({ ...prev, modulos_seleccionados: modulosDisponibles }));
+    }
+  };
+
+  const handleToggleModuloIndividual = (moduloId: string, checked: boolean) => {
+    const newSelection = checked
+      ? [...selectedModulos, moduloId]
+      : selectedModulos.filter(id => id !== moduloId);
+    setSelectedModulos(newSelection);
+    setFormData(prev => ({ ...prev, modulos_seleccionados: newSelection }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -835,24 +862,73 @@ export default function AdminMatriculaForm() {
                 </Select>
               </div>
 
-              {/* Vista previa de módulos de la edición seleccionada */}
+              {/* Vista previa / selección de módulos de la edición seleccionada */}
               {selectedEdicion && (() => {
                 const edicionData = modulosPorCurso.find(g => g.course.id === selectedEdicion);
                 if (!edicionData) return null;
                 const todosMatriculados = edicionData.modulos.every(m => modulosYaMatriculados.includes(m.id));
+                const modulosDisponibles = edicionData.modulos.filter(m => !modulosYaMatriculados.includes(m.id));
                 return (
                   <div className="border rounded-lg p-4 space-y-3">
-                    <p className="text-sm font-medium text-gray-700">
-                      Módulos que se incluirán en la matrícula:
-                    </p>
                     {todosMatriculados && (
                       <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
                         ⚠️ El estudiante ya está matriculado en todos los módulos de esta edición.
                       </div>
                     )}
+
+                    {/* Toggle: módulo individual */}
+                    {!todosMatriculados && (
+                      <div className="flex items-center gap-3 px-1">
+                        <Switch
+                          id="modo_modulo_individual"
+                          checked={modoModuloIndividual}
+                          onCheckedChange={handleToggleModoModuloIndividual}
+                        />
+                        <Label htmlFor="modo_modulo_individual" className="cursor-pointer">
+                          Matricular sólo módulo(s) específico(s)
+                        </Label>
+                        {modoModuloIndividual && (
+                          <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+                            Seleccione los módulos manualmente
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Lista de módulos */}
                     <div className="grid grid-cols-2 gap-2">
                       {edicionData.modulos.map((modulo) => {
                         const yaMatriculado = modulosYaMatriculados.includes(modulo.id);
+                        const seleccionado = selectedModulos.includes(modulo.id);
+
+                        if (modoModuloIndividual && !yaMatriculado) {
+                          // Modo individual: checkboxes interactivos
+                          return (
+                            <div
+                              key={modulo.id}
+                              onClick={() => handleToggleModuloIndividual(modulo.id, !seleccionado)}
+                              className={`flex items-center gap-2 text-sm p-2 rounded border cursor-pointer transition-colors ${
+                                seleccionado
+                                  ? 'bg-blue-50 border-blue-300 text-blue-800'
+                                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              <Checkbox
+                                checked={seleccionado}
+                                onCheckedChange={(checked: boolean) =>
+                                  handleToggleModuloIndividual(modulo.id, checked)
+                                }
+                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                              />
+                              <span className="font-medium">M{modulo.num_modulo}: {modulo.name}</span>
+                              <span className="text-xs ml-auto text-gray-400">
+                                {formatDate(modulo.start_date)}
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        // Modo normal: vista informativa
                         return (
                           <div
                             key={modulo.id}
@@ -871,9 +947,16 @@ export default function AdminMatriculaForm() {
                         );
                       })}
                     </div>
+
+                    {/* Resumen */}
                     {!todosMatriculados && (
                       <p className="text-xs text-gray-500">
-                        Se matricularán {selectedModulos.length} módulo(s). El acceso individual a módulos se gestiona desde la lista de estudiantes.
+                        {modoModuloIndividual
+                          ? selectedModulos.length === 0
+                            ? '⚠️ Seleccione al menos un módulo para continuar.'
+                            : `Se matricularán ${selectedModulos.length} módulo(s) seleccionado(s). Para matricular módulos restantes, genere una nueva matrícula.`
+                          : `Se matricularán ${selectedModulos.length} módulo(s) disponible(s) de la edición.`
+                        }
                       </p>
                     )}
                   </div>
