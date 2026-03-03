@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronRight, Plus, FileText, Link2, ClipboardList, Video, FileImage, Edit } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, FileText, Link2, ClipboardList, Video, FileImage, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ResourceForm } from './ResourceForm';
@@ -31,6 +31,7 @@ interface WeeklyResource {
   max_score?: number;
   settings?: any;
   assignment_id?: string;
+  teacher_files?: Array<{ file_path: string; file_name: string; file_size: number; mime_type: string }>;
 }
 
 interface WeeklySection {
@@ -139,6 +140,45 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
       toast.error('Error al actualizar la semana');
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteResource = async (resource: WeeklyResource, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`¿Eliminar el recurso "${resource.title}"? Esta acción no se puede deshacer.`)) return;
+
+    try {
+      // 1. Eliminar archivos del storage
+      const bucket = resource.resource_type === 'video' ? 'course-videos' : 'course-documents';
+      const filesToDelete: string[] = [];
+
+      // Recopilar todos los archivos (teacher_files puede tener múltiples)
+      if (resource.teacher_files && resource.teacher_files.length > 0) {
+        resource.teacher_files.forEach(f => filesToDelete.push(f.file_path));
+      } else if (resource.file_path) {
+        filesToDelete.push(resource.file_path);
+      }
+
+      if (filesToDelete.length > 0) {
+        const { error: storageError } = await supabase.storage
+          .from(bucket)
+          .remove(filesToDelete);
+        if (storageError) console.warn('Advertencia al eliminar archivos del storage:', storageError);
+      }
+
+      // 2. Eliminar el registro de la base de datos
+      const { error: dbError } = await supabase
+        .from('course_weekly_resources')
+        .delete()
+        .eq('id', resource.id);
+
+      if (dbError) throw dbError;
+
+      toast.success('Recurso eliminado correctamente');
+      onUpdateSection?.(section);
+    } catch (error: any) {
+      console.error('Error al eliminar recurso:', error);
+      toast.error(`Error al eliminar el recurso: ${error.message}`);
     }
   };
 
@@ -311,6 +351,14 @@ export function CourseWeeklySection({ section, courseId, canEdit, onUpdateSectio
                               }}
                             >
                               <Edit className="h-4 w-4 text-gray-500" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-red-100 text-red-500"
+                              onClick={(e) => handleDeleteResource(resource, e)}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                             <Switch
                               className="scale-75"
