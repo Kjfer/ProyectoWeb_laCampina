@@ -42,7 +42,7 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Plus, DollarSign, Filter, Calendar, FileText, Loader2 } from 'lucide-react';
+import { Plus, DollarSign, Filter, Calendar, FileText, Loader2, Pencil } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -89,6 +89,11 @@ export default function AdminPagosManagement() {
   const [materialesPorCurso, setMaterialesPorCurso] = useState<Map<string, string>>(new Map());
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [uploadingComprobante, setUploadingComprobante] = useState(false);
+  const [editComprobanteDialogOpen, setEditComprobanteDialogOpen] = useState(false);
+  const [pagoEditandoComprobante, setPagoEditandoComprobante] = useState<PagoWithRelations | null>(null);
+  const [editComprobanteFile, setEditComprobanteFile] = useState<File | null>(null);
+  const [uploadingEditComprobante, setUploadingEditComprobante] = useState(false);
+  const [recentlyUpdatedPagoId, setRecentlyUpdatedPagoId] = useState<string | null>(null);
   const [metodoPagoPersonalizado, setMetodoPagoPersonalizado] = useState<string>('');
   // Saldo de compra de cursos grabados seleccionada
   const [compraGrabadaInfo, setCompraGrabadaInfo] = useState<{
@@ -600,6 +605,138 @@ export default function AdminPagosManagement() {
     setLoadingCuotas(false);
     setMetodoPagoPersonalizado('');
     setCompraGrabadaInfo(null);
+  };
+
+  const getPaymentReceiptPathFromUrl = (publicUrl?: string | null) => {
+    if (!publicUrl) return null;
+
+    try {
+      const url = new URL(publicUrl);
+      const marker = '/storage/v1/object/public/payment-receipts/';
+      const markerIndex = url.pathname.indexOf(marker);
+
+      if (markerIndex === -1) return null;
+
+      const objectPath = url.pathname.slice(markerIndex + marker.length);
+      return decodeURIComponent(objectPath);
+    } catch {
+      return null;
+    }
+  };
+
+  const handleOpenEditComprobanteDialog = (pago: PagoWithRelations) => {
+    setPagoEditandoComprobante(pago);
+    setEditComprobanteFile(null);
+    setEditComprobanteDialogOpen(true);
+  };
+
+  const handleCloseEditComprobanteDialog = () => {
+    setEditComprobanteDialogOpen(false);
+    setPagoEditandoComprobante(null);
+    setEditComprobanteFile(null);
+    setUploadingEditComprobante(false);
+  };
+
+  const handleUpdateComprobante = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!pagoEditandoComprobante) {
+      toast({
+        title: 'Error',
+        description: 'No se encontró el pago a editar',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!editComprobanteFile) {
+      toast({
+        title: 'Error',
+        description: 'Debe seleccionar un nuevo comprobante',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setUploadingEditComprobante(true);
+
+      const fileExt = editComprobanteFile.name.split('.').pop();
+      const fileName = `${Date.now()}_${pagoEditandoComprobante.id}.${fileExt}`;
+      const folder = pagoEditandoComprobante.estudiante_id || 'sin_estudiante';
+      const newFilePath = `${folder}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('payment-receipts')
+        .upload(newFilePath, editComprobanteFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('payment-receipts')
+        .getPublicUrl(newFilePath);
+
+      const newComprobanteUrl = urlData.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from('pagos' as any)
+        .update({ comprobante: newComprobanteUrl })
+        .eq('id', pagoEditandoComprobante.id);
+
+      if (updateError) throw updateError;
+
+      const oldFilePath = getPaymentReceiptPathFromUrl(pagoEditandoComprobante.comprobante);
+      if (oldFilePath && oldFilePath !== newFilePath) {
+        const { error: deleteError } = await supabase.storage
+          .from('payment-receipts')
+          .remove([oldFilePath]);
+
+        if (deleteError) {
+          console.warn('No se pudo eliminar el comprobante anterior del bucket:', deleteError.message);
+        }
+      }
+
+      toast({
+        title: 'Éxito',
+        description: 'Comprobante actualizado correctamente',
+      });
+
+      setRecentlyUpdatedPagoId(pagoEditandoComprobante.id);
+      setTimeout(() => setRecentlyUpdatedPagoId(null), 5 * 60 * 1000);
+
+      fetchPagos();
+      handleCloseEditComprobanteDialog();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: `Error al actualizar comprobante: ${error.message}`,
+        variant: 'destructive',
+      });
+      setUploadingEditComprobante(false);
+    }
+  };
+
+  const formatRelativeTime = (dateString?: string | null) => {
+    if (!dateString) return '';
+
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const diffMs = Date.now() - date.getTime();
+
+    if (diffMs < 60_000) return 'hace unos segundos';
+
+    const diffMinutes = Math.floor(diffMs / 60_000);
+    if (diffMinutes < 60) return `hace ${diffMinutes} min`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `hace ${diffHours} h`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `hace ${diffDays} día${diffDays === 1 ? '' : 's'}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1145,6 +1282,7 @@ export default function AdminPagosManagement() {
           {loading ? (
             <div className="text-center py-8">Cargando...</div>
           ) : (
+            <div className="w-full overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1156,6 +1294,7 @@ export default function AdminPagosManagement() {
                   <TableHead>Método</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Comprobante</TableHead>
+                  <TableHead>Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1204,23 +1343,44 @@ export default function AdminPagosManagement() {
                     </TableCell>
                     <TableCell>
                       {pago.comprobante ? (
-                        <a 
-                          href={pago.comprobante} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                          <FileText className="h-4 w-4" />
-                          Ver comprobante
-                        </a>
+                        <div className="space-y-1">
+                          <a
+                            href={pago.comprobante}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <FileText className="h-4 w-4" />
+                            Ver comprobante
+                          </a>
+                          <p className={`text-xs ${recentlyUpdatedPagoId === pago.id ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>
+                            Actualizado {formatRelativeTime(pago.updated_at)}
+                          </p>
+                        </div>
                       ) : (
                         '-'
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 sm:w-auto sm:px-2"
+                        onClick={() => handleOpenEditComprobanteDialog(pago)}
+                        aria-label={pago.comprobante ? 'Editar comprobante' : 'Subir comprobante'}
+                      >
+                        <Pencil className="h-3.5 w-3.5 sm:mr-1" />
+                        <span className="hidden sm:inline">
+                          {pago.comprobante ? 'Editar' : 'Subir'}
+                        </span>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -1763,6 +1923,70 @@ export default function AdminPagosManagement() {
               >
                 <DollarSign className="mr-2 h-4 w-4" />
                 {uploadingComprobante ? 'Subiendo...' : 'Registrar Pago'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editComprobanteDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCloseEditComprobanteDialog();
+            return;
+          }
+          setEditComprobanteDialogOpen(true);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Editar Comprobante
+            </DialogTitle>
+            <DialogDescription>
+              Reemplace el comprobante del pago seleccionado. El cambio se reflejará en la base de datos y en el bucket.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleUpdateComprobante} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Código de pago</Label>
+              <Input value={pagoEditandoComprobante?.codigo_producto || ''} disabled />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_comprobante">Nuevo comprobante <span className="text-destructive">*</span></Label>
+              <Input
+                id="edit_comprobante"
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  setEditComprobanteFile(file || null);
+                }}
+                disabled={uploadingEditComprobante}
+                required
+              />
+              {editComprobanteFile && (
+                <p className="text-xs text-muted-foreground">
+                  Archivo seleccionado: {editComprobanteFile.name}
+                </p>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseEditComprobanteDialog}
+                disabled={uploadingEditComprobante}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={uploadingEditComprobante || !editComprobanteFile}>
+                {uploadingEditComprobante ? 'Actualizando...' : 'Guardar comprobante'}
               </Button>
             </DialogFooter>
           </form>
